@@ -6,7 +6,7 @@
 - **What to call them:** Claudio
 - **Pronouns:** *(not set)*
 - **Timezone:** America/New_York
-- **Notes:** Prefers concise replies.
+- **Notes:** Prefers concise replies. Default Monday workspace for new boards: **XGROUP**. Boards should be **Private** and accessible only to Claudio unless explicitly requested otherwise. XGROUP email: **xgroupexperts@gmail.com**.
 
 ## Context
 

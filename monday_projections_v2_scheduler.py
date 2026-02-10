@@ -51,6 +51,7 @@ SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
 SUB_COL_PROJECTED_START = "date0"
 SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
 
+TEMPLATE_ITEM_NAME = "TEMPLATE (DO NOT EDIT)"
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
 
 API_URL = "https://api.monday.com/v2"
@@ -103,6 +104,7 @@ def add_days(d: dt.date, days: int) -> dt.date:
 
 
 def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
+    """Fetch main-board items + their relevant columns and subitems."""
     # items_page is the modern way; we page until done.
     items: List[dict] = []
     cursor = None
@@ -152,6 +154,93 @@ def change_column_value(token: str, board_id: str, item_id: str, column_id: str,
     }
     """
     gql(token, q, {"bid": board_id, "iid": item_id, "cid": column_id, "val": json.dumps(value)})
+
+
+def create_subitem(token: str, parent_item_id: str, name: str, planned_duration: Optional[int]) -> str:
+    q = """
+    mutation ($pid: ID!, $name: String!, $vals: JSON) {
+      create_subitem(parent_item_id: $pid, item_name: $name, column_values: $vals) { id }
+    }
+    """
+
+    colvals: Dict[str, Any] = {}
+    if planned_duration is not None:
+        # Numbers column: sending as string is accepted by monday (and matches what the API returns).
+        colvals[SUB_COL_PLANNED_DURATION] = str(int(planned_duration))
+
+    data = gql(token, q, {"pid": parent_item_id, "name": name, "vals": json.dumps(colvals) if colvals else None})
+    return data["create_subitem"]["id"]
+
+
+def find_template_item_id(token: str) -> Optional[str]:
+    # Find by exact name match (best effort). If not found, return None.
+    items = get_items_with_subitems(token)
+    for it in items:
+        if (it.get("name") or "").strip() == TEMPLATE_ITEM_NAME:
+            return it["id"]
+    return None
+
+
+def get_template_subitems(token: str, template_item_id: str) -> List[Tuple[str, Optional[int]]]:
+    q = """
+    query ($id:[ID!]) {
+      items(ids:$id) {
+        id
+        name
+        subitems {
+          id
+          name
+          board { id }
+          column_values(ids:["%s"]) { id text value }
+        }
+      }
+    }
+    """ % (SUB_COL_PLANNED_DURATION,)
+
+    data = gql(token, q, {"id": [template_item_id]})
+    subs = data["items"][0].get("subitems") or []
+    subs = [s for s in subs if (s.get("board") or {}).get("id") == SUBITEMS_BOARD_ID]
+
+    out: List[Tuple[str, Optional[int]]] = []
+    for s in subs:
+        name = (s.get("name") or "").strip()
+        scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
+        dur_txt = (scols.get(SUB_COL_PLANNED_DURATION, {}).get("text") or "").strip()
+        dur: Optional[int]
+        try:
+            dur = int(float(dur_txt)) if dur_txt else None
+        except ValueError:
+            dur = None
+        if name:
+            out.append((name, dur))
+    return out
+
+
+def ensure_subitems_exist(token: str, parent_item: dict, template_subs: List[Tuple[str, Optional[int]]]) -> bool:
+    """If parent_item has no relevant subitems, create them from the template.
+
+    Returns True if we created any.
+    """
+
+    if not template_subs:
+        return False
+
+    name = (parent_item.get("name") or "").strip()
+    if name.upper().startswith("TEMPLATE"):
+        return False
+
+    subitems = parent_item.get("subitems") or []
+    subitems = [s for s in subitems if (s.get("board") or {}).get("id") == SUBITEMS_BOARD_ID]
+    if subitems:
+        return False
+
+    for sub_name, dur in template_subs:
+        try:
+            create_subitem(token, parent_item["id"], sub_name, dur)
+        except Exception as e:
+            print(f"WARN: could not create subitem '{sub_name}' under {name} ({parent_item['id']}): {e}", file=sys.stderr)
+
+    return True
 
 
 def ensure_status_labels_match_subitems(token: str, subitem_names_in_order: List[str]) -> None:
@@ -233,6 +322,16 @@ def main() -> int:
 
     items = get_items_with_subitems(token)
 
+    template_subs: List[Tuple[str, Optional[int]]] = []
+    try:
+        template_id = find_template_item_id(token)
+        if template_id:
+            template_subs = get_template_subitems(token, template_id)
+        else:
+            print("WARN: template item not found; cannot auto-create subitems", file=sys.stderr)
+    except Exception as e:
+        print(f"WARN: could not load template subitems (non-fatal): {e}", file=sys.stderr)
+
     # Build a global superset of subitem names in first-seen order to populate PHASE STATUS labels.
     global_phase_names: List[str] = []
     seen = set()
@@ -257,6 +356,14 @@ def main() -> int:
         unfold_date = parse_date(colvals.get(COL_UNFOLD_DATE, {}).get("value"))
         phase_status = (colvals.get(COL_PHASE_STATUS, {}).get("text") or "").strip()
 
+        # 1) Always ensure subitems exist (so creating a new pulse auto-populates phases).
+        if template_subs:
+            created = ensure_subitems_exist(token, it, template_subs)
+            if created:
+                # Subitems were just created; let the next cron run pick them up for schedule generation.
+                continue
+
+        # 2) Only generate dates/schedule once UNFOLD DATE is set.
         if not unfold_date:
             continue
 

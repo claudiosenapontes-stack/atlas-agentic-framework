@@ -537,8 +537,10 @@ def main() -> int:
         frozen = compute_freeze(sub_names, phase_status)
         # Claudio rule: projections are always recalculated from UNFOLD DATE based on subitems.
         projected_frozen = False
-        # Safety: do not auto-write ACTUALs during projection runs.
-        projected_only = True
+        # Claudio rule: until PMs start entering actuals, keep ACTUAL in sync with PROJECTED.
+        # If you ever want to stop syncing, set PROJECTIONS_SYNC_ACTUALS=0.
+        sync_actuals = os.environ.get("PROJECTIONS_SYNC_ACTUALS", "1") != "0"
+        projected_only = not sync_actuals
 
         # Recompute projections unless frozen (or forced)
         projected_ranges: List[Tuple[str, dt.date, dt.date]] = []
@@ -599,21 +601,21 @@ def main() -> int:
                     SUB_COL_PROJECTED_TIMELINE: {"from": date_to_iso(start), "to": date_to_iso(end)},
                 }
 
-                # Set ACTUAL dates to match PROJECTED initially, but never overwrite PM edits.
-                if not projected_only:
-                    actual_start_val = scols.get(SUB_COL_ACTUAL_START, {}).get("value")
-                    actual_tl_val = scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value")
-                    if not actual_start_val:
-                        vals[SUB_COL_ACTUAL_START] = {"date": date_to_iso(start)}
-                    if not actual_tl_val:
-                        vals[SUB_COL_ACTUAL_TIMELINE] = {"from": date_to_iso(start), "to": date_to_iso(end)}
+                # Keep ACTUAL dates in sync with PROJECTED (until manual tracking begins).
+                if sync_actuals:
+                    vals[SUB_COL_ACTUAL_START] = {"date": date_to_iso(start)}
+                    vals[SUB_COL_ACTUAL_TIMELINE] = {"from": date_to_iso(start), "to": date_to_iso(end)}
 
                 change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
 
-            # Always mirror ACTUAL timeline up to the parent once populated on the subitem.
-            tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
-            if tl:
-                actual_ranges.append(tl)
+            # Mirror ACTUAL timeline up to the parent.
+            # Note: scols is stale after mutations, so when syncing actuals, use the just-computed range.
+            if sync_actuals:
+                actual_ranges.append((start, end))
+            else:
+                tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
+                if tl:
+                    actual_ranges.append(tl)
 
             cur_start = end
 

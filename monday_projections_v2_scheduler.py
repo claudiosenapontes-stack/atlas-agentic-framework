@@ -296,7 +296,10 @@ def get_template_subitems(token: str, template_item_id: str) -> List[Tuple[str, 
 
 
 def ensure_subitems_exist(token: str, parent_item: dict, template_subs: List[Tuple[str, Optional[int]]]) -> bool:
-    """If parent_item has no relevant subitems, create them from the template.
+    """Ensure the standard template subitems exist under a parent item.
+
+    Older items may have only a partial set of subitems (e.g., just 1-4).
+    We *add missing* template subitems but never delete or rename existing ones.
 
     Returns True if we created any.
     """
@@ -310,16 +313,20 @@ def ensure_subitems_exist(token: str, parent_item: dict, template_subs: List[Tup
 
     subitems = parent_item.get("subitems") or []
     subitems = [s for s in subitems if (s.get("board") or {}).get("id") == SUBITEMS_BOARD_ID]
-    if subitems:
-        return False
 
+    existing_names = {(s.get("name") or "").strip() for s in subitems if (s.get("name") or "").strip()}
+
+    created_any = False
     for sub_name, dur in template_subs:
+        if sub_name in existing_names:
+            continue
         try:
             create_subitem(token, parent_item["id"], sub_name, dur)
+            created_any = True
         except Exception as e:
             print(f"WARN: could not create subitem '{sub_name}' under {name} ({parent_item['id']}): {e}", file=sys.stderr)
 
-    return True
+    return created_any
 
 
 def ensure_status_labels_match_subitems(token: str, subitem_names_in_order: List[str]) -> None:

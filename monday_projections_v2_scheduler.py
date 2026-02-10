@@ -47,10 +47,14 @@ SUBITEMS_BOARD_ID = "18399430647"
 
 COL_UNFOLD_DATE = "date_mm0e9cvp"
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
+COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
+COL_ACTUAL_TIMELINE_MAIN = "timerange_mm0egs6a"  # ACTUAL TIMELINE
 
 SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
 SUB_COL_PROJECTED_START = "date0"
 SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
+SUB_COL_ACTUAL_START = "date_mm0ex00"  # ACTUAL START DATE
+SUB_COL_ACTUAL_TIMELINE = "timerange_mm0e4dmn"  # ACTUAL TIMELINE
 
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
 
@@ -94,6 +98,26 @@ def parse_date(value: Any) -> Optional[dt.date]:
     return None
 
 
+def parse_timeline(value: Any) -> Optional[Tuple[dt.date, dt.date]]:
+    """Parse monday timeline value: {"from":"YYYY-MM-DD","to":"YYYY-MM-DD"}."""
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except Exception:
+            return None
+    if isinstance(value, dict):
+        f = value.get("from") or value.get("start")
+        t = value.get("to") or value.get("end")
+        if f and t:
+            try:
+                return (dt.date.fromisoformat(f), dt.date.fromisoformat(t))
+            except ValueError:
+                return None
+    return None
+
+
 def date_to_iso(d: dt.date) -> str:
     return d.isoformat()
 
@@ -114,12 +138,12 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
           items {
             id
             name
-            column_values(ids: ["%s", "%s"]) { id text value }
+            column_values(ids: ["%s", "%s", "%s", "%s"]) { id text value }
             subitems {
               id
               name
               board { id }
-              column_values(ids: ["%s", "%s", "%s"]) { id text value }
+              column_values(ids: ["%s", "%s", "%s", "%s", "%s"]) { id text value }
             }
           }
         }
@@ -128,9 +152,13 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
     """ % (
         COL_UNFOLD_DATE,
         COL_PHASE_STATUS,
+        COL_PROJECTED_TIMELINE_MAIN,
+        COL_ACTUAL_TIMELINE_MAIN,
         SUB_COL_PLANNED_DURATION,
         SUB_COL_PROJECTED_START,
         SUB_COL_PROJECTED_TIMELINE,
+        SUB_COL_ACTUAL_START,
+        SUB_COL_ACTUAL_TIMELINE,
     )
 
     while True:
@@ -291,6 +319,55 @@ def main() -> int:
                 change_column_value(token, SUBITEMS_BOARD_ID, sid, SUB_COL_PROJECTED_TIMELINE, {"from": date_to_iso(start), "to": date_to_iso(end)})
 
             cur_start = end
+
+        # Mirror PROJECTED TIMELINE on the main item from the subitems' projected ranges
+        if projected_ranges:
+            proj_from = projected_ranges[0][1]
+            proj_to = projected_ranges[-1][2]
+            try:
+                change_column_value(
+                    token,
+                    MAIN_BOARD_ID,
+                    item_id,
+                    COL_PROJECTED_TIMELINE_MAIN,
+                    {"from": date_to_iso(proj_from), "to": date_to_iso(proj_to)},
+                )
+            except Exception as e:
+                print(
+                    f"WARN: could not mirror PROJECTED TIMELINE for {item_name} ({item_id}): {e}",
+                    file=sys.stderr,
+                )
+
+        # Mirror ACTUAL TIMELINE on the main item from the subitems' actual inputs
+        actual_from: Optional[dt.date] = None
+        actual_to: Optional[dt.date] = None
+        for s in subitems:
+            scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
+            tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
+            if tl:
+                f, t = tl
+            else:
+                f = parse_date(scols.get(SUB_COL_ACTUAL_START, {}).get("value"))
+                t = None
+            if f:
+                actual_from = f if actual_from is None else min(actual_from, f)
+            if t:
+                actual_to = t if actual_to is None else max(actual_to, t)
+
+        if actual_from and actual_to:
+            try:
+                change_column_value(
+                    token,
+                    MAIN_BOARD_ID,
+                    item_id,
+                    COL_ACTUAL_TIMELINE_MAIN,
+                    {"from": date_to_iso(actual_from), "to": date_to_iso(actual_to)},
+                )
+            except Exception as e:
+                print(
+                    f"WARN: could not mirror ACTUAL TIMELINE for {item_name} ({item_id}): {e}",
+                    file=sys.stderr,
+                )
 
         # Auto-advance PHASE STATUS based on today's date + computed projections
         current_phase = pick_current_phase(today, projected_ranges)

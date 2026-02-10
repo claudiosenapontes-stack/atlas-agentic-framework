@@ -176,6 +176,8 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
     # items_page is the modern way; we page until done.
     items: List[dict] = []
     cursor = None
+    progress = os.environ.get("PROJECTIONS_PROGRESS") == "1"
+    page_no = 0
     q = """
     query ($bid: [ID!], $limit: Int!, $cursor: String) {
       boards(ids: $bid) {
@@ -212,7 +214,10 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
     while True:
         data = gql(token, q, {"bid": [MAIN_BOARD_ID], "limit": limit, "cursor": cursor})
         page = data["boards"][0]["items_page"]
+        page_no += 1
         items.extend(page["items"])
+        if progress:
+            print(f"Fetched page {page_no}: +{len(page['items'])} items (total {len(items)})", file=sys.stderr)
         cursor = page.get("cursor")
         if not cursor:
             break
@@ -449,7 +454,11 @@ def main() -> int:
     token = load_token()
     today = dt.date.today()
 
+    progress = os.environ.get("PROJECTIONS_PROGRESS") == "1"
+
     items = get_items_with_subitems(token)
+    if progress:
+        print(f"Total items fetched: {len(items)}", file=sys.stderr)
 
     template_subs: List[Tuple[str, Optional[int]]] = []
     try:
@@ -479,9 +488,11 @@ def main() -> int:
     if template_subs:
         ensure_status_labels_match_subitems(token, [n for n, _ in template_subs])
 
-    for it in items:
+    for idx, it in enumerate(items, start=1):
         item_id = it["id"]
         item_name = it["name"]
+        if progress and (idx == 1 or idx % 20 == 0):
+            print(f"Processing item {idx}/{len(items)}: {item_name} ({item_id})", file=sys.stderr)
         colvals = {cv["id"]: cv for cv in it.get("column_values") or []}
         unfold_date = parse_date(colvals.get(COL_UNFOLD_DATE, {}).get("value"))
         phase_status = (colvals.get(COL_PHASE_STATUS, {}).get("text") or "").strip()

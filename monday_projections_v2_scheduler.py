@@ -89,8 +89,8 @@ DEFAULT_VARIANCE_DURATION = 90
 # approximate calendar days (365/426/548) to avoid undercounting (e.g., 14mo ≠ 303 days).
 CONSTRUCTION_TYPE_TO_WD: Dict[str, int] = {
     "Standard (12mo)": 365,
-    "Luxury (14mo)": 426,
-    "Multi-unit (18mo)": 548,
+    "medium(14mo)": 426,
+    "large (18mo)": 548,
 }
 
 API_URL = "https://api.monday.com/v2"
@@ -557,7 +557,24 @@ def main() -> int:
             except ValueError:
                 dur = 0
 
-            # CONSTRUCTION TYPE does not affect projections.
+            # CONSTRUCTION TYPE sets the planned duration for phase 7 (CONSTRUCTION),
+            # which drives PROJECTED FINISH CONSTRUCTION.
+            desired_construction = CONSTRUCTION_TYPE_TO_WD.get(construction_type)
+            if (sname or "").strip().startswith(FREEZE_PHASE_NAME) and desired_construction is not None:
+                if dur != desired_construction:
+                    try:
+                        change_multiple_column_values(
+                            token,
+                            SUBITEMS_BOARD_ID,
+                            sid,
+                            {SUB_COL_PLANNED_DURATION: str(int(desired_construction))},
+                        )
+                    except Exception as e:
+                        print(
+                            f"WARN: could not update CONSTRUCTION planned duration for {item_name} ({item_id}) subitem {sid}: {e}",
+                            file=sys.stderr,
+                        )
+                dur = desired_construction
 
             # Variance handling:
             # - If VARIANCE NEEDED? = Yes: ensure VARIANCE consumes time (default to 90 if blank/0).

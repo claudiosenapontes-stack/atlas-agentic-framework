@@ -17,7 +17,8 @@ Projection logic:
 
 Phase status logic:
 - Ensure PHASE STATUS labels match the current subitem names on each item (best-effort).
-- Auto-advance PHASE STATUS based on today's date relative to projected timeline.
+- PHASE STATUS advances ONLY from actuals: it stays at the current value until someone fills
+  ACTUAL START DATE / ACTUAL TIMELINE in subitems.
 
 Freeze logic:
 - Once the item reaches the "Construction" phase (or any phase after it in that item’s subitem order),
@@ -393,56 +394,44 @@ def compute_freeze(subitem_names: List[str], phase_status: str) -> bool:
     return cur_idx >= construction_idx
 
 
-def pick_current_phase(today: dt.date, projected_ranges: List[Tuple[str, dt.date, dt.date]]) -> Optional[str]:
-    """Pick the phase label for *today* from a list of (name, start, end).
+def pick_current_phase_from_actuals(subitems: List[dict]) -> Optional[str]:
+    """Pick current phase strictly from actuals.
 
-    Rules:
-    - Start day is day 0 of that phase (start is inclusive).
-    - When a phase ends on the same day the next phase starts, prefer the next phase.
-    - Ignore placeholder rows.
+    Claudio's rule: phase should stay in "projected" until someone fills actuals in.
+
+    We consider a subitem "started" if it has either:
+    - ACTUAL START DATE, or
+    - ACTUAL TIMELINE (from/to)
+
+    We return the highest-numbered phase among started phases.
+    If nothing has actuals, returns None.
     """
 
     def is_placeholder(n: str) -> bool:
         n = (n or "").strip().upper()
         return n.startswith("0-") or "PLACEHOLDER" in n
 
-    # 1) If anything starts today, choose the *best* one that isn't a placeholder.
-    starts_today = [(n, s, e) for (n, s, e) in projected_ranges if s == today and not is_placeholder(n)]
-    if starts_today:
-        # Prefer the highest numeric prefix (e.g., 3- over 2-), otherwise the last one.
-        def phase_num(n: str) -> int:
-            m = re.match(r"^(\d+)\s*-", (n or "").strip())
-            return int(m.group(1)) if m else -1
+    def phase_num(n: str) -> int:
+        m = re.match(r"^(\d+)\s*-", (n or "").strip())
+        return int(m.group(1)) if m else -1
 
-        starts_today.sort(key=lambda x: (phase_num(x[0]), x[1], x[2]))
-        return starts_today[-1][0]
-
-    # 2) Otherwise, find the most recent phase that has started and hasn't ended yet.
-    current: Optional[Tuple[str, dt.date, dt.date]] = None
-    for name, start, end in projected_ranges:
-        if is_placeholder(name):
+    started: List[str] = []
+    for s in subitems or []:
+        name = (s.get("name") or "").strip()
+        if not name or is_placeholder(name):
             continue
-        if start <= today < end:  # end is exclusive to allow boundary roll-forward
-            current = (name, start, end)
-        elif start <= today and today == end:
-            # don't lock onto an ending phase if something else starts today (handled above)
-            current = (name, start, end)
 
-    if current:
-        return current[0]
+        cols = {cv.get("id"): cv for cv in (s.get("column_values") or [])}
+        actual_start = parse_date((cols.get(SUB_COL_ACTUAL_START) or {}).get("value"))
+        actual_tl = parse_timeline((cols.get(SUB_COL_ACTUAL_TIMELINE) or {}).get("value"))
+        if actual_start or actual_tl:
+            started.append(name)
 
-    # 3) If we haven't started yet, return the first real phase.
-    for name, start, end in projected_ranges:
-        if not is_placeholder(name):
-            if today < start:
-                return name
+    if not started:
+        return None
 
-    # 4) Fallback: last real phase.
-    for name, start, end in reversed(projected_ranges):
-        if not is_placeholder(name):
-            return name
-
-    return None
+    started.sort(key=phase_num)
+    return started[-1]
 
 
 def main() -> int:
@@ -630,8 +619,8 @@ def main() -> int:
             except Exception as e:
                 print(f"WARN: could not mirror parent timelines for {item_name} ({item_id}): {e}", file=sys.stderr)
 
-        # Auto-advance PHASE STATUS based on today's date + computed projections
-        current_phase = pick_current_phase(today, projected_ranges)
+        # PHASE STATUS only advances when someone fills ACTUALs in subitems.
+        current_phase = pick_current_phase_from_actuals(subitems)
         if current_phase and current_phase != phase_status:
             # status column value expects {"label":"..."}
             try:

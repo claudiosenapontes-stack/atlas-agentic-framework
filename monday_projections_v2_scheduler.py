@@ -54,6 +54,19 @@ SUB_COL_ACTUAL_START = "date_mm0ex00"
 SUB_COL_ACTUAL_TIMELINE = "timerange_mm0e4dmn"
 
 TEMPLATE_ITEM_NAME = "TEMPLATE (DO NOT EDIT)"
+
+# Fallback phase template (used if the monday "TEMPLATE" item is missing/archived).
+DEFAULT_TEMPLATE_SUBS: List[Tuple[str, Optional[int]]] = [
+    ("1- SURVEYS", 5),
+    ("2- ARCHITECTURAL", 30),
+    ("3- MEP", 30),
+    ("4- STRUCTURAL", 30),
+    ("5- VARIANCE (IF NEEDED)", 90),
+    ("6- PERMITS", 45),
+    ("7- CONSTRUCTION", 260),
+    ("8- END CONSTRUCTION (MILESTONE)", 0),
+    ("9- SALE (MILESTONE)", 0),
+]
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
 
 API_URL = "https://api.monday.com/v2"
@@ -342,10 +355,11 @@ def main() -> int:
         template_id = find_template_item_id(token)
         if template_id:
             template_subs = get_template_subitems(token, template_id)
-        else:
-            print("WARN: template item not found; cannot auto-create subitems", file=sys.stderr)
     except Exception as e:
         print(f"WARN: could not load template subitems (non-fatal): {e}", file=sys.stderr)
+
+    if not template_subs:
+        template_subs = DEFAULT_TEMPLATE_SUBS
 
     # Build a global superset of subitem names in first-seen order to populate PHASE STATUS labels.
     global_phase_names: List[str] = []

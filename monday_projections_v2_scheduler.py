@@ -46,7 +46,7 @@ MAIN_BOARD_ID = "18399430614"
 SUBITEMS_BOARD_ID = "18399430647"
 
 COL_UNFOLD_DATE = "date_mm0e9cvp"
-COL_FINISH_CONSTRUCTION_DATE = "date_mm0ed0np"  # FINISH CONSTRUCTION DATE
+COL_FINISH_CONSTRUCTION_DATE = "date_mm0ed0np"  # PROJECTED FINISH CONSTRUCTION
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
 COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE
 COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
@@ -534,21 +534,28 @@ def main() -> int:
                 "to": date_to_iso(max(b for _, b in actual_ranges)),
             }
 
-        # FINISH CONSTRUCTION DATE (main board): populate once we have an ACTUAL date on the
-        # "8- END CONSTRUCTION (MILESTONE)" subitem. Use its ACTUAL TIMELINE (preferred)
-        # or ACTUAL START.
-        end_construction_actual: Optional[dt.date] = None
+        # PROJECTED FINISH CONSTRUCTION (main board): set from the projected end date of
+        # "8- END CONSTRUCTION (MILESTONE)" as soon as we have projections.
+        end_construction_projected: Optional[dt.date] = None
+
+        # Prefer reading the subitem's PROJECTED TIMELINE (works even if projections are frozen).
         for s in subitems:
             if (s.get("name") or "").strip().startswith("8- END CONSTRUCTION"):
                 scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
-                tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
+                tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
                 if tl:
-                    end_construction_actual = tl[1]
-                else:
-                    end_construction_actual = parse_date(scols.get(SUB_COL_ACTUAL_START, {}).get("value"))
+                    end_construction_projected = tl[1]
                 break
-        if end_construction_actual:
-            parent_updates[COL_FINISH_CONSTRUCTION_DATE] = {"date": date_to_iso(end_construction_actual)}
+
+        # Fallback: use the freshly computed projected_ranges list.
+        if not end_construction_projected:
+            for name, _start, end in projected_ranges:
+                if (name or "").strip().startswith("8- END CONSTRUCTION"):
+                    end_construction_projected = end
+                    break
+
+        if end_construction_projected:
+            parent_updates[COL_FINISH_CONSTRUCTION_DATE] = {"date": date_to_iso(end_construction_projected)}
 
         if parent_updates:
             try:

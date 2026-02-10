@@ -563,14 +563,16 @@ def main() -> int:
             # Optional variance: if planned duration is 0/blank, it should NOT consume time.
             is_variance = (sname or "").strip().upper().startswith(VARIANCE_PREFIX)
             if is_variance and dur <= 0:
-                # Best-effort cleanup: clear projected/actual date fields if they look like auto-filled defaults.
-                if not projected_frozen:
-                    vals = {
-                        SUB_COL_PROJECTED_START: {"date": None},
-                        SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
-                    }
+                # Cleanup: a 0-duration variance should not show any projected bars.
+                # Clear projected fields EVEN if the item is frozen (safe because it's projected-only).
+                vals = {
+                    SUB_COL_PROJECTED_START: {"date": None},
+                    SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
+                }
 
-                    # Only clear ACTUALs if they match PROJECTED (i.e., likely auto-set, not PM-entered).
+                # Only clear ACTUALs if we're allowed to touch actuals and they match PROJECTED
+                # (i.e., likely auto-set, not PM-entered).
+                if not projected_only:
                     proj_start_val = parse_date((scols.get(SUB_COL_PROJECTED_START) or {}).get("value"))
                     proj_tl_val = parse_timeline((scols.get(SUB_COL_PROJECTED_TIMELINE) or {}).get("value"))
                     act_start_val = parse_date((scols.get(SUB_COL_ACTUAL_START) or {}).get("value"))
@@ -581,13 +583,13 @@ def main() -> int:
                     if act_tl_val and proj_tl_val and act_tl_val == proj_tl_val:
                         vals[SUB_COL_ACTUAL_TIMELINE] = {"from": None, "to": None}
 
-                    try:
-                        change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
-                    except Exception as e:
-                        print(
-                            f"WARN: could not clear optional variance fields for {item_name} ({item_id}) subitem {sid}: {e}",
-                            file=sys.stderr,
-                        )
+                try:
+                    change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
+                except Exception as e:
+                    print(
+                        f"WARN: could not clear optional variance fields for {item_name} ({item_id}) subitem {sid}: {e}",
+                        file=sys.stderr,
+                    )
 
                 # Do not advance cur_start; do not add to projected ranges.
                 continue

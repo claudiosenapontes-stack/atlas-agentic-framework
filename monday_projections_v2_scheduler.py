@@ -79,12 +79,14 @@ FREEZE_PHASE_NAME = "7- CONSTRUCTION"
 VARIANCE_PREFIX = "5- VARIANCE"
 DEFAULT_VARIANCE_DURATION = 90
 
-# Construction type -> construction phase planned duration (workdays).
-# Claudio: keep 12mo standard, but adjust if CONSTRUCTION TYPE changes.
+# Construction type -> construction phase planned duration.
+# NOTE: Despite the column label showing "(WD)", Claudio's rule is that the CONSTRUCTION TYPE
+# stipulates a month-based duration. Our projection math uses calendar days, so we map months to
+# approximate calendar days (365/426/548) to avoid undercounting (e.g., 14mo ≠ 303 days).
 CONSTRUCTION_TYPE_TO_WD: Dict[str, int] = {
-    "Standard (12mo)": 260,
-    "Luxury (14mo)": 303,
-    "Multi-unit (18mo)": 390,
+    "Standard (12mo)": 365,
+    "Luxury (14mo)": 426,
+    "Multi-unit (18mo)": 548,
 }
 
 API_URL = "https://api.monday.com/v2"

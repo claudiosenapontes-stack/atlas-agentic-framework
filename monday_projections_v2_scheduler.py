@@ -539,20 +539,34 @@ def main() -> int:
         end_construction_projected: Optional[dt.date] = None
 
         # Prefer reading the subitem's PROJECTED TIMELINE (works even if projections are frozen).
-        for s in subitems:
-            if (s.get("name") or "").strip().startswith("8- END CONSTRUCTION"):
-                scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
-                tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
-                if tl:
-                    end_construction_projected = tl[1]
+        preferred_prefixes = [
+            "8- END CONSTRUCTION",  # best
+            "7- CONSTRUCTION",      # fallback if milestone missing
+        ]
+        for prefix in preferred_prefixes:
+            for s in subitems:
+                if (s.get("name") or "").strip().startswith(prefix):
+                    scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
+                    tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
+                    if tl:
+                        end_construction_projected = tl[1]
+                    break
+            if end_construction_projected:
                 break
 
         # Fallback: use the freshly computed projected_ranges list.
         if not end_construction_projected:
-            for name, _start, end in projected_ranges:
-                if (name or "").strip().startswith("8- END CONSTRUCTION"):
-                    end_construction_projected = end
+            for prefix in preferred_prefixes:
+                for name, _start, end in projected_ranges:
+                    if (name or "").strip().startswith(prefix):
+                        end_construction_projected = end
+                        break
+                if end_construction_projected:
                     break
+
+        # Final fallback: last projected phase end.
+        if not end_construction_projected and projected_ranges:
+            end_construction_projected = projected_ranges[-1][2]
 
         if end_construction_projected:
             parent_updates[COL_FINISH_CONSTRUCTION_DATE] = {"date": date_to_iso(end_construction_projected)}

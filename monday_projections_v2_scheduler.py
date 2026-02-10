@@ -47,6 +47,7 @@ SUBITEMS_BOARD_ID = "18399430647"
 
 COL_UNFOLD_DATE = "date_mm0e9cvp"
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
+COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE
 SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
 SUB_COL_PROJECTED_START = "date0"
 SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
@@ -68,6 +69,14 @@ DEFAULT_TEMPLATE_SUBS: List[Tuple[str, Optional[int]]] = [
     ("9- SALE (MILESTONE)", 0),
 ]
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
+
+# Construction type -> construction phase planned duration (workdays).
+# Claudio: keep 12mo standard, but adjust if CONSTRUCTION TYPE changes.
+CONSTRUCTION_TYPE_TO_WD: Dict[str, int] = {
+    "Standard (12mo)": 260,
+    "Luxury (14mo)": 303,
+    "Multi-unit (18mo)": 390,
+}
 
 API_URL = "https://api.monday.com/v2"
 
@@ -131,7 +140,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
           items {
             id
             name
-            column_values(ids: ["%s", "%s"]) { id text value }
+            column_values(ids: ["%s", "%s", "%s"]) { id text value }
             subitems {
               id
               name
@@ -145,6 +154,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
     """ % (
         COL_UNFOLD_DATE,
         COL_PHASE_STATUS,
+        COL_CONSTRUCTION_TYPE,
         SUB_COL_PLANNED_DURATION,
         SUB_COL_PROJECTED_START,
         SUB_COL_PROJECTED_TIMELINE,
@@ -384,6 +394,7 @@ def main() -> int:
         colvals = {cv["id"]: cv for cv in it.get("column_values") or []}
         unfold_date = parse_date(colvals.get(COL_UNFOLD_DATE, {}).get("value"))
         phase_status = (colvals.get(COL_PHASE_STATUS, {}).get("text") or "").strip()
+        construction_type = (colvals.get(COL_CONSTRUCTION_TYPE, {}).get("text") or "").strip()
 
         # 1) Always ensure subitems exist (so creating a new pulse auto-populates phases).
         if template_subs:
@@ -417,6 +428,28 @@ def main() -> int:
                 dur = int(float(dur_txt)) if dur_txt else 0
             except ValueError:
                 dur = 0
+
+            # Subitem guideline: CONSTRUCTION duration is dictated by the parent item's CONSTRUCTION TYPE.
+            desired_construction_wd = CONSTRUCTION_TYPE_TO_WD.get(construction_type)
+            if sname == FREEZE_PHASE_NAME and desired_construction_wd is not None:
+                # Keep projections frozen once we hit Construction, but keep PLANNED DURATION aligned.
+                if dur != desired_construction_wd:
+                    try:
+                        change_multiple_column_values(
+                            token,
+                            SUBITEMS_BOARD_ID,
+                            sid,
+                            {SUB_COL_PLANNED_DURATION: str(int(desired_construction_wd))},
+                        )
+                    except Exception as e:
+                        print(
+                            f"WARN: could not update CONSTRUCTION planned duration for {item_name} ({item_id}): {e}",
+                            file=sys.stderr,
+                        )
+
+                # Only use the desired duration in projection math if we're not frozen.
+                if not frozen:
+                    dur = desired_construction_wd
 
             start = cur_start
             end = add_days(start, dur)

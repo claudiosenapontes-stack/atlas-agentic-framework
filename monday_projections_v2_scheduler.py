@@ -75,6 +75,10 @@ DEFAULT_TEMPLATE_SUBS: List[Tuple[str, Optional[int]]] = [
 ]
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
 
+# Variance is optional. If its planned duration is 0/blank, it should not affect the schedule.
+VARIANCE_PREFIX = "5- VARIANCE"
+DEFAULT_VARIANCE_DURATION = 90
+
 # Construction type -> construction phase planned duration (workdays).
 # Claudio: keep 12mo standard, but adjust if CONSTRUCTION TYPE changes.
 CONSTRUCTION_TYPE_TO_WD: Dict[str, int] = {
@@ -539,6 +543,38 @@ def main() -> int:
                 # Only use the desired duration in projection math if we're not frozen.
                 if not frozen:
                     dur = desired_construction_wd
+
+            # Optional variance: if planned duration is 0/blank, it should NOT consume time.
+            is_variance = (sname or "").strip().upper().startswith(VARIANCE_PREFIX)
+            if is_variance and dur <= 0:
+                # Best-effort cleanup: clear projected/actual date fields if they look like auto-filled defaults.
+                if not frozen:
+                    vals = {
+                        SUB_COL_PROJECTED_START: {"date": None},
+                        SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
+                    }
+
+                    # Only clear ACTUALs if they match PROJECTED (i.e., likely auto-set, not PM-entered).
+                    proj_start_val = parse_date((scols.get(SUB_COL_PROJECTED_START) or {}).get("value"))
+                    proj_tl_val = parse_timeline((scols.get(SUB_COL_PROJECTED_TIMELINE) or {}).get("value"))
+                    act_start_val = parse_date((scols.get(SUB_COL_ACTUAL_START) or {}).get("value"))
+                    act_tl_val = parse_timeline((scols.get(SUB_COL_ACTUAL_TIMELINE) or {}).get("value"))
+
+                    if act_start_val and proj_start_val and act_start_val == proj_start_val:
+                        vals[SUB_COL_ACTUAL_START] = {"date": None}
+                    if act_tl_val and proj_tl_val and act_tl_val == proj_tl_val:
+                        vals[SUB_COL_ACTUAL_TIMELINE] = {"from": None, "to": None}
+
+                    try:
+                        change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
+                    except Exception as e:
+                        print(
+                            f"WARN: could not clear optional variance fields for {item_name} ({item_id}) subitem {sid}: {e}",
+                            file=sys.stderr,
+                        )
+
+                # Do not advance cur_start; do not add to projected ranges.
+                continue
 
             start = cur_start
             end = add_days(start, dur)

@@ -48,6 +48,8 @@ SUBITEMS_BOARD_ID = "18399430647"
 COL_UNFOLD_DATE = "date_mm0e9cvp"
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
 COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE
+COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
+COL_ACTUAL_TIMELINE_MAIN = "timerange_mm0egs6a"  # ACTUAL TIMELINE
 SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
 SUB_COL_PROJECTED_START = "date0"
 SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
@@ -118,6 +120,26 @@ def parse_date(value: Any) -> Optional[dt.date]:
     return None
 
 
+def parse_timeline(value: Any) -> Optional[Tuple[dt.date, dt.date]]:
+    """Parse monday timeline value.
+
+    Expects either None, a JSON string, or a dict like {"from":"YYYY-MM-DD","to":"YYYY-MM-DD"}.
+    """
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except Exception:
+            return None
+    if isinstance(value, dict) and value.get("from") and value.get("to"):
+        try:
+            return (dt.date.fromisoformat(value["from"]), dt.date.fromisoformat(value["to"]))
+        except ValueError:
+            return None
+    return None
+
+
 
 def date_to_iso(d: dt.date) -> str:
     return d.isoformat()
@@ -140,7 +162,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
           items {
             id
             name
-            column_values(ids: ["%s", "%s", "%s"]) { id text value }
+            column_values(ids: ["%s", "%s", "%s", "%s", "%s"]) { id text value }
             subitems {
               id
               name
@@ -155,6 +177,8 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
         COL_UNFOLD_DATE,
         COL_PHASE_STATUS,
         COL_CONSTRUCTION_TYPE,
+        COL_PROJECTED_TIMELINE_MAIN,
+        COL_ACTUAL_TIMELINE_MAIN,
         SUB_COL_PLANNED_DURATION,
         SUB_COL_PROJECTED_START,
         SUB_COL_PROJECTED_TIMELINE,
@@ -418,6 +442,8 @@ def main() -> int:
 
         # Recompute projections unless frozen
         projected_ranges: List[Tuple[str, dt.date, dt.date]] = []
+        actual_ranges: List[Tuple[dt.date, dt.date]] = []
+
         cur_start = unfold_date
         for s in subitems:
             sid = s["id"]
@@ -471,7 +497,30 @@ def main() -> int:
 
                 change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
 
+            # Always mirror ACTUAL timeline up to the parent once populated on the subitem.
+            tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
+            if tl:
+                actual_ranges.append(tl)
+
             cur_start = end
+
+        # Mirror timelines to parent pulse (these are empty until we set them from subitems).
+        parent_updates: Dict[str, Any] = {}
+        if projected_ranges:
+            parent_updates[COL_PROJECTED_TIMELINE_MAIN] = {
+                "from": date_to_iso(projected_ranges[0][1]),
+                "to": date_to_iso(projected_ranges[-1][2]),
+            }
+        if actual_ranges:
+            parent_updates[COL_ACTUAL_TIMELINE_MAIN] = {
+                "from": date_to_iso(min(a for a, _ in actual_ranges)),
+                "to": date_to_iso(max(b for _, b in actual_ranges)),
+            }
+        if parent_updates:
+            try:
+                change_multiple_column_values(token, MAIN_BOARD_ID, item_id, parent_updates)
+            except Exception as e:
+                print(f"WARN: could not mirror parent timelines for {item_name} ({item_id}): {e}", file=sys.stderr)
 
         # Auto-advance PHASE STATUS based on today's date + computed projections
         current_phase = pick_current_phase(today, projected_ranges)

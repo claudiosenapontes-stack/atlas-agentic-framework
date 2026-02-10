@@ -407,10 +407,10 @@ def main() -> int:
                 global_phase_names.append(n)
                 seen.add(n)
 
-    # NOTE: monday's public API doesn't reliably support editing Status column labels on an existing column.
-    # We'll still attempt to *set* PHASE STATUS to subitem names; if a label is missing, we warn and move on.
-    # if global_phase_names:
-    #     ensure_status_labels_match_subitems(token, global_phase_names)
+    # Ensure PHASE STATUS label set includes all phase names we use (so setting {"label": ...} works).
+    # We use the template phase list as source-of-truth.
+    if template_subs:
+        ensure_status_labels_match_subitems(token, [n for n, _ in template_subs])
 
     for it in items:
         item_id = it["id"]

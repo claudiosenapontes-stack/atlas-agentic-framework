@@ -519,8 +519,11 @@ def main() -> int:
 
         sub_names = [(s.get("name") or "").strip() for s in subitems]
         frozen = compute_freeze(sub_names, phase_status)
+        force_reproject = os.environ.get("PROJECTIONS_FORCE_REPROJECT") == "1"
+        projected_frozen = (False if force_reproject else frozen)
+        projected_only = os.environ.get("PROJECTIONS_PROJECTED_ONLY") == "1" or force_reproject
 
-        # Recompute projections unless frozen
+        # Recompute projections unless frozen (or forced)
         projected_ranges: List[Tuple[str, dt.date, dt.date]] = []
         actual_ranges: List[Tuple[dt.date, dt.date]] = []
 
@@ -554,14 +557,14 @@ def main() -> int:
                         )
 
                 # Only use the desired duration in projection math if we're not frozen.
-                if not frozen:
+                if not projected_frozen:
                     dur = desired_construction_wd
 
             # Optional variance: if planned duration is 0/blank, it should NOT consume time.
             is_variance = (sname or "").strip().upper().startswith(VARIANCE_PREFIX)
             if is_variance and dur <= 0:
                 # Best-effort cleanup: clear projected/actual date fields if they look like auto-filled defaults.
-                if not frozen:
+                if not projected_frozen:
                     vals = {
                         SUB_COL_PROJECTED_START: {"date": None},
                         SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
@@ -593,19 +596,20 @@ def main() -> int:
             end = add_days(start, dur)
             projected_ranges.append((sname, start, end))
 
-            if not frozen:
+            if not projected_frozen:
                 vals = {
                     SUB_COL_PROJECTED_START: {"date": date_to_iso(start)},
                     SUB_COL_PROJECTED_TIMELINE: {"from": date_to_iso(start), "to": date_to_iso(end)},
                 }
 
                 # Set ACTUAL dates to match PROJECTED initially, but never overwrite PM edits.
-                actual_start_val = scols.get(SUB_COL_ACTUAL_START, {}).get("value")
-                actual_tl_val = scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value")
-                if not actual_start_val:
-                    vals[SUB_COL_ACTUAL_START] = {"date": date_to_iso(start)}
-                if not actual_tl_val:
-                    vals[SUB_COL_ACTUAL_TIMELINE] = {"from": date_to_iso(start), "to": date_to_iso(end)}
+                if not projected_only:
+                    actual_start_val = scols.get(SUB_COL_ACTUAL_START, {}).get("value")
+                    actual_tl_val = scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value")
+                    if not actual_start_val:
+                        vals[SUB_COL_ACTUAL_START] = {"date": date_to_iso(start)}
+                    if not actual_tl_val:
+                        vals[SUB_COL_ACTUAL_TIMELINE] = {"from": date_to_iso(start), "to": date_to_iso(end)}
 
                 change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
 
@@ -633,33 +637,34 @@ def main() -> int:
         # "8- END CONSTRUCTION (MILESTONE)" as soon as we have projections.
         end_construction_projected: Optional[dt.date] = None
 
-        # Prefer reading the subitem's PROJECTED TIMELINE (works even if projections are frozen).
         preferred_prefixes = [
             "8- END CONSTRUCTION",  # best
             "7- CONSTRUCTION",      # fallback if milestone missing
         ]
 
-        # Read from subitems: if there are multiple matches (duplicates), pick the *earliest* end.
-        for prefix in preferred_prefixes:
-            ends: List[dt.date] = []
-            for s in subitems:
-                if (s.get("name") or "").strip().startswith(prefix):
-                    scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
-                    tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
-                    if tl:
-                        ends.append(tl[1])
-            if ends:
-                end_construction_projected = min(ends)
-                break
-
-        # Fallback: use the freshly computed projected_ranges list.
-        if not end_construction_projected:
+        # If we regenerated projections this run, prefer the freshly computed projected_ranges.
+        # (The `subitems` list we fetched at the start is stale after mutations.)
+        if not projected_frozen:
             for prefix in preferred_prefixes:
                 for name, _start, end in projected_ranges:
                     if (name or "").strip().startswith(prefix):
                         end_construction_projected = end
                         break
                 if end_construction_projected:
+                    break
+
+        # Otherwise (frozen), read from stored subitem PROJECTED TIMELINE.
+        if not end_construction_projected:
+            for prefix in preferred_prefixes:
+                ends: List[dt.date] = []
+                for s in subitems:
+                    if (s.get("name") or "").strip().startswith(prefix):
+                        scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
+                        tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
+                        if tl:
+                            ends.append(tl[1])
+                if ends:
+                    end_construction_projected = min(ends)
                     break
 
         # Final fallback: last projected phase end.

@@ -46,6 +46,7 @@ MAIN_BOARD_ID = "18399430614"
 SUBITEMS_BOARD_ID = "18399430647"
 
 COL_UNFOLD_DATE = "date_mm0e9cvp"
+COL_FINISH_CONSTRUCTION_DATE = "date_mm0ed0np"  # FINISH CONSTRUCTION DATE
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
 COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE
 COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
@@ -105,18 +106,33 @@ def gql(token: str, query: str, variables: Optional[dict] = None) -> dict:
 
 
 def parse_date(value: Any) -> Optional[dt.date]:
+    """Parse monday date column value.
+
+    Monday often returns date column "value" as a JSON string like:
+      {"date":"YYYY-MM-DD","changed_at":"..."}
+    but may also return a dict.
+    """
     if not value:
         return None
+
     if isinstance(value, str):
+        # Try ISO first (sometimes we already have a plain date string)
         try:
             return dt.date.fromisoformat(value)
         except ValueError:
+            pass
+        # Then try JSON string
+        try:
+            value = json.loads(value)
+        except Exception:
             return None
+
     if isinstance(value, dict) and value.get("date"):
         try:
             return dt.date.fromisoformat(value["date"])
         except ValueError:
             return None
+
     return None
 
 
@@ -162,7 +178,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
           items {
             id
             name
-            column_values(ids: ["%s", "%s", "%s", "%s", "%s"]) { id text value }
+            column_values(ids: ["%s", "%s", "%s", "%s", "%s", "%s"]) { id text value }
             subitems {
               id
               name
@@ -175,6 +191,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
     }
     """ % (
         COL_UNFOLD_DATE,
+        COL_FINISH_CONSTRUCTION_DATE,
         COL_PHASE_STATUS,
         COL_CONSTRUCTION_TYPE,
         COL_PROJECTED_TIMELINE_MAIN,
@@ -516,6 +533,23 @@ def main() -> int:
                 "from": date_to_iso(min(a for a, _ in actual_ranges)),
                 "to": date_to_iso(max(b for _, b in actual_ranges)),
             }
+
+        # FINISH CONSTRUCTION DATE (main board): populate once we have an ACTUAL date on the
+        # "8- END CONSTRUCTION (MILESTONE)" subitem. Use its ACTUAL TIMELINE (preferred)
+        # or ACTUAL START.
+        end_construction_actual: Optional[dt.date] = None
+        for s in subitems:
+            if (s.get("name") or "").strip().startswith("8- END CONSTRUCTION"):
+                scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
+                tl = parse_timeline(scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value"))
+                if tl:
+                    end_construction_actual = tl[1]
+                else:
+                    end_construction_actual = parse_date(scols.get(SUB_COL_ACTUAL_START, {}).get("value"))
+                break
+        if end_construction_actual:
+            parent_updates[COL_FINISH_CONSTRUCTION_DATE] = {"date": date_to_iso(end_construction_actual)}
+
         if parent_updates:
             try:
                 change_multiple_column_values(token, MAIN_BOARD_ID, item_id, parent_updates)

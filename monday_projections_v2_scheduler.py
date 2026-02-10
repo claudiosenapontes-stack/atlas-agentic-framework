@@ -394,14 +394,14 @@ def compute_freeze(subitem_names: List[str], phase_status: str) -> bool:
     return cur_idx >= construction_idx
 
 
-def pick_current_phase_from_actuals(subitems: List[dict]) -> Optional[str]:
-    """Pick current phase strictly from actuals.
+def pick_current_phase_from_actuals(today: dt.date, subitems: List[dict]) -> Optional[str]:
+    """Pick current phase from actuals (ignoring future-dated actuals).
 
     Claudio's rule: phase should stay in "projected" until someone fills actuals in.
 
     We consider a subitem "started" if it has either:
-    - ACTUAL START DATE, or
-    - ACTUAL TIMELINE (from/to)
+    - ACTUAL START DATE <= today, or
+    - ACTUAL TIMELINE with from <= today
 
     We return the highest-numbered phase among started phases.
     If nothing has actuals, returns None.
@@ -424,7 +424,14 @@ def pick_current_phase_from_actuals(subitems: List[dict]) -> Optional[str]:
         cols = {cv.get("id"): cv for cv in (s.get("column_values") or [])}
         actual_start = parse_date((cols.get(SUB_COL_ACTUAL_START) or {}).get("value"))
         actual_tl = parse_timeline((cols.get(SUB_COL_ACTUAL_TIMELINE) or {}).get("value"))
-        if actual_start or actual_tl:
+
+        started_flag = False
+        if actual_start and actual_start <= today:
+            started_flag = True
+        if actual_tl and actual_tl[0] <= today:
+            started_flag = True
+
+        if started_flag:
             started.append(name)
 
     if not started:
@@ -620,7 +627,7 @@ def main() -> int:
                 print(f"WARN: could not mirror parent timelines for {item_name} ({item_id}): {e}", file=sys.stderr)
 
         # PHASE STATUS only advances when someone fills ACTUALs in subitems.
-        current_phase = pick_current_phase_from_actuals(subitems)
+        current_phase = pick_current_phase_from_actuals(today, subitems)
         if current_phase and current_phase != phase_status:
             # status column value expects {"label":"..."}
             try:

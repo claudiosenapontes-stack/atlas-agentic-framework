@@ -386,13 +386,55 @@ def compute_freeze(subitem_names: List[str], phase_status: str) -> bool:
 
 
 def pick_current_phase(today: dt.date, projected_ranges: List[Tuple[str, dt.date, dt.date]]) -> Optional[str]:
-    # projected_ranges entries are (name, start, end)
+    """Pick the phase label for *today* from a list of (name, start, end).
+
+    Rules:
+    - Start day is day 0 of that phase (start is inclusive).
+    - When a phase ends on the same day the next phase starts, prefer the next phase.
+    - Ignore placeholder rows.
+    """
+
+    def is_placeholder(n: str) -> bool:
+        n = (n or "").strip().upper()
+        return n.startswith("0-") or "PLACEHOLDER" in n
+
+    # 1) If anything starts today, choose the *best* one that isn't a placeholder.
+    starts_today = [(n, s, e) for (n, s, e) in projected_ranges if s == today and not is_placeholder(n)]
+    if starts_today:
+        # Prefer the highest numeric prefix (e.g., 3- over 2-), otherwise the last one.
+        def phase_num(n: str) -> int:
+            m = re.match(r"^(\d+)\s*-", (n or "").strip())
+            return int(m.group(1)) if m else -1
+
+        starts_today.sort(key=lambda x: (phase_num(x[0]), x[1], x[2]))
+        return starts_today[-1][0]
+
+    # 2) Otherwise, find the most recent phase that has started and hasn't ended yet.
+    current: Optional[Tuple[str, dt.date, dt.date]] = None
     for name, start, end in projected_ranges:
-        if today < start:
+        if is_placeholder(name):
+            continue
+        if start <= today < end:  # end is exclusive to allow boundary roll-forward
+            current = (name, start, end)
+        elif start <= today and today == end:
+            # don't lock onto an ending phase if something else starts today (handled above)
+            current = (name, start, end)
+
+    if current:
+        return current[0]
+
+    # 3) If we haven't started yet, return the first real phase.
+    for name, start, end in projected_ranges:
+        if not is_placeholder(name):
+            if today < start:
+                return name
+
+    # 4) Fallback: last real phase.
+    for name, start, end in reversed(projected_ranges):
+        if not is_placeholder(name):
             return name
-        if start <= today <= end:
-            return name
-    return projected_ranges[-1][0] if projected_ranges else None
+
+    return None
 
 
 def main() -> int:
@@ -543,15 +585,18 @@ def main() -> int:
             "8- END CONSTRUCTION",  # best
             "7- CONSTRUCTION",      # fallback if milestone missing
         ]
+
+        # Read from subitems: if there are multiple matches (duplicates), pick the *earliest* end.
         for prefix in preferred_prefixes:
+            ends: List[dt.date] = []
             for s in subitems:
                 if (s.get("name") or "").strip().startswith(prefix):
                     scols = {cv["id"]: cv for cv in (s.get("column_values") or [])}
                     tl = parse_timeline(scols.get(SUB_COL_PROJECTED_TIMELINE, {}).get("value"))
                     if tl:
-                        end_construction_projected = tl[1]
-                    break
-            if end_construction_projected:
+                        ends.append(tl[1])
+            if ends:
+                end_construction_projected = min(ends)
                 break
 
         # Fallback: use the freshly computed projected_ranges list.

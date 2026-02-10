@@ -50,6 +50,8 @@ COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
 SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
 SUB_COL_PROJECTED_START = "date0"
 SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
+SUB_COL_ACTUAL_START = "date_mm0ex00"
+SUB_COL_ACTUAL_TIMELINE = "timerange_mm0e4dmn"
 
 TEMPLATE_ITEM_NAME = "TEMPLATE (DO NOT EDIT)"
 FREEZE_PHASE_NAME = "7- CONSTRUCTION"
@@ -121,7 +123,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
               id
               name
               board { id }
-              column_values(ids: ["%s", "%s", "%s"]) { id text value }
+              column_values(ids: ["%s", "%s", "%s", "%s", "%s"]) { id text value }
             }
           }
         }
@@ -133,6 +135,8 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
         SUB_COL_PLANNED_DURATION,
         SUB_COL_PROJECTED_START,
         SUB_COL_PROJECTED_TIMELINE,
+        SUB_COL_ACTUAL_START,
+        SUB_COL_ACTUAL_TIMELINE,
     )
 
     while True:
@@ -154,6 +158,17 @@ def change_column_value(token: str, board_id: str, item_id: str, column_id: str,
     }
     """
     gql(token, q, {"bid": board_id, "iid": item_id, "cid": column_id, "val": json.dumps(value)})
+
+
+def change_multiple_column_values(token: str, board_id: str, item_id: str, values: dict) -> None:
+    q = """
+    mutation ($bid: ID!, $iid: ID!, $vals: JSON!) {
+      change_multiple_column_values(board_id: $bid, item_id: $iid, column_values: $vals) {
+        id
+      }
+    }
+    """
+    gql(token, q, {"bid": board_id, "iid": item_id, "vals": json.dumps(values)})
 
 
 def create_subitem(token: str, parent_item_id: str, name: str, planned_duration: Optional[int]) -> str:
@@ -394,8 +409,20 @@ def main() -> int:
             projected_ranges.append((sname, start, end))
 
             if not frozen:
-                change_column_value(token, SUBITEMS_BOARD_ID, sid, SUB_COL_PROJECTED_START, {"date": date_to_iso(start)})
-                change_column_value(token, SUBITEMS_BOARD_ID, sid, SUB_COL_PROJECTED_TIMELINE, {"from": date_to_iso(start), "to": date_to_iso(end)})
+                vals = {
+                    SUB_COL_PROJECTED_START: {"date": date_to_iso(start)},
+                    SUB_COL_PROJECTED_TIMELINE: {"from": date_to_iso(start), "to": date_to_iso(end)},
+                }
+
+                # Set ACTUAL dates to match PROJECTED initially, but never overwrite PM edits.
+                actual_start_val = scols.get(SUB_COL_ACTUAL_START, {}).get("value")
+                actual_tl_val = scols.get(SUB_COL_ACTUAL_TIMELINE, {}).get("value")
+                if not actual_start_val:
+                    vals[SUB_COL_ACTUAL_START] = {"date": date_to_iso(start)}
+                if not actual_tl_val:
+                    vals[SUB_COL_ACTUAL_TIMELINE] = {"from": date_to_iso(start), "to": date_to_iso(end)}
+
+                change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
 
             cur_start = end
 

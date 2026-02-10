@@ -14,6 +14,9 @@ Projection logic:
 - Subitem1 projected start = UNFOLD DATE
 - Each subitem projected end = start + PLANNED DURATION days (calendar days; includes weekends)
 - Next subitem projected start = previous projected end
+- PROJECTED FINISH CONSTRUCTION is derived from the full subitem timeline from UNFOLD DATE,
+  including VARIANCE when VARIANCE NEEDED? is Yes.
+- CONSTRUCTION TYPE does not affect projections.
 
 Phase status logic:
 - Ensure PHASE STATUS labels match the current subitem names on each item (best-effort).
@@ -50,7 +53,8 @@ SUBITEMS_BOARD_ID = "18399430647"
 COL_UNFOLD_DATE = "date_mm0e9cvp"
 COL_FINISH_CONSTRUCTION_DATE = "date_mm0ed0np"  # PROJECTED FINISH CONSTRUCTION
 COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
-COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE
+COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE (no longer used for projections)
+COL_VARIANCE_NEEDED = "color_mm0e96k4"  # VARIANCE NEEDED?
 COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
 COL_ACTUAL_TIMELINE_MAIN = "timerange_mm0egs6a"  # ACTUAL TIMELINE
 SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
@@ -188,7 +192,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
           items {
             id
             name
-            column_values(ids: ["%s", "%s", "%s", "%s", "%s", "%s"]) { id text value }
+            column_values(ids: ["%s", "%s", "%s", "%s", "%s", "%s", "%s"]) { id text value }
             subitems {
               id
               name
@@ -204,6 +208,7 @@ def get_items_with_subitems(token: str, limit: int = 200) -> List[dict]:
         COL_FINISH_CONSTRUCTION_DATE,
         COL_PHASE_STATUS,
         COL_CONSTRUCTION_TYPE,
+        COL_VARIANCE_NEEDED,
         COL_PROJECTED_TIMELINE_MAIN,
         COL_ACTUAL_TIMELINE_MAIN,
         SUB_COL_PLANNED_DURATION,
@@ -499,6 +504,7 @@ def main() -> int:
         unfold_date = parse_date(colvals.get(COL_UNFOLD_DATE, {}).get("value"))
         phase_status = (colvals.get(COL_PHASE_STATUS, {}).get("text") or "").strip()
         construction_type = (colvals.get(COL_CONSTRUCTION_TYPE, {}).get("text") or "").strip()
+        variance_needed = (colvals.get(COL_VARIANCE_NEEDED, {}).get("text") or "").strip()
 
         # 1) Always ensure subitems exist (so creating a new pulse auto-populates phases).
         if template_subs:
@@ -519,9 +525,10 @@ def main() -> int:
 
         sub_names = [(s.get("name") or "").strip() for s in subitems]
         frozen = compute_freeze(sub_names, phase_status)
-        force_reproject = os.environ.get("PROJECTIONS_FORCE_REPROJECT") == "1"
-        projected_frozen = (False if force_reproject else frozen)
-        projected_only = os.environ.get("PROJECTIONS_PROJECTED_ONLY") == "1" or force_reproject
+        # Claudio rule: projections are always recalculated from UNFOLD DATE based on subitems.
+        projected_frozen = False
+        # Safety: do not auto-write ACTUALs during projection runs.
+        projected_only = True
 
         # Recompute projections unless frozen (or forced)
         projected_ranges: List[Tuple[str, dt.date, dt.date]] = []
@@ -538,61 +545,48 @@ def main() -> int:
             except ValueError:
                 dur = 0
 
-            # Subitem guideline: CONSTRUCTION duration is dictated by the parent item's CONSTRUCTION TYPE.
-            desired_construction_wd = CONSTRUCTION_TYPE_TO_WD.get(construction_type)
-            if sname == FREEZE_PHASE_NAME and desired_construction_wd is not None:
-                # Keep projections frozen once we hit Construction, but keep PLANNED DURATION aligned.
-                if dur != desired_construction_wd:
+            # CONSTRUCTION TYPE does not affect projections.
+
+            # Variance handling:
+            # - If VARIANCE NEEDED? = Yes: ensure VARIANCE consumes time (default to 90 if blank/0).
+            # - If VARIANCE NEEDED? != Yes: force variance duration to 0 and clear its projected fields.
+            is_variance = (sname or "").strip().upper().startswith(VARIANCE_PREFIX)
+            if is_variance:
+                var_yes = variance_needed.strip().lower() in {"yes", "y", "true"}
+                if var_yes:
+                    if dur <= 0:
+                        dur = DEFAULT_VARIANCE_DURATION
+                        try:
+                            change_multiple_column_values(
+                                token,
+                                SUBITEMS_BOARD_ID,
+                                sid,
+                                {SUB_COL_PLANNED_DURATION: str(int(DEFAULT_VARIANCE_DURATION))},
+                            )
+                        except Exception as e:
+                            print(
+                                f"WARN: could not set variance duration for {item_name} ({item_id}) subitem {sid}: {e}",
+                                file=sys.stderr,
+                            )
+                else:
+                    # Force duration 0 + no projected bar.
+                    if dur != 0:
+                        try:
+                            change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, {SUB_COL_PLANNED_DURATION: "0"})
+                        except Exception:
+                            pass
+                    vals = {
+                        SUB_COL_PROJECTED_START: {"date": None},
+                        SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
+                    }
                     try:
-                        change_multiple_column_values(
-                            token,
-                            SUBITEMS_BOARD_ID,
-                            sid,
-                            {SUB_COL_PLANNED_DURATION: str(int(desired_construction_wd))},
-                        )
+                        change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
                     except Exception as e:
                         print(
-                            f"WARN: could not update CONSTRUCTION planned duration for {item_name} ({item_id}): {e}",
+                            f"WARN: could not clear variance projected fields for {item_name} ({item_id}) subitem {sid}: {e}",
                             file=sys.stderr,
                         )
-
-                # Only use the desired duration in projection math if we're not frozen.
-                if not projected_frozen:
-                    dur = desired_construction_wd
-
-            # Optional variance: if planned duration is 0/blank, it should NOT consume time.
-            is_variance = (sname or "").strip().upper().startswith(VARIANCE_PREFIX)
-            if is_variance and dur <= 0:
-                # Cleanup: a 0-duration variance should not show any projected bars.
-                # Clear projected fields EVEN if the item is frozen (safe because it's projected-only).
-                vals = {
-                    SUB_COL_PROJECTED_START: {"date": None},
-                    SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
-                }
-
-                # Only clear ACTUALs if we're allowed to touch actuals and they match PROJECTED
-                # (i.e., likely auto-set, not PM-entered).
-                if not projected_only:
-                    proj_start_val = parse_date((scols.get(SUB_COL_PROJECTED_START) or {}).get("value"))
-                    proj_tl_val = parse_timeline((scols.get(SUB_COL_PROJECTED_TIMELINE) or {}).get("value"))
-                    act_start_val = parse_date((scols.get(SUB_COL_ACTUAL_START) or {}).get("value"))
-                    act_tl_val = parse_timeline((scols.get(SUB_COL_ACTUAL_TIMELINE) or {}).get("value"))
-
-                    if act_start_val and proj_start_val and act_start_val == proj_start_val:
-                        vals[SUB_COL_ACTUAL_START] = {"date": None}
-                    if act_tl_val and proj_tl_val and act_tl_val == proj_tl_val:
-                        vals[SUB_COL_ACTUAL_TIMELINE] = {"from": None, "to": None}
-
-                try:
-                    change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
-                except Exception as e:
-                    print(
-                        f"WARN: could not clear optional variance fields for {item_name} ({item_id}) subitem {sid}: {e}",
-                        file=sys.stderr,
-                    )
-
-                # Do not advance cur_start; do not add to projected ranges.
-                continue
+                    continue
 
             start = cur_start
             end = add_days(start, dur)

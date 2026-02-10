@@ -8,6 +8,7 @@
 
 ## Ops / integrations
 - XGROUP email: **xgroupexperts@gmail.com**. (Saved 2026-02-06)
+- monday.com API access is available to Henry in this environment (token stored server-side; don’t keep asking Claudio “do you have API access?”—assume it). (Saved 2026-02-10)
 - Moltbot (OpenClaw/Clawdbot) channel health verified (Telegram multi-bot + WhatsApp linked/connected). Hooks: 3/4 ready; missing `soul-evil` is non-essential. (Checked 2026-02-05)
 - Google Workspace via `gog` CLI is currently **not** usable non-interactively because its token store is encrypted with a keyring password that isn’t available in the server environment. Attempted to set a new `GOG_KEYRING_PASSWORD`, but decrypt failed (`aes.KeyUnwrap integrity check failed`), indicating the existing token was encrypted with a different password. Gmail Watch hook (Pub/Sub → OpenClaw hook) continues to work. Fix requires the original keyring password or a re-auth/login with a known password (interactive step or token store migration). (2026-02-05)
 - Outstanding security fix: state dir `/root/.clawdbot` (symlink to `/root/.openclaw`) was previously flagged world-writable (777); recommended `chmod 700` when approved. (2026-02-05)

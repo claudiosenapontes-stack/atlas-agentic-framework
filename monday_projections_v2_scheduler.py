@@ -253,6 +253,16 @@ def change_multiple_column_values(token: str, board_id: str, item_id: str, value
     gql(token, q, {"bid": board_id, "iid": item_id, "vals": json.dumps(values)})
 
 
+def archive_item(token: str, item_id: str) -> None:
+    """Archive an item/subitem in monday (reversible vs hard delete)."""
+    q = """
+    mutation ($iid: ID!) {
+      archive_item(item_id: $iid) { id }
+    }
+    """
+    gql(token, q, {"iid": item_id})
+
+
 def create_subitem(token: str, parent_item_id: str, name: str, planned_duration: Optional[int]) -> str:
     q = """
     mutation ($pid: ID!, $name: String!, $vals: JSON) {
@@ -569,21 +579,12 @@ def main() -> int:
                                 file=sys.stderr,
                             )
                 else:
-                    # Force duration 0 + no projected bar.
-                    if dur != 0:
-                        try:
-                            change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, {SUB_COL_PLANNED_DURATION: "0"})
-                        except Exception:
-                            pass
-                    vals = {
-                        SUB_COL_PROJECTED_START: {"date": None},
-                        SUB_COL_PROJECTED_TIMELINE: {"from": None, "to": None},
-                    }
+                    # No variance needed: remove the variance subitem entirely (archive is safest).
                     try:
-                        change_multiple_column_values(token, SUBITEMS_BOARD_ID, sid, vals)
+                        archive_item(token, sid)
                     except Exception as e:
                         print(
-                            f"WARN: could not clear variance projected fields for {item_name} ({item_id}) subitem {sid}: {e}",
+                            f"WARN: could not archive variance subitem for {item_name} ({item_id}) subitem {sid}: {e}",
                             file=sys.stderr,
                         )
                     continue

@@ -47,40 +47,41 @@ MONDAY_TOKEN_PATHS = [
     "/root/.openclaw/credentials/monday.token",
 ]
 
-MAIN_BOARD_ID = "18399430614"
-SUBITEMS_BOARD_ID = "18399430647"
+# ARQIA MAINBOARD v2 (ARQIA workspace)
+MAIN_BOARD_ID = "18399638410"
+SUBITEMS_BOARD_ID = "18399638411"
 
-COL_UNFOLD_DATE = "date_mm0e9cvp"
-COL_FINISH_CONSTRUCTION_DATE = "date_mm0ed0np"  # PROJECTED FINISH CONSTRUCTION
-COL_PHASE_STATUS = "color_mm0e21ex"  # PHASE STATUS (AUTO)
-COL_CONSTRUCTION_TYPE = "color_mm0ebzwz"  # CONSTRUCTION TYPE (no longer used for projections)
-COL_VARIANCE_NEEDED = "color_mm0e96k4"  # VARIANCE NEEDED?
-COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0e7x4g"  # PROJECTED TIMELINE
-COL_ACTUAL_TIMELINE_MAIN = "timerange_mm0egs6a"  # ACTUAL TIMELINE
-SUB_COL_PLANNED_DURATION = "numeric_mm0ezp5f"
-SUB_COL_PROJECTED_START = "date0"
-SUB_COL_PROJECTED_TIMELINE = "timerange_mm0e6s0k"
-SUB_COL_ACTUAL_START = "date_mm0ex00"
-SUB_COL_ACTUAL_TIMELINE = "timerange_mm0e4dmn"
+COL_UNFOLD_DATE = "date_mm0f23kg"  # UNFOLD DATE
+COL_FINISH_CONSTRUCTION_DATE = "date_mm0f8t7q"  # PROJECTED FINISH CONSTRUCTION
+COL_PHASE_STATUS = "dropdown_mm0fcjrf"  # PHASE STATUS (AUTO)
+COL_CONSTRUCTION_TYPE = "dropdown_mm0f5x24"  # CONSTRUCTION TYPE
+COL_VARIANCE_NEEDED = "dropdown_mm0fq9n6"  # VARIANCE NEEDED?
+COL_PROJECTED_TIMELINE_MAIN = "timerange_mm0fj558"  # PROJECTED TIMELINE
+COL_ACTUAL_TIMELINE_MAIN = "timerange_mm0fc2rz"  # ACTUAL TIMELINE
+SUB_COL_PLANNED_DURATION = "numeric_mm0fznrz"  # PLANNED DURATION (DAYS)
+SUB_COL_PROJECTED_START = "date_mm0f1pzj"  # PROJECTED START DATE
+SUB_COL_PROJECTED_TIMELINE = "timerange_mm0ff3qb"  # PROJECTED TIMELINE
+SUB_COL_ACTUAL_START = "date_mm0f3yza"  # ACTUAL START DATE
+SUB_COL_ACTUAL_TIMELINE = "timerange_mm0fkty8"  # ACTUAL TIMELINE
 
 TEMPLATE_ITEM_NAME = "TEMPLATE (DO NOT EDIT)"
 
 # Fallback phase template (used if the monday "TEMPLATE" item is missing/archived).
 DEFAULT_TEMPLATE_SUBS: List[Tuple[str, Optional[int]]] = [
-    ("1- SURVEYS", 5),
-    ("2- ARCHITECTURAL", 30),
-    ("3- MEP", 30),
-    ("4- STRUCTURAL", 30),
-    ("5- VARIANCE (IF NEEDED)", 90),
-    ("6- PERMITS", 45),
-    ("7- CONSTRUCTION", 260),
-    ("8- END CONSTRUCTION (MILESTONE)", 0),
-    ("9- SALE (MILESTONE)", 0),
+    ("A- UPSTREAM + FEASIBILITY (1-7)", 14),
+    ("B- CONCEPT → BASE PLANS (8-20)", 30),
+    ("C- ARCHITECTURE + INTERIOR + ELECTRIC (21-31)", 30),
+    ("D- ENGINEERING (MEP/STRUCT) + 3RD PARTY (32-35)", 30),
+    ("E- VARIANCES (IF NEEDED) (37)", 90),
+    ("E- PERMITS PACKAGE (36,38)", 45),
+    ("F- CONSTRUCTION EXECUTION (39-46)", 260),
+    ("END CONSTRUCTION (MILESTONE)", 0),
+    ("SALE (MILESTONE)", 0),
 ]
-FREEZE_PHASE_NAME = "7- CONSTRUCTION"
+FREEZE_PHASE_NAME = "F- CONSTRUCTION EXECUTION (39-46)"
 
 # Variance is optional. If its planned duration is 0/blank, it should not affect the schedule.
-VARIANCE_PREFIX = "5- VARIANCE"
+VARIANCE_PREFIX = "E- VARIANCES"
 DEFAULT_VARIANCE_DURATION = 90
 
 # Construction type -> construction phase planned duration.
@@ -374,6 +375,13 @@ def ensure_status_labels_match_subitems(token: str, subitem_names_in_order: List
     """ % (COL_PHASE_STATUS,)
     data = gql(token, q_get, {"bid": [MAIN_BOARD_ID]})
     col = data["boards"][0]["columns"][0]
+
+    # If PHASE STATUS is a dropdown (recommended), its labels were set at creation time and
+    # monday doesn't support the legacy change_column_settings mutation on this account.
+    # So we skip label syncing.
+    if (col.get("type") or "").lower() == "dropdown":
+        return
+
     settings = json.loads(col.get("settings_str") or "{}")
     labels = settings.get("labels", {})  # {"0":"Done",...}
 

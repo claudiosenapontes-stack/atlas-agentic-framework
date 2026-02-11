@@ -77,17 +77,35 @@ def load_token() -> str:
 
 
 def gql(token: str, query: str, variables: Optional[dict] = None) -> dict:
-    r = requests.post(
-        API_URL,
-        json={"query": query, "variables": variables or {}},
-        headers={"Authorization": token},
-        timeout=90,
-    )
-    r.raise_for_status()
-    data = r.json()
-    if "errors" in data:
-        raise RuntimeError(json.dumps(data["errors"], indent=2))
-    return data["data"]
+    """GraphQL call with basic retry for transient Monday API failures."""
+
+    import time
+
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, 8):
+        try:
+            r = requests.post(
+                API_URL,
+                json={"query": query, "variables": variables or {}},
+                headers={"Authorization": token},
+                timeout=90,
+            )
+            # Retry on common transient statuses
+            if r.status_code in {429, 500, 502, 503, 504}:
+                raise requests.HTTPError(f"HTTP {r.status_code}", response=r)
+            r.raise_for_status()
+            data = r.json()
+            if "errors" in data:
+                # Some errors are transient, but treat as fatal for now
+                raise RuntimeError(json.dumps(data["errors"], indent=2))
+            return data["data"]
+        except Exception as e:
+            last_exc = e
+            # Exponential backoff (1.2s, 2.4s, 4.8s, ... capped)
+            sleep_s = min(1.2 * (2 ** (attempt - 1)), 20)
+            time.sleep(sleep_s)
+
+    raise last_exc  # type: ignore
 
 
 def parse_date(value: Any) -> Optional[dt.date]:

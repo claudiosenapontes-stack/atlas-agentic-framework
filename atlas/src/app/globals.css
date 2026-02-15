@@ -1,26 +1,89 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core */
+  --atlas-bg: #f7f9fc;
+  --atlas-panel: rgba(255, 255, 255, 0.78);
+  --atlas-panel-solid: #ffffff;
+  --atlas-border: rgba(15, 23, 42, 0.10);
+  --atlas-text: #0b1220;
+  --atlas-muted: rgba(11, 18, 32, 0.60);
+
+  /* Accent (ice-blue) */
+  --atlas-accent: #3b82f6;
+  --atlas-accent-soft: rgba(59, 130, 246, 0.12);
+
+  /* Background: subtle space haze + starfield */
+  --atlas-space-a: rgba(59, 130, 246, 0.12);
+  --atlas-space-b: rgba(168, 85, 247, 0.10);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--atlas-bg);
+  --color-foreground: var(--atlas-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(900px 500px at 15% 10%, var(--atlas-space-a), transparent 55%),
+    radial-gradient(800px 450px at 85% 20%, var(--atlas-space-b), transparent 60%),
+    radial-gradient(1px 1px at 12% 35%, rgba(15, 23, 42, 0.22) 50%, transparent 52%),
+    radial-gradient(1px 1px at 20% 62%, rgba(15, 23, 42, 0.20) 50%, transparent 52%),
+    radial-gradient(1px 1px at 66% 24%, rgba(15, 23, 42, 0.18) 50%, transparent 52%),
+    radial-gradient(1px 1px at 78% 70%, rgba(15, 23, 42, 0.18) 50%, transparent 52%),
+    radial-gradient(1px 1px at 92% 40%, rgba(15, 23, 42, 0.16) 50%, transparent 52%),
+    linear-gradient(180deg, #ffffff 0%, var(--atlas-bg) 60%);
+  color: var(--atlas-text);
+}
+
+/* Mission-control hero: clean white glass + subtle grid + stars */
+.atlas-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--atlas-border);
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0.66) 100%
+    ),
+    radial-gradient(900px 400px at 20% 25%, rgba(59, 130, 246, 0.20), transparent 60%),
+    radial-gradient(800px 400px at 80% 35%, rgba(168, 85, 247, 0.18), transparent 62%);
+  box-shadow:
+    0 1px 0 rgba(2, 6, 23, 0.04),
+    0 20px 80px rgba(2, 6, 23, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.atlas-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.40;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(600px 240px at 50% 50%, #000 0%, transparent 72%);
+  pointer-events: none;
+}
+
+.atlas-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.40;
+  background:
+    radial-gradient(1px 1px at 10% 30%, rgba(2, 6, 23, 0.35) 50%, transparent 52%),
+    radial-gradient(1px 1px at 22% 70%, rgba(2, 6, 23, 0.30) 50%, transparent 52%),
+    radial-gradient(1px 1px at 54% 20%, rgba(2, 6, 23, 0.25) 50%, transparent 52%),
+    radial-gradient(1px 1px at 80% 62%, rgba(2, 6, 23, 0.25) 50%, transparent 52%),
+    radial-gradient(1px 1px at 92% 35%, rgba(2, 6, 23, 0.22) 50%, transparent 52%);
+  pointer-events: none;
 }

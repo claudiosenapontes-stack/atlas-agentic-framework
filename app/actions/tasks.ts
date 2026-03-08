@@ -8,17 +8,25 @@ import { revalidatePath } from 'next/cache'
 // ============================================
 
 export async function getTasks() {
-  const { data, error } = await supabase
-    .from('tasks')
-    .select(`
-      *,
-      company:companies(id, name),
-      assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
-    `)
-    .order('created_at', { ascending: false })
-  
-  if (error) throw error
-  return data || []
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        company:companies(id, name),
+        assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('[getTasks] Supabase error:', error)
+      return []
+    }
+    return data || []
+  } catch (err) {
+    console.error('[getTasks] Exception:', err)
+    return []
+  }
 }
 
 export async function getTaskById(id: string) {

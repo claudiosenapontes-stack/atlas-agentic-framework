@@ -57,22 +57,40 @@ export async function getQueueDepth(queueName: string) {
 }
 
 export async function getAllQueueDepths() {
-  const redis = getRedisClient()
-  const agents = ['henry', 'olivia', 'harvey', 'sophia', 'einstein', 'optimus', 'prime', 'severino']
-  
-  const depths: Record<string, number> = {}
-  
-  for (const agent of agents) {
-    const depth = await redis.zcard(`queue:tasks:${agent}`)
-    depths[`queue:tasks:${agent}`] = depth
+  try {
+    const redis = getRedisClient()
+    const agents = ['henry', 'olivia', 'harvey', 'sophia', 'einstein', 'optimus', 'prime', 'severino']
+    
+    const depths: Record<string, number> = {}
+    
+    for (const agent of agents) {
+      const depth = await redis.zcard(`queue:tasks:${agent}`).catch(() => 0)
+      depths[`queue:tasks:${agent}`] = depth
+    }
+    
+    // Also check system queues
+    depths['queue:incidents'] = await redis.zcard('queue:incidents').catch(() => 0)
+    depths['queue:approvals'] = await redis.zcard('queue:approvals').catch(() => 0)
+    depths['queue:retries'] = await redis.zcard('queue:retries').catch(() => 0)
+    
+    return depths
+  } catch (err) {
+    console.error('[getAllQueueDepths] Redis error:', err)
+    // Return empty queues as fallback
+    return {
+      'queue:tasks:henry': 0,
+      'queue:tasks:olivia': 0,
+      'queue:tasks:harvey': 0,
+      'queue:tasks:sophia': 0,
+      'queue:tasks:einstein': 0,
+      'queue:tasks:optimus': 0,
+      'queue:tasks:prime': 0,
+      'queue:tasks:severino': 0,
+      'queue:incidents': 0,
+      'queue:approvals': 0,
+      'queue:retries': 0,
+    }
   }
-  
-  // Also check system queues
-  depths['queue:incidents'] = await redis.zcard('queue:incidents').catch(() => 0)
-  depths['queue:approvals'] = await redis.zcard('queue:approvals').catch(() => 0)
-  depths['queue:retries'] = await redis.zcard('queue:retries').catch(() => 0)
-  
-  return depths
 }
 
 // ============================================
@@ -121,19 +139,25 @@ export async function getPresence(agentName: string) {
 }
 
 export async function getAllPresence() {
-  const redis = getRedisClient()
-  const keys = await redis.keys('presence:agent:*')
-  const presence: Record<string, any> = {}
-  
-  for (const key of keys) {
-    const agentName = key.replace('presence:agent:', '')
-    const data = await redis.hgetall(key)
-    if (data && Object.keys(data).length > 0) {
-      presence[agentName] = data
+  try {
+    const redis = getRedisClient()
+    const keys = await redis.keys('presence:agent:*').catch(() => [])
+    const presence: Record<string, any> = {}
+    
+    for (const key of keys) {
+      const agentName = key.replace('presence:agent:', '')
+      const data = await redis.hgetall(key).catch(() => null)
+      if (data && Object.keys(data).length > 0) {
+        presence[agentName] = data
+      }
     }
+    
+    return presence
+  } catch (err) {
+    console.error('[getAllPresence] Redis error:', err)
+    // Return empty presence as fallback
+    return {}
   }
-  
-  return presence
 }
 
 // ============================================

@@ -240,7 +240,7 @@ export async function getResourcePermissions(
   }
 }
 
-export async function bulkCreateRules(rules: Omit<ACLRule, 'id'>[]): Promise<number> {
+export async function bulkCreateRules(rules: any[]): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('acl_rules')
@@ -248,14 +248,14 @@ export async function bulkCreateRules(rules: Omit<ACLRule, 'id'>[]): Promise<num
     
     if (error) {
       console.error('[ACL] Bulk create error:', error)
-      return 0
+      return false
     }
     
     revalidatePath('/acl')
-    return rules.length
+    return true
   } catch (err) {
     console.error('[ACL] Bulk create exception:', err)
-    return 0
+    return false
   }
 }
 
@@ -263,8 +263,8 @@ export async function bulkCreateRules(rules: Omit<ACLRule, 'id'>[]): Promise<num
 // DEFAULT RULES SEEDER
 // ============================================
 
-export async function seedDefaultACLRules(): Promise<number> {
-  const defaultRules = [
+export async function seedDefaultACLRules(): Promise<boolean> {
+  const defaultRules: any[] = [
     // Henry (CEO) - Full admin access
     { resource_type: 'agent', subject_type: 'agent', subject_id: 'henry', permission: 'admin', priority: 1 },
     { resource_type: 'company', subject_type: 'agent', subject_id: 'henry', permission: 'admin', priority: 1 },

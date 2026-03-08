@@ -26,15 +26,16 @@ export default async function ACLPage() {
         <div className="flex gap-2">
           <form action={async () => {
             'use server'
-            await seedDefaultACLRules()
+            const result = await seedDefaultACLRules()
+            console.log('Seeded ACL rules:', result)
           }}>
             <button type="submit" className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium">
               Seed Defaults
             </button>
           </form>
-          <Link href="/acl/new" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium">
-            + New Rule
-          </Link>
+          <button disabled className="px-4 py-2 bg-gray-600 rounded-lg font-medium opacity-50 cursor-not-allowed">
+            + New Rule (Coming Soon)
+          </button>
         </div>
       </div>
 

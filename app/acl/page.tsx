@@ -10,7 +10,7 @@ export default async function ACLPage() {
     getAgents()
   ])
 
-  const agentsById = Object.fromEntries(agents.map(a => [a.id, a]))
+  const agentsById = Object.fromEntries(agents.map((a: any) => [a.id, a]))
 
   const resourceTypes = ['agent', 'company', 'task', 'execution', 'communication', 'approval', 'incident']
   const subjectTypes = ['agent', 'role', 'company']
@@ -46,19 +46,19 @@ export default async function ACLPage() {
         </div>
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <div className="text-2xl font-bold text-green-400">
-            {rules.filter(r => r.permission === 'admin').length}
+            {rules.filter((r: any) => r.permission === 'admin').length}
           </div>
           <div className="text-sm text-gray-400">Admin Rules</div>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <div className="text-2xl font-bold text-blue-400">
-            {new Set(rules.map(r => r.subject_id)).size}
+            {new Set(rules.map((r: any) => r.subject_id)).size}
           </div>
           <div className="text-sm text-gray-400">Active Subjects</div>
         </div>
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
           <div className="text-2xl font-bold text-amber-400">
-            {rules.filter(r => r.expires_at && new Date(r.expires_at) < new Date()).length}
+            {rules.filter((r: any) => r.expires_at && new Date(r.expires_at) < new Date()).length}
           </div>
           <div className="text-sm text-gray-400">Expired</div>
         </div>

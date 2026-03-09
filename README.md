@@ -170,7 +170,7 @@ MOCK_MODE=false
 ## 📁 Project Structure
 
 ```
-mission-control/
+atlas-agentic-framework/
 ├── app/                          # Next.js app router
 │   ├── api/                     # 12 API routes
 │   │   ├── agents/             # 8 agent endpoints
@@ -280,14 +280,14 @@ vercel --prod
 
 ```bash
 # Build image
-docker build -t mission-control .
+docker build -t atlas-agentic-framework .
 
 # Run container
 docker run -p 3000:3000 \
   -e REDIS_URL=redis://host:6379 \
   -e NEXT_PUBLIC_SUPABASE_URL=... \
   -e NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
-  mission-control
+  atlas-agentic-framework
 ```
 
 ### Self-Hosted with PM2
@@ -297,7 +297,7 @@ docker run -p 3000:3000 \
 npm run build
 
 # Start with PM2
-pm2 start npm --name "mission-control" -- start
+pm2 start npm --name "atlas-agentic-framework" -- start
 
 # Save PM2 config
 pm2 save

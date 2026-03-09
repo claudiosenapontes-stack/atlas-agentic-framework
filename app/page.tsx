@@ -3,6 +3,8 @@ import { getAgents } from '@/app/actions/agents'
 import { getApprovals } from '@/app/actions/approvals'
 import { getIncidents } from '@/app/actions/incidents'
 import { RealtimeStatus } from '@/components/realtime-status'
+import { PredictiveAnalytics } from '@/app/components/predictive-analytics'
+import { AutoOptimizer } from '@/app/components/auto-optimizer'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -75,6 +77,8 @@ export default async function DashboardPage() {
 
         {/* Sidebar - Full width on mobile */}
         <div className="space-y-4 sm:space-y-6">
+          <PredictiveAnalytics />
+          <AutoOptimizer />
           <RealtimeStatus />
         </div>
       </div>

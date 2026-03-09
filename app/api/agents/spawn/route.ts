@@ -38,6 +38,9 @@ const AGENT_TYPES = {
   },
 };
 
+// Infrastructure service URL
+const SPAWNER_URL = process.env.SPAWNER_URL || 'http://localhost:9999';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -109,7 +112,36 @@ export async function POST(request: NextRequest) {
     });
     await redis.expire(`presence:agent:${agentId}`, 3600);
 
-    // Step 3: Spawn real process using child_process
+    // Step 3: Call Severino's infrastructure spawner
+    let infrastructureSpawned = false;
+    let infrastructureError = null;
+    try {
+      const spawnerResponse = await fetch(`${SPAWNER_URL}/spawn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentType,
+          agentId,
+          taskId,
+          displayName,
+          context: context || {},
+        }),
+      });
+      
+      if (spawnerResponse.ok) {
+        infrastructureSpawned = true;
+        console.log(`[Agent Spawn] Infrastructure spawner accepted ${agentId}`);
+      } else {
+        infrastructureError = await spawnerResponse.text();
+        console.warn(`[Agent Spawn] Infrastructure spawner returned ${spawnerResponse.status}:`, infrastructureError);
+      }
+    } catch (err) {
+      infrastructureError = err instanceof Error ? err.message : 'Unknown error';
+      console.warn(`[Agent Spawn] Infrastructure spawner unavailable:`, infrastructureError);
+      // Continue with local spawn - don't fail the request
+    }
+
+    // Step 4: Spawn real process using child_process
     const scriptPath = path.join(process.cwd(), agentConfig.script);
     
     const childProcess = spawn('node', [scriptPath], {
@@ -125,6 +157,7 @@ export async function POST(request: NextRequest) {
         REDIS_URL: redisUrl,
         SUPABASE_URL: supabaseUrl,
         SUPABASE_KEY: supabaseKey,
+        INFRASTRUCTURE_SPAWNED: infrastructureSpawned ? 'true' : 'false',
       },
     });
 
@@ -152,7 +185,7 @@ export async function POST(request: NextRequest) {
     // Unref so parent can exit independently
     childProcess.unref();
 
-    // Step 4: If taskId provided, assign the task
+    // Step 5: If taskId provided, assign the task
     if (taskId) {
       await supabase
         .from("tasks")
@@ -172,13 +205,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 5: Update presence with real PID
+    // Step 6: Update presence with real PID
     await redis.hset(`presence:agent:${agentId}`, {
       pid: pid?.toString() || 'unknown',
       status: 'online',
+      infrastructure_spawned: infrastructureSpawned ? 'true' : 'false',
     });
 
-    // Step 6: Update Supabase to active
+    // Step 7: Update Supabase to active
     await supabase
       .from("agents")
       .update({ 
@@ -198,7 +232,9 @@ export async function POST(request: NextRequest) {
       pid: pid,
       taskId: taskId || null,
       spawnedAt: new Date().toISOString(),
-      message: `Agent ${displayName} spawned (PID: ${pid})`,
+      infrastructureSpawned,
+      infrastructureError: infrastructureError || undefined,
+      message: `Agent ${displayName} spawned (PID: ${pid})${infrastructureSpawned ? ' + infrastructure synced' : ''}`,
     }, { status: 201 });
 
   } catch (error) {

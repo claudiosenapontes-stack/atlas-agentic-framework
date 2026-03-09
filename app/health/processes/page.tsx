@@ -1,9 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Play, RotateCcw, AlertCircle } from 'lucide-react';
 
 interface PM2Process {
@@ -68,129 +65,137 @@ export default function ProcessMonitorPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      online: 'default',
-      stopped: 'secondary',
-      errored: 'destructive',
-      launching: 'outline'
+    const styles: Record<string, string> = {
+      online: 'bg-green-500/20 text-green-400 border-green-500/30',
+      stopped: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      errored: 'bg-red-500/20 text-red-400 border-red-500/30',
+      launching: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     };
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
+    return (
+      <span className={`px-2 py-0.5 text-xs font-medium rounded border ${styles[status] || styles.stopped}`}>
+        {status}
+      </span>
+    );
   };
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Process Monitor</h1>
-          <p className="text-muted-foreground">Manage PM2 processes and services</p>
+          <h1 className="text-3xl font-bold text-white">Process Monitor</h1>
+          <p className="text-gray-400">Manage PM2 processes and services</p>
         </div>
-        <Button onClick={fetchProcesses} disabled={loading} variant="outline">
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+        <button 
+          onClick={fetchProcesses} 
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg border border-gray-700 transition-colors"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </Button>
+        </button>
       </div>
 
       <div className="grid gap-4">
         {processes.map((proc) => (
-          <Card key={proc.name} className={proc.status !== 'online' ? 'border-destructive' : ''}>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-lg">{proc.name}</h3>
-                      {getStatusBadge(proc.status)}
-                      {proc.restarts > 0 && (
-                        <Badge variant="outline" className="text-amber-500">
-                          <AlertCircle className="w-3 h-3 mr-1" />
-                          {proc.restarts} restart{proc.restarts !== 1 ? 's' : ''}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      PID: {proc.pid} • Uptime: {formatUptime(proc.uptime)}
-                    </div>
+          <div 
+            key={proc.name} 
+            className={`bg-gray-900 rounded-lg border p-6 ${proc.status !== 'online' ? 'border-red-500/50' : 'border-gray-800'}`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-semibold text-lg text-white">{proc.name}</h3>
+                    {getStatusBadge(proc.status)}
+                    {proc.restarts > 0 && (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded border bg-yellow-500/10 text-yellow-400 border-yellow-500/30 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {proc.restarts} restart{proc.restarts !== 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="text-center">
-                    <div className="font-semibold">{formatMemory(proc.memory)}</div>
-                    <div className="text-muted-foreground">Memory</div>
+                  <div className="text-sm text-gray-500">
+                    PID: {proc.pid} • Uptime: {formatUptime(proc.uptime)}
                   </div>
-                  <div className="text-center">
-                    <div className="font-semibold">{proc.cpu}%</div>
-                    <div className="text-muted-foreground">CPU</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {proc.status === 'online' ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRestart(proc.name)}
-                      disabled={actionLoading === proc.name}
-                    >
-                      <RotateCcw className={`w-4 h-4 mr-2 ${actionLoading === proc.name ? 'animate-spin' : ''}`} />
-                      Restart
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleRestart(proc.name)}
-                      disabled={actionLoading === proc.name}
-                    >
-                      <Play className="w-4 h-4 mr-2" />
-                      Start
-                    </Button>
-                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+
+              <div className="flex items-center gap-6 text-sm">
+                <div className="text-center">
+                  <div className="font-semibold text-white">{formatMemory(proc.memory)}</div>
+                  <div className="text-gray-500">Memory</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-white">{proc.cpu}%</div>
+                  <div className="text-gray-500">CPU</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {proc.status === 'online' ? (
+                  <button
+                    onClick={() => handleRestart(proc.name)}
+                    disabled={actionLoading === proc.name}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white text-sm rounded border border-gray-700 transition-colors"
+                  >
+                    <RotateCcw className={`w-4 h-4 ${actionLoading === proc.name ? 'animate-spin' : ''}`} />
+                    Restart
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleRestart(proc.name)}
+                    disabled={actionLoading === proc.name}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
+                  >
+                    <Play className="w-4 h-4" />
+                    Start
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         ))}
 
         {processes.length === 0 && !loading && (
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No processes found</p>
-            <Button onClick={fetchProcesses} variant="outline" className="mt-4">
-              <RefreshCw className="w-4 h-4 mr-2" />
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-12 text-center">
+            <p className="text-gray-500">No processes found</p>
+            <button 
+              onClick={fetchProcesses}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded border border-gray-700 transition-colors mt-4 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
               Retry
-            </Button>
-          </Card>
+            </button>
+          </div>
         )}
       </div>
 
-      <Card className="bg-muted">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div>
-              <span className="text-muted-foreground">Total: </span>
-              <span className="font-semibold">{processes.length}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Online: </span>
-              <span className="font-semibold text-green-600">
-                {processes.filter(p => p.status === 'online').length}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Issues: </span>
-              <span className="font-semibold text-red-600">
-                {processes.filter(p => p.status !== 'online').length}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Total Restarts: </span>
-              <span className="font-semibold">
-                {processes.reduce((sum, p) => sum + p.restarts, 0)}
-              </span>
-            </div>
+      <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="flex flex-wrap gap-6 text-sm">
+          <div>
+            <span className="text-gray-500">Total: </span>
+            <span className="font-semibold text-white">{processes.length}</span>
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <span className="text-gray-500">Online: </span>
+            <span className="font-semibold text-green-400">
+              {processes.filter(p => p.status === 'online').length}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Issues: </span>
+            <span className="font-semibold text-red-400">
+              {processes.filter(p => p.status !== 'online').length}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Total Restarts: </span>
+            <span className="font-semibold text-white">
+              {processes.reduce((sum, p) => sum + p.restarts, 0)}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

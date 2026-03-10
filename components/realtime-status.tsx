@@ -29,12 +29,12 @@ export function RealtimeStatus() {
   }, [addActivity]))
 
   return (
-    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-lg p-4 border border-stone-200 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-gray-900">Realtime Activity</h3>
+        <h3 className="font-semibold text-stone-900">Realtime Activity</h3>
         {lastUpdate && (
-          <span className="text-xs text-green-600 flex items-center gap-1 font-medium">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          <span className="text-xs text-green-700 flex items-center gap-1 font-medium">
+            <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
             Live
           </span>
         )}
@@ -42,10 +42,10 @@ export function RealtimeStatus() {
       
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {activity.length === 0 ? (
-          <p className="text-gray-500 text-sm">No activity yet...</p>
+          <p className="text-stone-500 text-sm">No activity yet...</p>
         ) : (
           activity.map((item, i) => (
-            <div key={i} className="text-sm text-gray-700 border-b border-gray-100 pb-1 last:border-0">
+            <div key={i} className="text-sm text-stone-700 border-b border-stone-100 pb-1 last:border-0">
               {item}
             </div>
           ))

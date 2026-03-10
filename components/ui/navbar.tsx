@@ -20,12 +20,12 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    <nav className="bg-white border-b border-stone-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-blue-600">Atlas AI</span>
+            <span className="text-xl font-bold text-blue-700">Atlas Agentic Corporation</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -34,7 +34,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
               >
                 {link.label}
               </Link>
@@ -44,7 +44,7 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 btn-touch"
+            className="lg:hidden p-2 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-stone-900 btn-touch"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -62,14 +62,14 @@ export function Navbar() {
           />
           
           {/* Mobile Menu */}
-          <div className="lg:hidden bg-white border-t border-gray-200">
+          <div className="lg:hidden bg-white border-t border-stone-200">
             <div className="px-4 py-2 space-y-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className="block px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors btn-touch"
+                  className="block px-4 py-3 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors btn-touch"
                 >
                   {link.label}
                 </Link>

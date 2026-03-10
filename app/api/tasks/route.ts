@@ -1,6 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export async function GET() {
+  try {
+    // Try with joins first
+    let { data: tasks, error } = await supabase
+      .from("tasks")
+      .select(`
+        *,
+        company:companies(id, name),
+        assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
+      `)
+      .order("created_at", { ascending: false });
+
+    // If joins fail, fetch without relationships
+    if (error) {
+      console.log("[Tasks GET] Falling back to simple query:", error.message);
+      const simpleResult = await supabase
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      tasks = simpleResult.data;
+      error = simpleResult.error;
+    }
+
+    if (error) {
+      console.error("[Tasks GET] Supabase error:", error);
+      return NextResponse.json(
+        { success: false, error: "Failed to fetch tasks" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      tasks: tasks || [],
+      count: tasks?.length || 0,
+    });
+  } catch (error) {
+    console.error("[Tasks GET] Error:", error);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

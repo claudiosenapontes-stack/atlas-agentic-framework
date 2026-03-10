@@ -72,15 +72,15 @@ export function AutoOptimizer() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
         <div className="flex items-center gap-3">
-          <Zap className="w-5 h-5 text-yellow-600" />
-          <h3 className="font-semibold text-gray-900">Auto-Optimizer</h3>
+          <Zap className="w-5 h-5 text-amber-600" />
+          <h3 className="font-semibold text-stone-900">Auto-Optimizer</h3>
         </div>
         <button
           onClick={() => setEnabled(!enabled)}
-          className={`relative w-12 h-6 rounded-full transition-colors ${enabled ? "bg-green-500" : "bg-gray-300"}`}
+          className={`relative w-12 h-6 rounded-full transition-colors ${enabled ? "bg-green-600" : "bg-stone-300"}`}
         >
           <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${enabled ? "translate-x-7" : "translate-x-1"}`} />
         </button>
@@ -92,18 +92,18 @@ export function AutoOptimizer() {
           <div className="flex items-center gap-2">
             {enabled ? (
               <>
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-sm text-green-600 font-medium">Auto-optimization enabled</span>
+                <CheckCircle className="w-4 h-4 text-green-700" />
+                <span className="text-sm text-green-700 font-medium">Auto-optimization enabled</span>
               </>
             ) : (
               <>
-                <AlertCircle className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-500">Manual mode</span>
+                <AlertCircle className="w-4 h-4 text-stone-400" />
+                <span className="text-sm text-stone-500">Manual mode</span>
               </>
             )}
           </div>
           {lastOptimized && (
-            <span className="text-xs text-gray-400">Last: {formatTime(lastOptimized)}</span>
+            <span className="text-xs text-stone-400">Last: {formatTime(lastOptimized)}</span>
           )}
         </div>
 
@@ -111,7 +111,7 @@ export function AutoOptimizer() {
         <button
           onClick={runOptimization}
           disabled={optimizing}
-          className="w-full py-2 px-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+          className="w-full py-2 px-4 bg-stone-900 hover:bg-stone-800 disabled:bg-stone-300 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           {optimizing ? (
             <>
@@ -125,24 +125,24 @@ export function AutoOptimizer() {
 
         {/* Recent Logs */}
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-            <History className="w-4 h-4 text-gray-500" />
+          <h4 className="text-sm font-medium text-stone-700 mb-2 flex items-center gap-2">
+            <History className="w-4 h-4 text-stone-500" />
             Recent Changes
           </h4>
           {logs.length === 0 ? (
-            <div className="text-sm text-gray-500">No optimizations yet</div>
+            <div className="text-sm text-stone-500">No optimizations yet</div>
           ) : (
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {logs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded-lg border border-gray-100">
+                <div key={log.id} className="flex items-center justify-between text-sm bg-stone-50 p-2 rounded-lg border border-stone-100">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${log.agentsAfter > log.agentsBefore ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${log.agentsAfter > log.agentsBefore ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
                       {log.agentsAfter > log.agentsBefore ? "+" : ""}
                       {log.agentsAfter - log.agentsBefore}
                     </span>
-                    <span className="text-xs text-gray-600">{log.reason}</span>
+                    <span className="text-xs text-stone-600">{log.reason}</span>
                   </div>
-                  <span className="text-xs text-gray-400">{formatTime(log.timestamp)}</span>
+                  <span className="text-xs text-stone-400">{formatTime(log.timestamp)}</span>
                 </div>
               ))}
             </div>
@@ -150,7 +150,7 @@ export function AutoOptimizer() {
         </div>
 
         {/* Info */}
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-stone-500">
           Auto-optimizer adjusts agent mix every 5 minutes based on queue depth and task patterns.
         </p>
       </div>

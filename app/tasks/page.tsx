@@ -1,10 +1,15 @@
 import { getTasks } from '@/app/actions/tasks'
+import { getCompanies } from '@/app/actions/companies'
 import Link from 'next/link'
+import { NewTaskButton } from './new-task-button'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TasksPage() {
-  const tasks = await getTasks()
+  const [tasks, companies] = await Promise.all([
+    getTasks(),
+    getCompanies()
+  ])
 
   const statusColors: Record<string, string> = {
     inbox: 'bg-gray-700',
@@ -29,9 +34,7 @@ export default async function TasksPage() {
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">Tasks</h1>
           <p className="text-gray-400 text-sm sm:text-base">Manage tasks across the AI network</p>
         </div>
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium btn-touch">
-          + New Task
-        </button>
+        <NewTaskButton companies={companies.map((c: any) => ({ id: c.id, name: c.name }))} />
       </div>
 
       {/* Desktop Table / Mobile Cards */}

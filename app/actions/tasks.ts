@@ -9,7 +9,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function getTasks() {
   try {
-    const { data, error } = await supabase
+    // Try with joins first
+    let { data, error } = await supabase
       .from('tasks')
       .select(`
         *,
@@ -17,6 +18,18 @@ export async function getTasks() {
         assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
       `)
       .order('created_at', { ascending: false })
+    
+    // If joins fail, fetch without relationships
+    if (error) {
+      console.log('[getTasks] Falling back to simple query:', error.message)
+      const simpleResult = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      data = simpleResult.data
+      error = simpleResult.error
+    }
     
     if (error) {
       console.error('[getTasks] Supabase error:', error)

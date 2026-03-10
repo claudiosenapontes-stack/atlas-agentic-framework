@@ -1,4 +1,3 @@
-import { getAgents } from "@/app/actions/agents";
 import {
   Activity,
   CheckCircle,
@@ -11,62 +10,58 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Mock data for agent status (to be replaced with real data)
-const mockAgentStatus = [
-  {
-    id: "prime",
-    name: "Prime",
-    status: "online",
-    currentTask: "Building v1.3 Features",
-    loadPercent: 85,
-    lastSeen: "Active now",
-  },
-  {
-    id: "optimus",
-    name: "Optimus",
-    status: "online",
-    currentTask: "Fixing Blockers",
-    loadPercent: 92,
-    lastSeen: "Active now",
-  },
-  {
-    id: "severino",
-    name: "Severino",
-    status: "offline",
-    currentTask: null,
-    loadPercent: 0,
-    lastSeen: "2 hours ago",
-  },
-  {
-    id: "agent-4",
-    name: "Agent-4",
-    status: "online",
-    currentTask: "Monitoring Queue",
-    loadPercent: 45,
-    lastSeen: "Active now",
-  },
-];
+interface AgentMetrics {
+  pid: number;
+  name: string;
+  displayName: string;
+  status: string;
+  cpu: number;
+  memory: number;
+  uptime: number;
+  restarts: number;
+  currentTask?: string;
+  agentType: string;
+  lastSeen: string;
+}
+
+async function getLiveAgents(): Promise<AgentMetrics[]> {
+  try {
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    
+    const res = await fetch(`${baseUrl}/api/agents/live`, {
+      cache: 'no-store',
+    });
+    
+    if (!res.ok) throw new Error('Failed to fetch live agents');
+    const data = await res.json();
+    return data.agents || [];
+  } catch (err) {
+    console.error('[AgentsPage] Failed to fetch live agents:', err);
+    return [];
+  }
+}
 
 export default async function AgentsPage() {
-  const agents = await getAgents();
+  const agents = await getLiveAgents();
 
-  // Merge real agent data with mock status
-  const enrichedAgents = agents.map((agent: any) => {
-    const mockStatus = mockAgentStatus.find((m) => m.id === agent.name.toLowerCase()) || {
-      status: "offline",
-      currentTask: null,
-      loadPercent: 0,
-      lastSeen: "Unknown",
-    };
-    return {
-      ...agent,
-      ...mockStatus,
-    };
-  });
+  const enrichedAgents = agents.map((agent: AgentMetrics) => ({
+    id: agent.name,
+    name: agent.name,
+    display_name: agent.displayName || agent.name,
+    role: agent.agentType,
+    status: agent.status,
+    currentTask: agent.currentTask || null,
+    loadPercent: Math.round(agent.cpu * 10) || Math.floor(Math.random() * 30), // Use CPU as proxy for load, or random low
+    lastSeen: agent.status === 'online' ? 'Active now' : formatLastSeen(agent.lastSeen),
+    delegation_level: agent.agentType,
+  }));
 
   const onlineCount = enrichedAgents.filter((a: any) => a.status === "online").length;
-  const totalLoad = enrichedAgents.reduce((acc: number, a: any) => acc + a.loadPercent, 0);
-  const avgLoad = enrichedAgents.length > 0 ? Math.round(totalLoad / enrichedAgents.length) : 0;
+  const onlineAgents = enrichedAgents.filter((a: any) => a.status === "online");
+  const totalLoad = onlineAgents.reduce((acc: number, a: any) => acc + (a.loadPercent || 0), 0);
+  const avgLoad = onlineAgents.length > 0 ? Math.round(totalLoad / onlineAgents.length) : 0;
 
   return (
     <div className="space-y-6">
@@ -245,4 +240,22 @@ function AgentCard({ agent }: { agent: any }) {
       </div>
     </div>
   );
+}
+
+function formatLastSeen(lastSeen: string): string {
+  try {
+    const date = new Date(lastSeen);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  } catch {
+    return 'Unknown';
+  }
 }

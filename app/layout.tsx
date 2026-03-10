@@ -5,7 +5,7 @@ import { Navbar } from '@/components/ui/navbar'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Mission Control | Atlas AI',
+  title: 'Atlas AI | Agentic Framework',
   description: 'Atlas Agentic Framework Dashboard',
 }
 

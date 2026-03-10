@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRedisClient, getAllPresence } from "@/lib/redis";
+import { getOpenClawClient } from "@/lib/openclaw";
 import { supabase } from "@/lib/supabase";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -18,13 +18,34 @@ interface AgentMetrics {
   currentTask?: string;
   agentType: string;
   lastSeen: string;
+  source: 'openclaw' | 'database' | 'process';
 }
+
+// Known agent configurations from OpenClaw
+const AGENT_CONFIG: Record<string, { displayName: string; role: string; emoji: string }> = {
+  henry: { displayName: "Henry", role: "CEO", emoji: "👔" },
+  harvey: { displayName: "Harvey", role: "Finance", emoji: "💰" },
+  einstein: { displayName: "Einstein", role: "Research", emoji: "🔬" },
+  sophia: { displayName: "Sophia", role: "Marketing", emoji: "📈" },
+  severino: { displayName: "Severino", role: "Operations", emoji: "⚙️" },
+  olivia: { displayName: "Olivia", role: "Executive Assistant", emoji: "🗂️" },
+  optimus: { displayName: "Optimus", role: "Tech Lead", emoji: "🧰" },
+  prime: { displayName: "Prime", role: "Senior Dev", emoji: "🏗️" },
+  "optimus-prime": { displayName: "Prime", role: "Senior Dev", emoji: "🏗️" },
+  sentinel: { displayName: "Sentinel", role: "Monitoring", emoji: "👁️" },
+  argus: { displayName: "Argus", role: "Security", emoji: "🛡️" },
+  chronos: { displayName: "Chronos", role: "Scheduler", emoji: "⏰" },
+  hermes: { displayName: "Hermes", role: "Messaging", emoji: "📨" },
+  mercury: { displayName: "Mercury", role: "Speed", emoji: "⚡" },
+  aegis: { displayName: "Aegis", role: "Protection", emoji: "🛡️" },
+  astra: { displayName: "Astra", role: "Analytics", emoji: "⭐" },
+  echo: { displayName: "Echo", role: "Communication", emoji: "📢" },
+};
 
 async function getProcessList(): Promise<any[]> {
   try {
-    // Use ps command to get process info
     const { stdout } = await execAsync(
-      "ps aux | grep -E 'node.*agents' | grep -v grep || true"
+      "ps aux | grep -E 'node.*agent' | grep -v grep || true"
     );
     
     const processes: any[] = [];
@@ -38,17 +59,7 @@ async function getProcessList(): Promise<any[]> {
         const memory = parseFloat(parts[3]) || 0;
         const command = parts.slice(10).join(' ');
         
-        // Extract agent type from command
-        const match = command.match(/agents\/(\w+)\/index\.js/);
-        const agentType = match ? match[1] : 'unknown';
-        
-        processes.push({
-          pid,
-          cpu,
-          memoryPercent: memory,
-          command,
-          agentType,
-        });
+        processes.push({ pid, cpu, memoryPercent: memory, command });
       }
     }
     
@@ -59,99 +70,141 @@ async function getProcessList(): Promise<any[]> {
   }
 }
 
-async function getProcessUptime(pid: number): Promise<number> {
-  try {
-    const { stdout } = await execAsync(`ps -o etimes= -p ${pid} 2>/dev/null || echo 0`);
-    return parseInt(stdout.trim(), 10) * 1000; // Convert seconds to ms
-  } catch {
-    return 0;
-  }
-}
-
 export async function GET() {
   try {
-    // Get Redis presence data
-    const presenceData = await getAllPresence();
-    
-    // Get real process data
-    const processes = await getProcessList();
-
-    // Get agents from Supabase
-    const { data: dbAgents, error: dbError } = await supabase
-      .from("agents")
-      .select("id, name, display_name, role, status, pid")
-      .order("created_at", { ascending: false });
-
-    if (dbError) {
-      console.error("[Live Agents] Supabase error:", dbError);
-    }
-
-    // Merge data sources
+    const openclaw = getOpenClawClient();
     const agents: AgentMetrics[] = [];
     const processedNames = new Set<string>();
 
-    // Process Redis presence data first (most accurate for status)
-    for (const [agentName, presence] of Object.entries(presenceData)) {
-      const dbAgent = dbAgents?.find((a: any) => a.name === agentName);
-      const processInfo = processes.find((p) => p.pid === parseInt(presence.pid || '0', 10));
-      
-      // Calculate memory in bytes from percentage (assume 8GB system for rough estimate)
-      const memoryBytes = processInfo ? processInfo.memoryPercent * 80 * 1024 * 1024 : 0;
-      
-      const uptime = presence.pid && presence.pid !== 'spawning' 
-        ? await getProcessUptime(parseInt(presence.pid, 10))
-        : 0;
+    // 1. Get REAL data from OpenClaw Gateway
+    let openclawConnected = false;
+    try {
+      const [activeAgents, cronJobs] = await Promise.all([
+        openclaw.getActiveAgents(),
+        openclaw.getCronJobs(),
+      ]);
 
-      agents.push({
-        pid: parseInt(presence.pid || '0', 10) || 0,
-        name: agentName,
-        displayName: dbAgent?.display_name || agentName,
-        status: presence.status === "online" ? "online" : presence.status || "offline",
-        cpu: processInfo?.cpu || 0,
-        memory: memoryBytes,
-        uptime: uptime,
-        restarts: 0,
-        currentTask: presence.current_task || dbAgent?.current_task || undefined,
-        agentType: dbAgent?.role || presence.agent_type || "unknown",
-        lastSeen: presence.last_seen || new Date().toISOString(),
-      });
-      
-      processedNames.add(agentName);
+      openclawConnected = true;
+
+      // Add active agents from OpenClaw sessions
+      for (const agent of activeAgents) {
+        const config = AGENT_CONFIG[agent.id.toLowerCase()] || { 
+          displayName: agent.name, 
+          role: agent.id,
+          emoji: "🤖"
+        };
+
+        agents.push({
+          pid: 0,
+          name: agent.id,
+          displayName: config.displayName,
+          status: agent.status,
+          cpu: 0,
+          memory: 0,
+          uptime: 0,
+          restarts: 0,
+          currentTask: agent.currentTask,
+          agentType: config.role,
+          lastSeen: agent.lastSeen || new Date().toISOString(),
+          source: 'openclaw',
+        });
+        processedNames.add(agent.id.toLowerCase());
+      }
+
+      // Add cron jobs as "scheduled tasks" for agents
+      for (const job of cronJobs) {
+        const agentName = job.agentId || 'system';
+        if (!processedNames.has(agentName.toLowerCase()) && agentName !== 'main') {
+          const config = AGENT_CONFIG[agentName.toLowerCase()];
+          if (config) {
+            agents.push({
+              pid: 0,
+              name: agentName,
+              displayName: config.displayName,
+              status: 'scheduled',
+              cpu: 0,
+              memory: 0,
+              uptime: 0,
+              restarts: 0,
+              currentTask: job.name,
+              agentType: config.role,
+              lastSeen: job.state?.lastRunAt 
+                ? new Date(job.state.lastRunAt).toISOString()
+                : new Date().toISOString(),
+              source: 'openclaw',
+            });
+            processedNames.add(agentName.toLowerCase());
+          }
+        }
+      }
+    } catch (error) {
+      console.log('[Live Agents] OpenClaw not connected, falling back to database');
     }
 
-    // Add DB agents not in Redis (recently created or stale)
-    for (const dbAgent of dbAgents || []) {
-      if (!processedNames.has(dbAgent.name)) {
-        const processInfo = processes.find((p) => p.pid === dbAgent.pid);
-        
-        agents.push({
-          pid: dbAgent.pid || 0,
-          name: dbAgent.name,
-          displayName: dbAgent.display_name || dbAgent.name,
-          status: dbAgent.status === "active" ? "online" : dbAgent.status || "offline",
-          cpu: processInfo?.cpu || 0,
-          memory: processInfo ? processInfo.memoryPercent * 80 * 1024 * 1024 : 0,
-          uptime: dbAgent.pid ? await getProcessUptime(dbAgent.pid) : 0,
-          restarts: 0,
-          currentTask: undefined,
-          agentType: dbAgent.role || "unknown",
-          lastSeen: new Date().toISOString(),
-        });
+    // 2. Get agents from Supabase database
+    const { data: dbAgents, error: dbError } = await supabase
+      .from("agents")
+      .select("id, name, display_name, role, status")
+      .order("created_at", { ascending: false });
+
+    if (!dbError && dbAgents) {
+      for (const dbAgent of dbAgents) {
+        const agentKey = dbAgent.name.toLowerCase();
+        if (!processedNames.has(agentKey)) {
+          const config = AGENT_CONFIG[agentKey] || { 
+            displayName: dbAgent.display_name || dbAgent.name, 
+            role: dbAgent.role || "Agent",
+            emoji: "🤖"
+          };
+
+          agents.push({
+            pid: 0,
+            name: dbAgent.name,
+            displayName: config.displayName,
+            status: dbAgent.status === "active" ? "online" : dbAgent.status || "offline",
+            cpu: 0,
+            memory: 0,
+            uptime: 0,
+            restarts: 0,
+            currentTask: undefined,
+            agentType: config.role,
+            lastSeen: new Date().toISOString(),
+            source: 'database',
+          });
+          processedNames.add(agentKey);
+        }
       }
     }
 
-    // Sort by status (online first) then by name
+    // 3. Get process info for running agents
+    const processes = await getProcessList();
+    for (const agent of agents) {
+      const proc = processes.find(p => 
+        p.command.toLowerCase().includes(agent.name.toLowerCase())
+      );
+      if (proc) {
+        agent.pid = proc.pid;
+        agent.cpu = proc.cpu;
+        agent.memory = proc.memoryPercent * 80 * 1024 * 1024; // Rough estimate
+        agent.source = 'process';
+      }
+    }
+
+    // Sort: online first, then by name
     agents.sort((a, b) => {
-      if (a.status === "online" && b.status !== "online") return -1;
-      if (a.status !== "online" && b.status === "online") return 1;
-      return b.pid - a.pid; // Most recent first
+      const statusOrder = { online: 0, scheduled: 1, busy: 2, offline: 3 };
+      const aOrder = statusOrder[a.status as keyof typeof statusOrder] ?? 4;
+      const bOrder = statusOrder[b.status as keyof typeof statusOrder] ?? 4;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.name.localeCompare(b.name);
     });
 
     return NextResponse.json({
       success: true,
       agents,
       count: agents.length,
-      onlineCount: agents.filter((a: any) => a.status === "online").length,
+      onlineCount: agents.filter(a => a.status === "online").length,
+      openclawConnected,
       timestamp: new Date().toISOString(),
     });
 

@@ -1,10 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getOpenClawClient } from "@/lib/openclaw";
 import { supabase } from "@/lib/supabase";
+
+// Map cron schedule to human-readable format
+function formatSchedule(schedule: any): string {
+  if (!schedule) return "Unknown";
+  
+  if (schedule.kind === "cron") {
+    const expr = schedule.expr;
+    if (expr === "0 7 * * *") return "Daily at 7:00 AM";
+    if (expr === "0 8 * * *") return "Daily at 8:00 AM";
+    if (expr === "0 14 * * *") return "Daily at 2:00 PM";
+    if (expr === "0 18 * * *") return "Daily at 6:00 PM";
+    if (expr === "0 20 * * 0") return "Sunday at 8:00 PM";
+    if (expr === "0 17 * * 5") return "Friday at 5:00 PM";
+    return expr;
+  }
+  
+  if (schedule.kind === "every") {
+    const ms = schedule.everyMs;
+    if (ms < 60000) return `Every ${ms / 1000}s`;
+    if (ms < 3600000) return `Every ${Math.round(ms / 60000)}min`;
+    return `Every ${Math.round(ms / 3600000)}h`;
+  }
+  
+  return schedule.kind;
+}
+
+// Determine priority based on agent role
+function getPriority(agentId: string): string {
+  const highPriority = ["henry", "severino", "sophia"];
+  if (highPriority.includes(agentId?.toLowerCase())) return "high";
+  return "medium";
+}
 
 export async function GET() {
   try {
-    // Try with joins first
-    let { data: tasks, error } = await supabase
+    const openclaw = getOpenClawClient();
+    const tasks: any[] = [];
+
+    // 1. Get real cron jobs from OpenClaw
+    try {
+      const cronJobs = await openclaw.getCronJobs();
+      
+      for (const job of cronJobs) {
+        const agentId = job.agentId || "system";
+        const isEnabled = job.enabled !== false;
+        
+        // Determine status based on job state
+        let status = "planned";
+        if (!isEnabled) status = "blocked";
+        else if (job.state?.lastRunStatus === "ok") status = "completed";
+        else if (job.state?.lastRunStatus === "error") status = "blocked";
+        else if (job.state?.lastRunStatus === "running") status = "in_progress";
+        
+        tasks.push({
+          id: job.id,
+          title: job.name || "Unnamed Task",
+          description: job.payload?.message?.substring(0, 200) || "",
+          priority: getPriority(agentId),
+          status: status,
+          assigned_agent_id: agentId,
+          assigned_agent: { name: agentId, display_name: agentId },
+          schedule: formatSchedule(job.schedule),
+          nextRun: job.state?.nextRunAtMs 
+            ? new Date(job.state.nextRunAtMs).toISOString()
+            : null,
+          lastRun: job.state?.lastRunAtMs
+            ? new Date(job.state.lastRunAtMs).toISOString()
+            : null,
+          source: "openclaw",
+          created_at: new Date(job.createdAtMs).toISOString(),
+        });
+      }
+    } catch (error) {
+      console.log("[Tasks GET] OpenClaw not available, using database only");
+    }
+
+    // 2. Get tasks from Supabase database
+    const { data: dbTasks, error: dbError } = await supabase
       .from("tasks")
       .select(`
         *,
@@ -13,118 +87,39 @@ export async function GET() {
       `)
       .order("created_at", { ascending: false });
 
-    // If joins fail, fetch without relationships
-    if (error) {
-      console.log("[Tasks GET] Falling back to simple query:", error.message);
-      const simpleResult = await supabase
-        .from("tasks")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      tasks = simpleResult.data;
-      error = simpleResult.error;
+    if (!dbError && dbTasks) {
+      for (const task of dbTasks) {
+        // Only add if not already from OpenClaw
+        const exists = tasks.find(t => t.id === task.id);
+        if (!exists) {
+          tasks.push({
+            ...task,
+            source: "database",
+          });
+        }
+      }
     }
 
-    if (error) {
-      console.error("[Tasks GET] Supabase error:", error);
-      return NextResponse.json(
-        { success: false, error: "Failed to fetch tasks" },
-        { status: 500 }
-      );
-    }
+    // Sort by priority then by created_at
+    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    tasks.sort((a, b) => {
+      const pA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2;
+      const pB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2;
+      if (pA !== pB) return pA - pB;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
     return NextResponse.json({
       success: true,
-      tasks: tasks || [],
-      count: tasks?.length || 0,
+      tasks,
+      count: tasks.length,
+      timestamp: new Date().toISOString(),
     });
+
   } catch (error) {
     console.error("[Tasks GET] Error:", error);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { title, description, company_id, priority, status, assigned_agent_id } = body;
-
-    // Validation
-    if (!title || typeof title !== "string" || title.trim().length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Title is required" },
-        { status: 400 }
-      );
-    }
-
-    if (title.length > 200) {
-      return NextResponse.json(
-        { success: false, error: "Title must be less than 200 characters" },
-        { status: 400 }
-      );
-    }
-
-    const validPriorities = ["low", "medium", "high", "urgent"];
-    const validStatuses = ["inbox", "in_progress", "review", "completed", "archived"];
-
-    if (priority && !validPriorities.includes(priority)) {
-      return NextResponse.json(
-        { success: false, error: `Priority must be one of: ${validPriorities.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { success: false, error: `Status must be one of: ${validStatuses.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    // Build insert object
-    const insertData: any = {
-      title: title.trim(),
-      description: description?.trim() || null,
-      priority: priority || "medium",
-      status: status || "inbox",
-      company_id: company_id || null,
-      assigned_agent_id: assigned_agent_id || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Insert task
-    const { data: task, error: insertError } = await supabase
-      .from("tasks")
-      .insert(insertData)
-      .select(`
-        *,
-        company:companies(id, name),
-        assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
-      `)
-      .single();
-
-    if (insertError) {
-      console.error("[Task Create] Insert error:", insertError);
-      return NextResponse.json(
-        { success: false, error: "Failed to create task" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      task,
-      createdAt: new Date().toISOString(),
-    }, { status: 201 });
-
-  } catch (error) {
-    console.error("[Task Create] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "Internal server error", tasks: [] },
       { status: 500 }
     );
   }

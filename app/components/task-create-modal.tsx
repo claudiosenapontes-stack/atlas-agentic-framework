@@ -8,8 +8,15 @@ interface Company {
   name: string;
 }
 
+interface Agent {
+  id: string;
+  name: string;
+  display_name?: string;
+}
+
 interface TaskCreateModalProps {
   companies?: Company[];
+  agents?: Agent[];
   onTaskCreated?: (task: any) => void;
   onClose?: () => void;
 }
@@ -23,6 +30,7 @@ export function TaskCreateModal({ companies = [], onTaskCreated, onClose }: Task
     title: "",
     description: "",
     company_id: "",
+    assigned_agent_id: "",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
   });
 
@@ -64,6 +72,7 @@ export function TaskCreateModal({ companies = [], onTaskCreated, onClose }: Task
         title: "",
         description: "",
         company_id: "",
+        assigned_agent_id: "",
         priority: "medium",
       });
 

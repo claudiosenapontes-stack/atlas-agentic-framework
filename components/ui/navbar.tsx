@@ -20,12 +20,12 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white border-b border-stone-200 shadow-sm">
+    <nav className="bg-white border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-blue-700">Atlas Agentic Corporation</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-blue-600 bg-clip-text text-transparent">Atlas Agentic Corporation</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -34,7 +34,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
               >
                 {link.label}
               </Link>
@@ -44,7 +44,7 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-stone-100 text-stone-600 hover:text-stone-900 btn-touch"
+            className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-blue-600 btn-touch"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -69,7 +69,7 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className="block px-4 py-3 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors btn-touch"
+                  className="block px-4 py-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors btn-touch"
                 >
                   {link.label}
                 </Link>

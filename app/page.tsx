@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-stone-900">Executive Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-800 to-blue-600 bg-clip-text text-transparent">Executive Dashboard</h1>
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
           <span className="text-green-700 text-sm sm:text-base font-medium">System Operational</span>
@@ -52,13 +52,13 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Agent Fleet */}
-          <div className="bg-white rounded-lg p-4 sm:p-6 border border-stone-200 shadow-sm">
-            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-stone-900">Agent Fleet</h2>
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200/60 shadow-sm hover:shadow-md transition-all">
+            <h2 className="text-lg sm:text-xl font-semibold mb-4 text-slate-800">Agent Fleet</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {agents.slice(0, 6).map((agent: any) => (
                 <div key={agent.id} className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${agent.status === 'active' ? 'bg-green-500' : 'bg-stone-400'}`}></span>
-                  <span className="text-stone-700 text-sm truncate">{agent.display_name || agent.name}</span>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${agent.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                  <span className="text-slate-600 text-sm truncate">{agent.display_name || agent.name}</span>
                 </div>
               ))}
             </div>

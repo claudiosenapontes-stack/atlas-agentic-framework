@@ -1,0 +1,15 @@
+# Gate 4 Verification Marker
+# ATLAS-PROD-PACKAGE-HOLD-OR-GO-706
+# 
+# When Henry verifies Gate 4 is working correctly in production:
+# 1. Change the line below from NO to YES
+# 2. Commit this file
+# 3. Run: ./scripts/promote-to-prod.sh
+
+VERIFIED=NO
+
+# Verification details (fill in when VERIFIED=YES):
+# Verified by: Henry
+# Date: 
+# Test execution: 
+# Notes: 

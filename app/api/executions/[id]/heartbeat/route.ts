@@ -117,14 +117,6 @@ export async function POST(
       .insert({
         execution_id: executionId,
         event_type: "heartbeat",
-        event_data: {
-          agent_id,
-          lease_duration_seconds,
-          lease_expires_at: leaseExpiresAt.toISOString(),
-          heartbeat_count: newHeartbeatCount,
-          lease_claimed: leaseExpired,
-        },
-        created_at: now.toISOString(),
       });
 
     return NextResponse.json({

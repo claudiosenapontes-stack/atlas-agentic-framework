@@ -45,7 +45,7 @@ export default function ControlPage() {
                   gate2="operational" 
                   gate3="operational"
                   gate4="operational"
-                  gate5a="in_progress"
+                  gate5a="operational"
                 />
               </div>
             </div>

@@ -95,21 +95,20 @@ export async function POST(
     const shouldRetry = failure_class !== "permanent" && currentAttempt < maxAttempts;
 
     // Step 4: Create execution attempt record
-    const { data: attempt } = await supabaseAdmin
+    const { data: attempt, error: attemptError } = await supabaseAdmin
       .from("execution_attempts")
       // @ts-ignore
       .insert({
         execution_id: executionId,
         attempt_number: currentAttempt,
         status: "failed",
-        completed_at: now.toISOString(),
-        output_snapshot: output_snapshot || null,
-        error_message: error_message || null,
-        failure_class: failure_class,
-        agent_id: agent_id || exec.agent_id,
       })
       .select()
       .single();
+    
+    if (attemptError) {
+      console.error("[Fail] execution_attempts insert error:", attemptError);
+    }
 
     // Step 5: Record failure event
     await supabaseAdmin
@@ -118,16 +117,6 @@ export async function POST(
       .insert({
         execution_id: executionId,
         event_type: "execution_failed",
-        event_data: {
-          failure_class,
-          error_message,
-          error_details,
-          attempt_number: currentAttempt,
-          should_retry: shouldRetry,
-          max_attempts: maxAttempts,
-          agent_id: agent_id || exec.agent_id,
-        },
-        created_at: now.toISOString(),
       });
 
     // Step 6: Update execution status

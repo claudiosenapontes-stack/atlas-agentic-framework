@@ -154,13 +154,6 @@ export async function PATCH(
           execution_id: executionId,
           attempt_number: attemptNumber,
           status: status,
-          started_at: now.toISOString(),
-          completed_at: now.toISOString(),
-          output_snapshot: output_snapshot || null,
-          error_message: error_message || null,
-          agent_id: agent_id || exec.agent_id,
-          tokens_used: tokens_used || 0,
-          actual_cost_usd: actual_cost_usd || 0,
         })
         .select()
         .single();
@@ -185,18 +178,6 @@ export async function PATCH(
       .insert({
         execution_id: executionId,
         event_type: eventType,
-        event_data: {
-          status,
-          output_preview: output_preview ? output_preview.substring(0, 500) : null,
-          output_snapshot_present: !!output_snapshot,
-          error_message: error_message || null,
-          tokens_used: tokens_used || 0,
-          actual_cost_usd: actual_cost_usd || 0,
-          idempotency_key: idempotency_key || null,
-          agent_id: agent_id || exec.agent_id,
-          attempt_number: exec.attempt_number || 1,
-        },
-        created_at: now.toISOString(),
       })
       .select()
       .single();

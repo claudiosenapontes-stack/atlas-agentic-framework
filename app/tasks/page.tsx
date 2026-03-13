@@ -3,7 +3,7 @@ import { getCompanies } from '@/app/actions/companies'
 import { getAgents } from '@/app/actions/agents'
 import Link from 'next/link'
 import { NewTaskButton } from './new-task-button'
-import { CheckCircle2, Clock, AlertCircle, GitBranch, Users, BarChart3 } from 'lucide-react'
+import { CheckCircle2, Clock, AlertCircle, GitBranch, Users, BarChart3, Briefcase } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,13 +59,30 @@ export default async function TasksPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header — Clean Business Style */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium text-white">Task Operations</h1>
-          <p className="text-xs text-[#6B7280]">Work management and delegation</p>
+      {/* Header — Business Layer with Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#1F2226]">
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-medium text-white">Task Operations</h1>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#9BA3AF]/10 text-[#9BA3AF] border border-[#9BA3AF]/30 uppercase tracking-wider">Business</span>
+            </div>
+            <p className="text-xs text-[#6B7280]">Work management and delegation</p>
+          </div>
         </div>
-        <NewTaskButton companies={companies.map((c: any) => ({ id: c.id, name: c.name }))} />
+        <div className="flex items-center gap-3">
+          {/* Layer Navigation */}
+          <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg bg-[#111214] border border-[#1F2226]">
+            <Link href="/" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">System</Link>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/control" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Control</Link>
+            <span className="text-[#1F2226]">/</span>
+            <span className="px-2 py-1 rounded text-[10px] text-white bg-[#1F2226]">Tasks</span>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/cost" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Cost</Link>
+          </div>
+          <NewTaskButton companies={companies.map((c: any) => ({ id: c.id, name: c.name }))} />
+        </div>
       </div>
 
       {/* Queue Summary — Clean Metrics */}

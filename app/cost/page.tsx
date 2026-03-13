@@ -72,19 +72,36 @@ export default async function CostPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Cost Observatory</h1>
-          <p className="text-sm text-[#6B7280] mt-0.5">Token usage and spend analytics</p>
+      {/* Header — Business Layer with Navigation */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#1F2226]">
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold text-white">Cost Observatory</h1>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#9BA3AF]/10 text-[#9BA3AF] border border-[#9BA3AF]/30 uppercase tracking-wider">Business</span>
+            </div>
+            <p className="text-sm text-[#6B7280] mt-0.5">Token usage and spend analytics</p>
+          </div>
         </div>
-        <Link 
-          href="/control" 
-          className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white transition-colors"
-        >
-          <Activity className="w-3.5 h-3.5" />
-          Live Monitor
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* Layer Navigation */}
+          <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg bg-[#111214] border border-[#1F2226]">
+            <Link href="/" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">System</Link>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/control" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Control</Link>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/tasks" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Tasks</Link>
+            <span className="text-[#1F2226]">/</span>
+            <span className="px-2 py-1 rounded text-[10px] text-white bg-[#1F2226]">Cost</span>
+          </div>
+          <Link 
+            href="/control" 
+            className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white hover:bg-[#1F2226] transition-colors"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Live Monitor
+          </Link>
+        </div>
       </div>
 
       {/* Top Stats */}

@@ -1,0 +1,9 @@
+{
+  "routes": {
+    "heartbeat": "openrouter/moonshotai/kimi-k2",
+    "cron": "openrouter/moonshotai/kimi-k2",
+    "report": "openrouter/moonshotai/kimi-k2",
+    "health_check": "openrouter/moonshotai/kimi-k2",
+    "telegram_agent_request": "openrouter/moonshotai/kimi-k2.5"
+  }
+}

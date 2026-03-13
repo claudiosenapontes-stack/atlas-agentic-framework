@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenClawClient } from "@/lib/openclaw";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // Map cron schedule to human-readable format
 function formatSchedule(schedule: any): string {
@@ -34,8 +34,13 @@ function getPriority(agentId: string): string {
   return "medium";
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const includeChildren = searchParams.get("includeChildren") === "true";
+    const taskId = searchParams.get("taskId");
+
     const openclaw = getOpenClawClient();
     const tasks: any[] = [];
 
@@ -77,17 +82,70 @@ export async function GET() {
       console.log("[Tasks GET] OpenClaw not available, using database only");
     }
 
-    // 2. Get tasks from Supabase database
-    const { data: dbTasks, error: dbError } = await supabase
-      .from("tasks")
-      .select(`
-        *,
-        company:companies(id, name),
-        assigned_agent:agents!tasks_assigned_agent_id_fkey(id, name, display_name)
-      `)
-      .order("created_at", { ascending: false });
+    // 2. Get tasks from Supabase database (use admin client to bypass RLS)
+    let dbTasks: any[] = [];
+    let childTasks: any[] = [];
+    try {
+      const supabaseAdmin = getSupabaseAdmin();
+      
+      // Build base query
+      let query = supabaseAdmin
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (!dbError && dbTasks) {
+      // Filter by taskId if provided
+      if (taskId) {
+        query = query.eq("id", taskId);
+      }
+      
+      const result = await query;
+      
+      if (result.error) {
+        console.error("[Tasks API] Query error:", result.error.message);
+      } else {
+        dbTasks = result.data || [];
+        console.log("[Tasks API] Retrieved", dbTasks.length, "tasks");
+
+        // If includeChildren, fetch child tasks for all parent tasks
+        if (includeChildren && dbTasks.length > 0) {
+          const parentIds = dbTasks
+            .filter((t: any) => !t.parent_task_id) // Only get children of root tasks
+            .map((t: any) => t.id);
+          
+          if (parentIds.length > 0) {
+            const { data: children, error: childrenError } = await supabaseAdmin
+              .from("tasks")
+              .select("*")
+              .in("parent_task_id", parentIds)
+              .order("created_at", { ascending: true });
+            
+            if (!childrenError && children) {
+              childTasks = children;
+              console.log("[Tasks API] Retrieved", childTasks.length, "child tasks");
+            }
+          }
+        }
+        
+        // Add company/agent placeholders for compatibility
+        const enrichTask = (task: any) => ({
+          ...task,
+          company: task.company_id ? { id: task.company_id, name: "Unknown" } : null,
+          assigned_agent: task.assigned_agent_id ? { 
+            id: task.assigned_agent_id, 
+            name: task.assigned_agent_id,
+            display_name: task.assigned_agent_id 
+          } : null
+        });
+
+        dbTasks = dbTasks.map(enrichTask);
+        childTasks = childTasks.map(enrichTask);
+      }
+    } catch (err: any) {
+      console.error("[Tasks API] Exception:", err?.message || err);
+    }
+
+    if (dbTasks.length > 0) {
       for (const task of dbTasks) {
         // Only add if not already from OpenClaw
         const exists = tasks.find(t => t.id === task.id);
@@ -109,12 +167,20 @@ export async function GET() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-    return NextResponse.json({
+    const response: any = {
       success: true,
       tasks,
       count: tasks.length,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    // Include child tasks if requested
+    if (includeChildren && childTasks.length > 0) {
+      response.childTasks = childTasks;
+      response.childCount = childTasks.length;
+    }
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error("[Tasks GET] Error:", error);

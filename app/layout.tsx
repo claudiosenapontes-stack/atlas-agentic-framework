@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Navbar } from '@/components/ui/navbar'
+import { AlertProvider } from '@/app/components/alert-toast'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ 
@@ -17,9 +18,11 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="${inter.variable} ${spaceGrotesk.variable}">
-      <body className={`${inter.className} bg-slate-50 text-slate-800 antialiased`}>
-        <Navbar />
-        <main className="max-w-7xl mx-auto p-4 sm:p-6">{children}</main>
+      <body className={`${inter.className} bg-[#0B0B0C] text-white antialiased`}>
+        <AlertProvider>
+          <Navbar />
+          <main className="p-4 sm:p-6">{children}</main>
+        </AlertProvider>
       </body>
     </html>
   )

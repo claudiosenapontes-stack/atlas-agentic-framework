@@ -14,7 +14,13 @@ export async function getCompanies() {
       console.error('[getCompanies] Supabase error:', error)
       return []
     }
-    return data || []
+    
+    // Deduplicate by ID to prevent rendering duplicates
+    const uniqueCompanies = data 
+      ? Array.from(new Map(data.map((c: any) => [c.id, c])).values())
+      : []
+    
+    return uniqueCompanies
   } catch (err) {
     console.error('[getCompanies] Exception:', err)
     return []

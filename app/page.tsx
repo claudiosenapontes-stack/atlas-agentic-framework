@@ -4,7 +4,7 @@ import { getApprovals } from '@/app/actions/approvals'
 import { getIncidents } from '@/app/actions/incidents'
 import { getCompanies } from '@/app/actions/companies'
 import Link from 'next/link'
-import { Building2, CheckCircle2, Clock, AlertCircle, Activity, DollarSign } from 'lucide-react'
+import { Building2, CheckCircle2, Clock, AlertCircle, Activity, DollarSign, LayoutDashboard, GitBranch } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,16 +37,31 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header — Quiet System Status */}
+      {/* Header — System Layer with Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#1F2226]/50">
-        <div>
-          <h1 className="text-base font-medium text-white">System Overview</h1>
-          <p className="text-xs text-[#4B5563]">Diagnostic dashboard</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-medium text-white">System Overview</h1>
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#16C784]/10 text-[#16C784] border border-[#16C784]/30 uppercase tracking-wider">System</span>
+            </div>
+            <p className="text-xs text-[#4B5563]">Diagnostic dashboard — Atlas health & status</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Layer Navigation */}
+          <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0B0B0C] border border-[#1F2226]/50">
+            <span className="px-2 py-1 rounded text-[10px] text-white bg-[#1F2226]">System</span>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/control" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Control</Link>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/tasks" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Tasks</Link>
+            <span className="text-[#1F2226]">/</span>
+            <Link href="/cost" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Cost</Link>
+          </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#0B0B0C] border border-[#1F2226]/50">
             <Activity className="w-3 h-3 text-[#16C784]" />
-            <span className="text-[10px] text-[#6B7280] uppercase tracking-wider">System</span>
+            <span className="text-[10px] text-[#6B7280] uppercase tracking-wider">Health</span>
             <span className="text-[10px] text-[#16C784]">Healthy</span>
           </div>
         </div>
@@ -112,15 +127,15 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* System Links — Quiet Navigation */}
+        {/* System Links — Layer Navigation */}
         <div className="col-span-12">
-          <div className="grid grid-cols-6 gap-3">
-            <SystemLink href="/control" label="Control" status="operational" />
-            <SystemLink href="/tasks" label="Operations" status="neutral" />
-            <SystemLink href="/agents" label="Fleet" status="neutral" />
-            <SystemLink href="/cost" label="Cost" status="neutral" />
-            <SystemLink href="/approvals" label="Approvals" count={pendingApprovals} alert={pendingApprovals > 0} />
-            <SystemLink href="/incidents" label="Incidents" count={openIncidents} alert={openIncidents > 0} critical={openIncidents > 0} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <SystemLink href="/control" label="Control" status="operational" layer="Operations" />
+            <SystemLink href="/tasks" label="Tasks" status="neutral" layer="Business" />
+            <SystemLink href="/agents" label="Fleet" status="neutral" layer="System" />
+            <SystemLink href="/cost" label="Cost" status="neutral" layer="Business" />
+            <SystemLink href="/approvals" label="Approvals" count={pendingApprovals} alert={pendingApprovals > 0} layer="Business" />
+            <SystemLink href="/incidents" label="Incidents" count={openIncidents} alert={openIncidents > 0} critical={openIncidents > 0} layer="System" />
           </div>
         </div>
       </div>
@@ -143,6 +158,7 @@ function SystemLink({
   href, 
   label, 
   status = 'neutral',
+  layer,
   count,
   alert,
   critical 
@@ -150,22 +166,31 @@ function SystemLink({
   href: string; 
   label: string; 
   status?: 'operational' | 'neutral';
+  layer?: string;
   count?: number;
   alert?: boolean;
   critical?: boolean;
 }) {
   const dotColor = critical ? 'bg-[#FF3B30]' : alert ? 'bg-[#FFB020]' : status === 'operational' ? 'bg-[#16C784]' : 'bg-[#4B5563]'
+  const layerColor = layer === 'System' ? 'text-[#16C784]' : layer === 'Operations' ? 'text-[#FFB020]' : 'text-[#9BA3AF]'
   
   return (
     <Link 
       href={href} 
-      className="flex items-center gap-2 p-3 bg-[#0B0B0C] rounded-[10px] border border-[#1F2226]/50 hover:border-[#1F2226] transition-colors"
+      className="group flex flex-col p-3 bg-[#0B0B0C] rounded-[10px] border border-[#1F2226]/50 hover:border-[#1F2226] hover:bg-[#111214] transition-all duration-150"
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-      <span className="text-xs text-[#9BA3AF]">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className={`text-[10px] font-mono ml-auto ${critical ? 'text-[#FF3B30]' : alert ? 'text-[#FFB020]' : 'text-[#6B7280]'}`}>
-          {count}
+      <div className="flex items-center gap-2">
+        <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+        <span className="text-xs text-[#9BA3AF] group-hover:text-white transition-colors">{label}</span>
+        {count !== undefined && count > 0 && (
+          <span className={`text-[10px] font-mono ml-auto ${critical ? 'text-[#FF3B30]' : alert ? 'text-[#FFB020]' : 'text-[#6B7280]'}`}>
+            {count}
+          </span>
+        )}
+      </div>
+      {layer && (
+        <span className={`text-[9px] mt-1.5 ml-3.5 ${layerColor} opacity-60 group-hover:opacity-100 transition-opacity`}>
+          {layer} Layer
         </span>
       )}
     </Link>

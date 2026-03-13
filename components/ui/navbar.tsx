@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/tasks", label: "Tasks" },
   { href: "/agents", label: "Agents" },
   { href: "/companies", label: "Companies" },
+  { href: "/campaigns", label: "Campaigns" },
   { href: "/cost", label: "Cost" },
   { href: "/communications", label: "Comms" },
   { href: "/approvals", label: "Approvals" },

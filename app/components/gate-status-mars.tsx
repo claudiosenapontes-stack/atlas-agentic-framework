@@ -60,8 +60,8 @@ export function GateStatusMars({
   gate1 = 'operational', 
   gate2 = 'operational', 
   gate3 = 'operational',
-  gate4 = 'in_progress',
-  gate5a = 'pending'
+  gate4 = 'operational',
+  gate5a = 'in_progress'
 }: GateStatusMarsProps) {
   const gates = [
     { id: 'G1', name: 'INGEST', status: gate1 },

@@ -7,6 +7,11 @@ import { HealthSummary } from '@/app/components/health-summary';
 import { GateStatusMars } from '@/app/components/gate-status-mars';
 import { ClaimExecutionStrip } from '@/app/components/claim-execution-strip';
 import { ExecutionThroughputPlaceholder } from '@/app/components/execution-throughput-placeholder';
+import { LeaseMonitor } from '@/app/components/lease-monitor';
+import { HeartbeatHealth } from '@/app/components/heartbeat-health';
+import { RetryQueue } from '@/app/components/retry-queue';
+import { ExecutionLineage } from '@/app/components/execution-lineage';
+import { AttemptHistory } from '@/app/components/attempt-history';
 import { Zap, Radio, Activity, AlertCircle, CheckCircle2, Layers, GitBranch, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -39,8 +44,8 @@ export default function ControlPage() {
                   gate1="operational"
                   gate2="operational" 
                   gate3="operational"
-                  gate4="in_progress"
-                  gate5a="pending"
+                  gate4="operational"
+                  gate5a="in_progress"
                 />
               </div>
             </div>
@@ -66,9 +71,9 @@ export default function ControlPage() {
 
             {/* Right: Status + Environment */}
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded bg-[#1F2226]/50">
-                <GitBranch className="w-3 h-3 text-[#6B7280]" />
-                <span className="text-[10px] text-[#6B7280]">staging</span>
+              <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded bg-[#16C784]/10 border border-[#16C784]/30">
+                <GitBranch className="w-3 h-3 text-[#16C784]" />
+                <span className="text-[10px] text-[#16C784]">production</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#16C784] animate-pulse" />
@@ -155,31 +160,31 @@ export default function ControlPage() {
               </div>
             </section>
 
-            {/* Orchestration Preview — Gate 4 PARTIAL with Prominent Blocker */}
+            {/* Gate 5A Durable Execution Preview */}
             <section className="bg-[#111214] rounded-[10px] border border-[#FFB020]/30 overflow-hidden">
               <div className="px-3 py-2 border-b border-[#FFB020]/20 bg-[#FFB020]/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Layers className="w-3.5 h-3.5 text-[#FFB020]" />
-                  <h2 className="text-xs font-medium text-[#FFB020] uppercase tracking-wider">Orchestration</h2>
+                  <h2 className="text-xs font-medium text-[#FFB020] uppercase tracking-wider">Durable Execution</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#FFB020] animate-pulse" />
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FFB020] text-[#0B0B0C] font-semibold">G4 PARTIAL</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FFB020] text-[#0B0B0C] font-semibold">G5A ACTIVE</span>
                 </div>
               </div>
               <div className="p-3">
-                {/* Gate 4 Closeout Blocker — PROMINENT */}
+                {/* G5A Feature Preview */}
                 <div className="mb-3 p-3 rounded-lg bg-[#FFB020]/10 border border-[#FFB020]/30">
                   <div className="flex items-start gap-3">
                     <div className="w-7 h-7 rounded-lg bg-[#FFB020]/20 flex items-center justify-center flex-shrink-0">
-                      <AlertCircle className="w-4 h-4 text-[#FFB020]" />
+                      <Activity className="w-4 h-4 text-[#FFB020]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-semibold text-[#FFB020] uppercase tracking-wide">Gate 4 Closeout Validation</p>
-                      <p className="text-xs text-[#9BA3AF] mt-1">Execution loop under closeout validation. Awaiting Henry verification before LIVE promotion.</p>
+                      <p className="text-[10px] font-semibold text-[#FFB020] uppercase tracking-wide">Gate 5A Operator Surface</p>
+                      <p className="text-xs text-[#9BA3AF] mt-1">Durable execution monitoring. Lease management, heartbeat health, and retry queue active.</p>
                       <div className="mt-2 flex items-center gap-2">
                         <span className="text-[10px] text-[#6B7280]">Status:</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FFB020]/20 text-[#FFB020]">Validating</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#FFB020]/20 text-[#FFB020]">In Progress</span>
                       </div>
                     </div>
                   </div>
@@ -202,12 +207,12 @@ export default function ControlPage() {
                   </div>
                   <span className="text-[10px] text-[#16C784]">Live</span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-[#0B0B0C] border border-[#1F2226]/50">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[#0B0B0C] border border-[#1F2226]">
                   <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#6B7280]" />
-                    <span className="text-xs text-[#6B7280]">Production</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#16C784]" />
+                    <span className="text-xs text-[#9BA3AF]">Production</span>
                   </div>
-                  <span className="text-[10px] text-[#6B7280]">Pending G4</span>
+                  <span className="text-[10px] text-[#16C784]">Live</span>
                 </div>
               </div>
             </section>
@@ -221,6 +226,21 @@ export default function ControlPage() {
               <div className="text-center py-4">
                 <CheckCircle2 className="w-5 h-5 text-[#16C784] mx-auto mb-1" />
                 <p className="text-xs text-[#6B7280]">No active alerts</p>
+              </div>
+            </section>
+
+            {/* Gate 5A Durable Execution Components */}
+            <section className="bg-[#111214] rounded-[10px] border border-[#FFB020]/30 p-3">
+              <h2 className="text-xs font-medium text-[#FFB020] uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Layers className="w-3.5 h-3.5" />
+                G5A Durable Execution
+              </h2>
+              <div className="space-y-3">
+                <LeaseMonitor />
+                <HeartbeatHealth />
+                <RetryQueue />
+                <ExecutionLineage />
+                <AttemptHistory />
               </div>
             </section>
           </div>

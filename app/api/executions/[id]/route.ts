@@ -10,6 +10,12 @@ type ExecutionStatus = (typeof VALID_STATUSES)[number];
 /**
  * PATCH /api/executions/:id
  * Update execution result and sync task status
+ * 
+ * Gate 5A Enhancements:
+ * - output_snapshot persistence
+ * - execution_attempts record creation
+ * - execution_events audit trail
+ * - idempotency guard for completion
  */
 export async function PATCH(
   request: NextRequest,
@@ -31,9 +37,12 @@ export async function PATCH(
       status,
       completed_at,
       output_preview,
+      output_snapshot,
       error_message,
       tokens_used,
       actual_cost_usd,
+      idempotency_key,
+      agent_id,
     } = body;
 
     // Validate status if provided
@@ -48,11 +57,12 @@ export async function PATCH(
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+    const now = new Date();
 
-    // Step 1: Fetch the execution record to get task_id
+    // Step 1: Fetch the execution record with all Gate 5A fields
     const { data: execution, error: fetchError } = await supabaseAdmin
       .from("executions")
-      .select("id, task_id, status, agent_id")
+      .select("id, task_id, status, agent_id, attempt_count, idempotent_completion_key")
       .eq("id", executionId)
       .single();
 
@@ -64,22 +74,55 @@ export async function PATCH(
       );
     }
 
-    // Step 2: Build execution update object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const exec: any = execution;
+
+    // Step 2: Idempotency guard for completion
+    // If execution already completed with same idempotency key, return success
+    if (status === "completed" && exec.status === "completed") {
+      if (idempotency_key && exec.idempotent_completion_key === idempotency_key) {
+        return NextResponse.json({
+          success: true,
+          execution: exec,
+          idempotent: true,
+          message: "Execution already completed with this idempotency key",
+        });
+      }
+    }
+
+    // Prevent updating already-completed executions without explicit override
+    if (exec.status === "completed" && status !== undefined) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "Execution already completed",
+          current_status: exec.status,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Step 3: Build execution update object
     const executionUpdates: any = {};
 
     if (status !== undefined) executionUpdates.status = status;
     if (completed_at !== undefined) executionUpdates.completed_at = completed_at;
     if (output_preview !== undefined) executionUpdates.output_preview = output_preview;
+    if (output_snapshot !== undefined) executionUpdates.output_snapshot = output_snapshot;
     if (error_message !== undefined) executionUpdates.error_message = error_message;
     if (tokens_used !== undefined) executionUpdates.tokens_used = tokens_used;
     if (actual_cost_usd !== undefined) executionUpdates.actual_cost_usd = actual_cost_usd;
+    if (idempotency_key !== undefined) executionUpdates.idempotent_completion_key = idempotency_key;
+    if (agent_id !== undefined) executionUpdates.agent_id = agent_id;
 
     // Auto-set completed_at if status is completed/failed/cancelled and not provided
     if ((status === "completed" || status === "failed" || status === "cancelled") && !completed_at) {
-      executionUpdates.completed_at = new Date().toISOString();
+      executionUpdates.completed_at = now.toISOString();
     }
 
-    // Step 3: Update execution record
+    executionUpdates.updated_at = now.toISOString();
+
+    // Step 4: Update execution record
     const { data: updatedExecution, error: execError } = await supabaseAdmin
       .from("executions")
       // @ts-ignore - Supabase type inference issue with dynamic updates
@@ -100,14 +143,79 @@ export async function PATCH(
       );
     }
 
+    // Step 5: Create execution_attempts record on completion/failure
+    let attemptRecord = null;
+    if (status === "completed" || status === "failed") {
+      const attemptNumber = exec.attempt_count || 1;
+      const { data: attempt, error: attemptError } = await supabaseAdmin
+        .from("execution_attempts")
+        // @ts-ignore
+        .insert({
+          execution_id: executionId,
+          attempt_number: attemptNumber,
+          status: status,
+          started_at: now.toISOString(),
+          completed_at: now.toISOString(),
+          output_snapshot: output_snapshot || null,
+          error_message: error_message || null,
+          agent_id: agent_id || exec.agent_id,
+          tokens_used: tokens_used || 0,
+          actual_cost_usd: actual_cost_usd || 0,
+        })
+        .select()
+        .single();
+
+      if (attemptError) {
+        console.error("[Executions PATCH] Attempt record error:", attemptError);
+        // Don't fail the request if attempt creation fails
+      } else {
+        attemptRecord = attempt;
+      }
+    }
+
+    // Step 6: Record execution event
+    let eventRecord = null;
+    const eventType = status === "completed" ? "execution_completed" : 
+                      status === "failed" ? "execution_failed" : 
+                      status === "in_progress" ? "execution_started" : "execution_updated";
+    
+    const { data: event, error: eventError } = await supabaseAdmin
+      .from("execution_events")
+      // @ts-ignore
+      .insert({
+        execution_id: executionId,
+        event_type: eventType,
+        event_data: {
+          status,
+          output_preview: output_preview ? output_preview.substring(0, 500) : null,
+          output_snapshot_present: !!output_snapshot,
+          error_message: error_message || null,
+          tokens_used: tokens_used || 0,
+          actual_cost_usd: actual_cost_usd || 0,
+          idempotency_key: idempotency_key || null,
+          agent_id: agent_id || exec.agent_id,
+          attempt_number: exec.attempt_count || 1,
+        },
+        created_at: now.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (eventError) {
+      console.error("[Executions PATCH] Event record error:", eventError);
+      // Don't fail the request if event creation fails
+    } else {
+      eventRecord = event;
+    }
+
     // ATLAS-COST-MVP-357: Capture cost data on completion
     let costCaptureResult = null;
     if ((status === "completed" || status === "failed") && tokens_used) {
       try {
         costCaptureResult = await captureExecutionCost({
           executionId,
-          agentId: (execution as any).agent_id,
-          taskId: (execution as any).task_id,
+          agentId: agent_id || exec.agent_id,
+          taskId: exec.task_id,
           model: body.model ?? "unknown",
           tokensUsed: tokens_used,
           inputTokens: body.input_tokens,
@@ -120,9 +228,9 @@ export async function PATCH(
       }
     }
 
-    // Step 4: Atomically update linked task status and execution_id
+    // Step 7: Atomically update linked task status and execution_id
     let updatedTask = null;
-    const executionTaskId = (execution as any).task_id;
+    const executionTaskId = exec.task_id;
     
     if (executionTaskId && status) {
       // Task status mapping based on execution status
@@ -160,7 +268,7 @@ export async function PATCH(
       }
     }
 
-    // Step 5: Gate 4 - Trigger orchestration hook for workflow steps
+    // Step 8: Gate 4 - Trigger orchestration hook for workflow steps
     // This handles sequential workflow progression
     if (status === "completed" || status === "failed") {
       try {
@@ -176,11 +284,18 @@ export async function PATCH(
       }
     }
 
-    // Step 6: Return JSON response
+    // Step 9: Return JSON response
     return NextResponse.json({
       success: true,
       execution: updatedExecution,
       task: updatedTask,
+      durability: {
+        attempt_recorded: !!attemptRecord,
+        attempt_id: attemptRecord?.id,
+        event_recorded: !!eventRecord,
+        event_id: eventRecord?.id,
+        idempotent: false,
+      },
       sync: {
         execution_updated: true,
         task_updated: !!updatedTask,
@@ -194,7 +309,7 @@ export async function PATCH(
         captured: costCaptureResult?.success ?? false,
         cost_id: costCaptureResult?.cost_id,
       },
-      timestamp: new Date().toISOString(),
+      timestamp: now.toISOString(),
     });
 
   } catch (error) {
@@ -212,7 +327,7 @@ export async function PATCH(
 
 /**
  * GET /api/executions/:id
- * Fetch single execution by ID
+ * Fetch single execution by ID with durability data
  */
 export async function GET(
   request: NextRequest,
@@ -230,6 +345,7 @@ export async function GET(
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // Fetch execution
     const { data: execution, error } = await supabaseAdmin
       .from("executions")
       .select("*")
@@ -243,9 +359,30 @@ export async function GET(
       );
     }
 
+    // Fetch related durability data
+    const [{ data: attempts }, { data: events }] = await Promise.all([
+      supabaseAdmin
+        .from("execution_attempts")
+        .select("*")
+        .eq("execution_id", executionId)
+        .order("attempt_number", { ascending: true }),
+      supabaseAdmin
+        .from("execution_events")
+        .select("*")
+        .eq("execution_id", executionId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
     return NextResponse.json({
       success: true,
       execution,
+      durability: {
+        attempts: attempts || [],
+        events: events || [],
+        attempt_count: attempts?.length || 0,
+        event_count: events?.length || 0,
+      },
       timestamp: new Date().toISOString(),
     });
 

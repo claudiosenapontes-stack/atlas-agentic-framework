@@ -56,7 +56,7 @@ export async function POST(
     // Step 1: Fetch execution
     const { data: execution, error: fetchError } = await supabaseAdmin
       .from("executions")
-      .select("id, status, task_id, agent_id, attempt_count")
+      .select("id, status, task_id, agent_id, attempt_number")
       .eq("id", executionId)
       .single();
 
@@ -91,7 +91,7 @@ export async function POST(
 
     const retryPolicyData = retryPolicy as { max_attempts?: number } | null;
     const maxAttempts = retryPolicyData?.max_attempts ?? 3;
-    const currentAttempt = exec.attempt_count || 1;
+    const currentAttempt = exec.attempt_number || 1;
     const shouldRetry = failure_class !== "permanent" && currentAttempt < maxAttempts;
 
     // Step 4: Create execution attempt record
@@ -137,7 +137,7 @@ export async function POST(
       error_message: error_message || null,
       output_snapshot: output_snapshot || null,
       completed_at: shouldRetry ? null : now.toISOString(),
-      attempt_count: currentAttempt + 1,
+      attempt_number: currentAttempt + 1,
       updated_at: now.toISOString(),
     };
 

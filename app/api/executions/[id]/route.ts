@@ -62,7 +62,7 @@ export async function PATCH(
     // Step 1: Fetch the execution record with all Gate 5A fields
     const { data: execution, error: fetchError } = await supabaseAdmin
       .from("executions")
-      .select("id, task_id, status, agent_id, attempt_count, idempotency_key")
+      .select("id, task_id, status, agent_id, attempt_number, idempotency_key")
       .eq("id", executionId)
       .single();
 
@@ -146,7 +146,7 @@ export async function PATCH(
     // Step 5: Create execution_attempts record on completion/failure
     let attemptRecord = null;
     if (status === "completed" || status === "failed") {
-      const attemptNumber = exec.attempt_count || 1;
+      const attemptNumber = exec.attempt_number || 1;
       const { data: attempt, error: attemptError } = await supabaseAdmin
         .from("execution_attempts")
         // @ts-ignore
@@ -194,7 +194,7 @@ export async function PATCH(
           actual_cost_usd: actual_cost_usd || 0,
           idempotency_key: idempotency_key || null,
           agent_id: agent_id || exec.agent_id,
-          attempt_number: exec.attempt_count || 1,
+          attempt_number: exec.attempt_number || 1,
         },
         created_at: now.toISOString(),
       })

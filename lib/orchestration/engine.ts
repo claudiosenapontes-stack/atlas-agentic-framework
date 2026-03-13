@@ -287,16 +287,23 @@ export async function handleStepCompletion(
     console.log(`[GATE4-602] Fetched ${tasks.length} workflow tasks:`);
     tasks.forEach((t: any) => console.log(`[GATE4-602]   - ${t.id}: ${t.name} (status=${t.status})`));
     
-    const completedTasks = tasks.filter(t => t.status === "completed" || t.id === workflowTaskId);
-    const completedIds = new Set(completedTasks.map(t => t.id));
+    // ATLAS-GATE4-FORCE-EXECUTION-602: Build completedIds from multiple sources
+    // Note: Query may return stale data, so also use execution.completed_task_ids
+    const completedFromQuery = tasks.filter(t => t.status === "completed").map(t => t.id);
+    const completedFromExecution = executionData.completed_task_ids || [];
+    const completedIds = new Set([...completedFromQuery, ...completedFromExecution, workflowTaskId]);
     const failedIds = new Set(tasks.filter(t => t.status === "failed").map(t => t.id));
-    console.log(`[GATE4-602] completedIds after filter: [${Array.from(completedIds).join(',')}]`);
+    console.log(`[GATE4-602] completedFromQuery: [${completedFromQuery.join(',')}]`);
+    console.log(`[GATE4-602] completedFromExecution: [${completedFromExecution.join(',')}]`);
+    console.log(`[GATE4-602] workflowTaskId: ${workflowTaskId}`);
+    const completedTasks = tasks.filter(t => completedIds.has(t.id));
+    console.log(`[GATE4-602] completedIds (query+current): [${Array.from(completedIds).join(',')}]`);
 
     // ATLAS-GATE4-CLOSEOUT-501: Build completed_task_ids array
     const completedTaskIds = Array.from(completedIds);
     
     // ATLAS-GATE4-FORCE-EXECUTION-602: Trace completion check
-    console.log(`[GATE4-602] Completion check: tasks=${tasks.length}, completed=${completedTasks.length}, completedIds=[${Array.from(completedIds).join(',')}]`);
+    console.log(`[GATE4-602] Completion check: tasks=${tasks.length}, completed=${completedIds.size}, completedIds=[${Array.from(completedIds).join(',')}]`);
     
     // Check if workflow is complete
     const completion = isExecutionComplete(tasks, completedIds, failedIds);
@@ -311,7 +318,7 @@ export async function handleStepCompletion(
         .update({
           status: completion.success ? "completed" : "failed",
           completed_at: new Date().toISOString(),
-          completed_tasks: completedTasks.length,
+          completed_tasks: completedIds.size,
           completed_task_ids: completedTaskIds,
           current_task_id: null,
           execution_context: updatedContext,

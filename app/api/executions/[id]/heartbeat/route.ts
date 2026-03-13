@@ -91,7 +91,7 @@ export async function POST(
       .from("executions")
       // @ts-ignore
       .update({
-        last_heartbeat_at: now.toISOString(),
+        heartbeat_at: now.toISOString(),
         lease_expires_at: leaseExpiresAt.toISOString(),
         heartbeat_count: newHeartbeatCount,
         // If lease was expired, claim it for this agent

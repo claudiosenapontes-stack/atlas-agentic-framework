@@ -9,17 +9,18 @@
 
 // Dynamic import for Deno/Node compatibility
 declare const Deno: { env: { get(name: string): string | undefined } } | undefined;
+
+// Use require for Node.js compatibility
 let createClient: typeof import('@supabase/supabase-js').createClient;
 
-// Runtime detection for import
-if (typeof Deno !== 'undefined') {
-  // Deno runtime - use esm.sh
-  const supabaseModule = await import('https://esm.sh/@supabase/supabase-js@2.39.3');
-  createClient = supabaseModule.createClient;
-} else {
-  // Node runtime
-  const supabaseModule = await import('@supabase/supabase-js');
-  createClient = supabaseModule.createClient;
+try {
+  // Node runtime - use require
+  const { createClient: supabaseCreate } = require('@supabase/supabase-js');
+  createClient = supabaseCreate;
+} catch {
+  // Fallback or handle Deno differently if needed
+  console.error('Failed to load Supabase client');
+  process.exit(1);
 }
 
 // Model configuration for heartbeat (since we can't import from @/lib)

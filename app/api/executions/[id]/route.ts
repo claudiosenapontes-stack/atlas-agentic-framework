@@ -62,7 +62,7 @@ export async function PATCH(
     // Step 1: Fetch the execution record with all Gate 5A fields
     const { data: execution, error: fetchError } = await supabaseAdmin
       .from("executions")
-      .select("id, task_id, status, agent_id, attempt_count, idempotent_completion_key")
+      .select("id, task_id, status, agent_id, attempt_count, idempotency_key")
       .eq("id", executionId)
       .single();
 
@@ -80,7 +80,7 @@ export async function PATCH(
     // Step 2: Idempotency guard for completion
     // If execution already completed with same idempotency key, return success
     if (status === "completed" && exec.status === "completed") {
-      if (idempotency_key && exec.idempotent_completion_key === idempotency_key) {
+      if (idempotency_key && exec.idempotency_key === idempotency_key) {
         return NextResponse.json({
           success: true,
           execution: exec,
@@ -112,7 +112,7 @@ export async function PATCH(
     if (error_message !== undefined) executionUpdates.error_message = error_message;
     if (tokens_used !== undefined) executionUpdates.tokens_used = tokens_used;
     if (actual_cost_usd !== undefined) executionUpdates.actual_cost_usd = actual_cost_usd;
-    if (idempotency_key !== undefined) executionUpdates.idempotent_completion_key = idempotency_key;
+    if (idempotency_key !== undefined) executionUpdates.idempotency_key = idempotency_key;
     if (agent_id !== undefined) executionUpdates.agent_id = agent_id;
 
     // Auto-set completed_at if status is completed/failed/cancelled and not provided

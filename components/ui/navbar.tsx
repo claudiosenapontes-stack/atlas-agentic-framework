@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Zap } from "lucide-react";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
+  { href: "/control", label: "Control" },
   { href: "/tasks", label: "Tasks" },
   { href: "/agents", label: "Agents" },
   { href: "/companies", label: "Companies" },
+  { href: "/cost", label: "Cost" },
   { href: "/communications", label: "Comms" },
   { href: "/approvals", label: "Approvals" },
   { href: "/incidents", label: "Incidents" },
@@ -20,12 +22,15 @@ export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <nav className="bg-[#111214] border-b border-[#1F2226]">
+      <div className="px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-blue-600 bg-clip-text text-transparent">Atlas Agentic Corporation</span>
+            <div className="w-7 h-7 rounded-lg bg-[#FF6A00] flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-lg font-semibold text-white">ATLAS</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -34,7 +39,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-3 py-2 text-sm text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="px-3 py-2 text-sm text-[#9BA3AF] hover:text-white hover:bg-[#1F2226] rounded-lg transition-colors"
               >
                 {link.label}
               </Link>
@@ -44,7 +49,7 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-blue-600 btn-touch"
+            className="lg:hidden p-2 rounded-lg hover:bg-[#1F2226] text-[#9BA3AF] hover:text-white"
             aria-label="Toggle menu"
           >
             {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -57,19 +62,19 @@ export function Navbar() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
             onClick={() => setIsMenuOpen(false)}
           />
           
           {/* Mobile Menu */}
-          <div className="lg:hidden bg-white border-t border-stone-200">
+          <div className="lg:hidden bg-[#111214] border-t border-[#1F2226]">
             <div className="px-4 py-2 space-y-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className="block px-4 py-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors btn-touch"
+                  className="block px-4 py-3 text-[#9BA3AF] hover:text-white hover:bg-[#1F2226] rounded-lg transition-colors"
                 >
                   {link.label}
                 </Link>

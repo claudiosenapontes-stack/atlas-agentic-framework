@@ -2,39 +2,241 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ATLAS Design System — Dark Theme Only
+ * 
+ * COLOR TOKENS:
+ * - Background:    #0B0B0C (deepest)
+ * - Panel:         #111214 (elevated surfaces)
+ * - Surface:       #1F2226 (inputs, buttons)
+ * - Border:        #1F2226 (default), #6B7280 (hover)
+ * - Primary:       #FF6A00 (orange, brand/action only)
+ * - Success:       #16C784 (green, operational)
+ * - Warning:       #FFB020 (yellow, partial/warning)
+ * - Critical:      #FF3B30 (red, error/failed)
+ * - Text Primary:  #FFFFFF
+ * - Text Secondary:#9BA3AF
+ * - Text Tertiary: #6B7280
+ * - Text Muted:    #4B5563
+ */
+
 :root {
-  --background: #f1f5f9;
-  --card: #ffffff;
-  --card-hover: #f8fafc;
-  --border: #e2e8f0;
-  --border-hover: #cbd5e1;
-  --text-primary: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-soft: #dbeafe;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  /* Backgrounds */
+  --atlas-bg: #0B0B0C;
+  --atlas-panel: #111214;
+  --atlas-surface: #1F2226;
+  
+  /* Borders */
+  --atlas-border: #1F2226;
+  --atlas-border-hover: #6B7280;
+  
+  /* Semantic Colors */
+  --atlas-primary: #FF6A00;
+  --atlas-primary-hover: #FF8533;
+  --atlas-success: #16C784;
+  --atlas-warning: #FFB020;
+  --atlas-critical: #FF3B30;
+  
+  /* Text */
+  --atlas-text-primary: #FFFFFF;
+  --atlas-text-secondary: #9BA3AF;
+  --atlas-text-tertiary: #6B7280;
+  --atlas-text-muted: #4B5563;
+  
+  /* Legacy mappings (for compatibility) */
+  --background: #0B0B0C;
+  --card: #111214;
+  --card-hover: #1F2226;
+  --border: #1F2226;
+  --border-hover: #6B7280;
+  --text-primary: #FFFFFF;
+  --text-secondary: #9BA3AF;
+  --text-muted: #6B7280;
+  --accent: #FF6A00;
+  --accent-hover: #FF8533;
+  --success: #16C784;
+  --warning: #FFB020;
+  --danger: #FF3B30;
+}
+
+/* Base Styles */
+html {
+  @apply antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  @apply bg-slate-50 text-slate-800;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  @apply bg-[#0B0B0C] text-white;
   min-height: 100vh;
 }
 
-/* Modern Typography */
+/* Typography Scale */
 h1, h2, h3 {
   font-family: var(--font-space), 'Space Grotesk', system-ui, sans-serif;
 }
 
-text-gradient {
-  background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Focus States — Consistent Across All Interactive Elements */
+@layer components {
+  /* Universal Focus Ring */
+  .atlas-focus {
+    @apply focus:outline-none focus:ring-2 focus:ring-[#FF6A00]/50;
+  }
+  
+  .atlas-focus-visible {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0C];
+  }
+  
+  /* Card Hover Pattern */
+  .atlas-card-hover {
+    @apply hover:border-[#6B7280]/50 transition-colors duration-150;
+  }
+  
+  /* Button Hover Pattern */
+  .atlas-button-hover {
+    @apply hover:brightness-110 active:brightness-90 active:scale-[0.98] transition-all duration-150;
+  }
+  
+  /* Link Hover Pattern */
+  .atlas-link-hover {
+    @apply hover:text-[#9BA3AF] transition-colors duration-150;
+  }
+  
+  /* Table Row Hover */
+  .atlas-row-hover {
+    @apply hover:bg-[#0B0B0C]/50 transition-colors duration-100;
+  }
+}
+
+/* Atlas Component Classes */
+@layer components {
+  /* Card Standard */
+  .atlas-card {
+    @apply bg-[#111214] rounded-[10px] border border-[#1F2226];
+  }
+  
+  /* Panel Standard */
+  .atlas-panel {
+    @apply bg-[#0B0B0C] rounded-[10px] border border-[#1F2226];
+  }
+  
+  /* Input Standard */
+  .atlas-input {
+    @apply bg-[#0B0B0C] border border-[#1F2226] rounded-lg px-3 py-2 
+           text-white text-sm placeholder:text-[#6B7280]
+           focus:outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00]/50
+           transition-colors duration-150;
+  }
+  
+  /* Badge Base */
+  .atlas-badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium;
+  }
+  
+  /* Section Header */
+  .atlas-section-header {
+    @apply text-xs font-medium text-[#9BA3AF] uppercase tracking-wider;
+  }
+  
+  /* Label Micro */
+  .atlas-label-micro {
+    @apply text-[10px] text-[#6B7280] uppercase tracking-wider;
+  }
+}
+
+/* Status Badge Variants */
+@layer components {
+  .atlas-badge-success {
+    @apply atlas-badge bg-[#16C784]/10 border border-[#16C784]/30 text-[#16C784];
+  }
+  
+  .atlas-badge-warning {
+    @apply atlas-badge bg-[#FFB020]/10 border border-[#FFB020]/30 text-[#FFB020];
+  }
+  
+  .atlas-badge-critical {
+    @apply atlas-badge bg-[#FF3B30]/10 border border-[#FF3B30]/30 text-[#FF3B30];
+  }
+  
+  .atlas-badge-neutral {
+    @apply atlas-badge bg-[#1F2226] border border-[#1F2226] text-[#9BA3AF];
+  }
+  
+  .atlas-badge-pending {
+    @apply atlas-badge bg-[#1F2226] border border-[#1F2226] text-[#6B7280];
+  }
+}
+
+/* Button Variants */
+@layer components {
+  .atlas-button {
+    @apply inline-flex items-center justify-center gap-2 font-medium
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .atlas-button-primary {
+    @apply atlas-button bg-[#FF6A00] text-white border border-[#FF6A00]
+           hover:brightness-110 active:brightness-90 active:scale-[0.98]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]/50;
+  }
+  
+  .atlas-button-secondary {
+    @apply atlas-button bg-transparent text-white border border-[#1F2226]
+           hover:bg-[#1F2226] hover:border-[#6B7280]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]/50;
+  }
+  
+  .atlas-button-ghost {
+    @apply atlas-button bg-transparent text-[#9BA3AF] border border-transparent
+           hover:text-white hover:bg-[#1F2226]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]/50;
+  }
+  
+  .atlas-button-danger {
+    @apply atlas-button bg-[#FF3B30]/10 text-[#FF3B30] border border-[#FF3B30]/30
+           hover:bg-[#FF3B30]/20 active:bg-[#FF3B30]/30
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF3B30]/50;
+  }
+}
+
+/* Button Sizes */
+@layer components {
+  .atlas-button-lg {
+    @apply h-10 px-4 text-sm rounded-lg;
+  }
+  
+  .atlas-button-default {
+    @apply h-8 px-3 text-xs rounded-lg;
+  }
+  
+  .atlas-button-sm {
+    @apply h-6 px-2 text-[10px] rounded;
+  }
+  
+  .atlas-button-icon {
+    @apply h-8 w-8 p-2 rounded-lg;
+  }
+}
+
+/* Skeleton Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(31, 34, 38, 0) 0%,
+    rgba(31, 34, 38, 0.5) 50%,
+    rgba(31, 34, 38, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
 /* Mobile Responsive Utilities */
@@ -46,31 +248,31 @@ text-gradient {
 
   /* Mobile-first card padding */
   .card-mobile {
-    @apply p-4 sm:p-6;
+    @apply p-3 sm:p-4;
   }
 
   /* Responsive grid layouts */
   .grid-responsive {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3;
   }
 
   /* Mobile stack layout */
   .stack-mobile {
-    @apply flex flex-col gap-4;
+    @apply flex flex-col gap-3;
   }
 
   /* Responsive text */
   .text-responsive-xl {
-    @apply text-xl sm:text-2xl lg:text-3xl;
+    @apply text-lg sm:text-xl lg:text-2xl;
   }
 
   .text-responsive-lg {
-    @apply text-lg sm:text-xl;
+    @apply text-base sm:text-lg;
   }
 
   /* Mobile sidebar overlay */
   .sidebar-overlay {
-    @apply fixed inset-0 bg-black/30 z-40 lg:hidden;
+    @apply fixed inset-0 bg-black/50 z-40 lg:hidden;
   }
 
   /* Hide scrollbar but keep functionality */
@@ -104,11 +306,11 @@ text-gradient {
 
   /* Smaller text on mobile headers */
   h1 {
-    @apply text-xl;
+    @apply text-lg;
   }
 
   h2 {
-    @apply text-lg;
+    @apply text-base;
   }
 }
 
@@ -119,30 +321,13 @@ text-gradient {
   }
 }
 
-/* Smooth transitions for responsive changes */
-* {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
-/* Skeleton animation */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.05) 50%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
 }

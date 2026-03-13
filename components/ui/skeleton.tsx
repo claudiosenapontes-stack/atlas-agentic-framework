@@ -1,38 +1,52 @@
-"use client";
+'use client';
 
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
-interface SkeletonProps {
+/**
+ * ATLAS Skeleton Components
+ * 
+ * Loading placeholders using Atlas design system colors.
+ * All colors use the dark theme tokens: #0B0B0C, #111214, #1F2226
+ */
+
+export interface SkeletonProps {
   className?: string;
 }
 
+/**
+ * Basic Skeleton — Pulsing background
+ */
 export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "animate-pulse bg-gray-800 rounded",
+        'animate-pulse bg-[#1F2226] rounded',
         className
       )}
     />
   );
 }
 
-// Animated shimmer skeleton
+/**
+ * Shimmer Skeleton — Animated gradient
+ */
 export function SkeletonShimmer({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "animate-shimmer bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded",
+        'animate-shimmer bg-gradient-to-r from-[#1F2226] via-[#111214] to-[#1F2226] rounded',
         className
       )}
     />
   );
 }
 
-// Card skeleton for task/agent cards
+/**
+ * Card Skeleton
+ */
 export function SkeletonCard({ className }: SkeletonProps) {
   return (
-    <div className={cn("bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-3", className)}>
+    <div className={cn('bg-[#111214] border border-[#1F2226] rounded-[10px] p-4 space-y-3', className)}>
       <Skeleton className="h-5 w-3/4" />
       <Skeleton className="h-4 w-1/2" />
       <div className="flex gap-2 pt-2">
@@ -43,10 +57,12 @@ export function SkeletonCard({ className }: SkeletonProps) {
   );
 }
 
-// Multiple card skeletons
+/**
+ * Card Grid Skeleton
+ */
 export function SkeletonCardGrid({ count = 4, className }: SkeletonProps & { count?: number }) {
   return (
-    <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4", className)}>
+    <div className={cn('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3', className)}>
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonCard key={i} />
       ))}
@@ -54,10 +70,12 @@ export function SkeletonCardGrid({ count = 4, className }: SkeletonProps & { cou
   );
 }
 
-// List item skeleton
+/**
+ * List Item Skeleton
+ */
 export function SkeletonListItem({ className }: SkeletonProps) {
   return (
-    <div className={cn("flex items-center gap-3 py-3", className)}>
+    <div className={cn('flex items-center gap-3 py-3', className)}>
       <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
       <div className="flex-1 space-y-2">
         <Skeleton className="h-4 w-1/3" />
@@ -68,10 +86,12 @@ export function SkeletonListItem({ className }: SkeletonProps) {
   );
 }
 
-// Full list skeleton
+/**
+ * List Skeleton
+ */
 export function SkeletonList({ count = 5, className }: SkeletonProps & { count?: number }) {
   return (
-    <div className={cn("divide-y divide-gray-800", className)}>
+    <div className={cn('divide-y divide-[#1F2226]', className)}>
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonListItem key={i} />
       ))}
@@ -79,12 +99,14 @@ export function SkeletonList({ count = 5, className }: SkeletonProps & { count?:
   );
 }
 
-// Stats skeleton for dashboard
+/**
+ * Stats Skeleton
+ */
 export function SkeletonStats({ className }: SkeletonProps) {
   return (
-    <div className={cn("grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4", className)}>
+    <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-3', className)}>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-gray-800 rounded-lg p-4 space-y-2">
+        <div key={i} className="bg-[#111214] rounded-[10px] p-3 space-y-2 border border-[#1F2226]">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-8 w-12" />
         </div>
@@ -93,12 +115,14 @@ export function SkeletonStats({ className }: SkeletonProps) {
   );
 }
 
-// Table skeleton
+/**
+ * Table Skeleton
+ */
 export function SkeletonTable({ rows = 5, className }: SkeletonProps & { rows?: number }) {
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn('space-y-3', className)}>
       {/* Header */}
-      <div className="flex gap-4 pb-3 border-b border-gray-700">
+      <div className="flex gap-4 pb-3 border-b border-[#1F2226]">
         <Skeleton className="h-4 w-1/4" />
         <Skeleton className="h-4 w-1/6" />
         <Skeleton className="h-4 w-1/6" />
@@ -117,20 +141,24 @@ export function SkeletonTable({ rows = 5, className }: SkeletonProps & { rows?: 
   );
 }
 
-// Page header skeleton
+/**
+ * Page Header Skeleton
+ */
 export function SkeletonHeader({ className }: SkeletonProps) {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn('space-y-2', className)}>
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-4 w-32" />
     </div>
   );
 }
 
-// Agent card specific skeleton
+/**
+ * Agent Card Skeleton
+ */
 export function SkeletonAgentCard({ className }: SkeletonProps) {
   return (
-    <div className={cn("bg-gray-800 rounded-lg p-5 space-y-4", className)}>
+    <div className={cn('bg-[#111214] rounded-[10px] p-4 space-y-4 border border-[#1F2226]', className)}>
       <div className="flex items-center gap-3">
         <Skeleton className="w-10 h-10 rounded-lg" />
         <div className="flex-1 space-y-2">
@@ -151,18 +179,32 @@ export function SkeletonAgentCard({ className }: SkeletonProps) {
   );
 }
 
-// Full page loading state
+/**
+ * Metric Box Skeleton
+ */
+export function SkeletonMetric({ className }: SkeletonProps) {
+  return (
+    <div className={cn('bg-[#111214] rounded-[10px] p-3 border border-[#1F2226]', className)}>
+      <Skeleton className="h-3 w-16 mb-2" />
+      <Skeleton className="h-6 w-12" />
+    </div>
+  );
+}
+
+/**
+ * Full Page Loading State
+ */
 export function SkeletonPage() {
   return (
     <div className="space-y-6">
       <SkeletonHeader />
       <SkeletonStats />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <Skeleton className="h-48 w-full rounded-lg" />
-          <Skeleton className="h-48 w-full rounded-lg" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="lg:col-span-2 space-y-3">
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
-        <Skeleton className="h-96 w-full rounded-lg" />
+        <SkeletonCard />
       </div>
     </div>
   );

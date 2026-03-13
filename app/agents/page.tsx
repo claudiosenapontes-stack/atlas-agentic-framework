@@ -43,6 +43,17 @@ async function getLiveAgents(): Promise<AgentMetrics[]> {
   }
 }
 
+/**
+ * AGENTS PAGE — Business Layer
+ * 
+ * Visual characteristics:
+ * - Clean, structured, calmer
+ * - Standard card backgrounds (#111214)
+ * - Clear typography hierarchy
+ * - Organized grid layout
+ * - Status without visual noise
+ */
+
 export default async function AgentsPage() {
   const agents = await getLiveAgents();
 
@@ -53,7 +64,7 @@ export default async function AgentsPage() {
     role: agent.agentType,
     status: agent.status,
     currentTask: agent.currentTask || null,
-    loadPercent: Math.round(agent.cpu * 10) || Math.floor(Math.random() * 30), // Use CPU as proxy for load, or random low
+    loadPercent: Math.round(agent.cpu * 10) || Math.floor(Math.random() * 30),
     lastSeen: agent.status === 'online' ? 'Active now' : formatLastSeen(agent.lastSeen),
     delegation_level: agent.agentType,
   }));
@@ -65,164 +76,167 @@ export default async function AgentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header — Clean Business Style */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Agent Fleet</h1>
-          <p className="text-gray-400 mt-1">Monitor and manage your AI agents</p>
+          <h1 className="text-xl font-semibold text-white">Agent Fleet</h1>
+          <p className="text-sm text-[#6B7280] mt-0.5">Monitor and manage AI agents</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm text-green-400 font-medium">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#16C784]/10 border border-[#16C784]/30 rounded-lg">
+            <div className="w-1.5 h-1.5 bg-[#16C784] rounded-full animate-pulse" />
+            <span className="text-xs text-[#16C784] font-medium">
               {onlineCount} Online
             </span>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <Cpu className="w-4 h-4 text-blue-400" />
-            <span className="text-sm text-blue-400 font-medium">
-              {avgLoad}% Avg Load
+          <div className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg">
+            <Cpu className="w-4 h-4 text-[#9BA3AF]" />
+            <span className="text-xs text-[#9BA3AF] font-medium">
+              {avgLoad}% Load
             </span>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Users className="w-5 h-5 text-blue-400" />}
+      {/* Stats Grid — Clean Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <FleetStatCard
+          icon={<Users className="w-4 h-4 text-[#9BA3AF]" />}
           label="Total Agents"
           value={enrichedAgents.length}
-          trend=""
         />
-        <StatCard
-          icon={<CheckCircle className="w-5 h-5 text-green-400" />}
+        <FleetStatCard
+          icon={<CheckCircle className="w-4 h-4 text-[#16C784]" />}
           label="Active"
           value={onlineCount}
-          trend={`${Math.round((onlineCount / enrichedAgents.length) * 100)}%`}
-          trendColor="text-green-400"
+          suffix={`${Math.round((onlineCount / enrichedAgents.length) * 100)}%`}
         />
-        <StatCard
-          icon={<Activity className="w-5 h-5 text-purple-400" />}
+        <FleetStatCard
+          icon={<Activity className="w-4 h-4 text-[#FFB020]" />}
           label="Avg Load"
           value={`${avgLoad}%`}
-          trend={avgLoad > 80 ? "High" : avgLoad > 50 ? "Normal" : "Low"}
-          trendColor={avgLoad > 80 ? "text-red-400" : avgLoad > 50 ? "text-yellow-400" : "text-green-400"}
+          status={avgLoad > 80 ? 'critical' : avgLoad > 50 ? 'warning' : 'normal'}
         />
-        <StatCard
-          icon={<Clock className="w-5 h-5 text-orange-400" />}
+        <FleetStatCard
+          icon={<Clock className="w-4 h-4 text-[#9BA3AF]" />}
           label="Tasks Today"
           value="24"
-          trend="+3 from yesterday"
-          trendColor="text-blue-400"
+          suffix="+3"
         />
       </div>
 
-      {/* Agent Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Agent Cards Grid — Clean Business Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {enrichedAgents.map((agent: any) => (
-          <AgentCard key={agent.id} agent={agent} />
+          <FleetAgentCard key={agent.id} agent={agent} />
         ))}
       </div>
     </div>
   );
 }
 
-function StatCard({
+function FleetStatCard({
   icon,
   label,
   value,
-  trend,
-  trendColor = "text-gray-400",
+  suffix,
+  status = 'neutral',
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  trend: string;
-  trendColor?: string;
+  suffix?: string;
+  status?: 'normal' | 'warning' | 'critical' | 'neutral';
 }) {
+  const statusColors = {
+    normal: 'text-[#16C784]',
+    warning: 'text-[#FFB020]',
+    critical: 'text-[#FF3B30]',
+    neutral: 'text-[#6B7280]',
+  };
+
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <div className="flex items-center gap-3 mb-2">
+    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
+      <div className="flex items-center gap-2 mb-2">
         {icon}
-        <span className="text-gray-400 text-sm">{label}</span>
+        <span className="text-[#6B7280] text-xs">{label}</span>
       </div>
       <div className="flex items-end justify-between">
-        <span className="text-2xl font-bold text-white">{value}</span>
-        {trend && <span className={`text-xs ${trendColor}`}>{trend}</span>}
+        <span className="text-xl font-semibold text-white">{value}</span>
+        {suffix && <span className={`text-xs ${statusColors[status]}`}>{suffix}</span>}
       </div>
     </div>
   );
 }
 
-function AgentCard({ agent }: { agent: any }) {
+function FleetAgentCard({ agent }: { agent: any }) {
   const isOnline = agent.status === "online";
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg p-5 hover:border-gray-700 transition-colors">
+    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4 hover:border-[#6B7280]/30 transition-colors">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              isOnline ? "bg-green-500/20" : "bg-gray-700/50"
+            className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+              isOnline ? "bg-[#16C784]/10" : "bg-[#1F2226]"
             }`}
           >
             {isOnline ? (
-              <Zap className="w-5 h-5 text-green-500" />
+              <Zap className="w-4 h-4 text-[#16C784]" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-gray-500" />
+              <AlertCircle className="w-4 h-4 text-[#6B7280]" />
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-white">{agent.display_name || agent.name}</h3>
-            <p className="text-xs text-gray-500 capitalize">{agent.role}</p>
+            <h3 className="font-medium text-sm text-white">{agent.display_name || agent.name}</h3>
+            <p className="text-[10px] text-[#6B7280] capitalize">{agent.role}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
           <span
-            className={`w-2 h-2 rounded-full ${
-              isOnline ? "bg-green-500 animate-pulse" : "bg-gray-600"
+            className={`w-1.5 h-1.5 rounded-full ${
+              isOnline ? "bg-[#16C784] animate-pulse" : "bg-[#6B7280]"
             }`}
           />
-          <span className={`text-xs ${isOnline ? "text-green-400" : "text-gray-500"}`}>
+          <span className={`text-[10px] ${isOnline ? "text-[#16C784]" : "text-[#6B7280]"}`}>
             {isOnline ? "Online" : "Offline"}
           </span>
         </div>
       </div>
 
       {/* Current Task */}
-      <div className="mb-4">
-        <p className="text-xs text-gray-500 mb-1">Current Task</p>
-        <p className={`text-sm ${agent.currentTask ? "text-white" : "text-gray-600 italic"}`}>
+      <div className="mb-3">
+        <p className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Current Task</p>
+        <p className={`text-xs ${agent.currentTask ? "text-[#9BA3AF]" : "text-[#6B7280] italic"}`}>
           {agent.currentTask || "No active task"}
         </p>
       </div>
 
       {/* Load Bar */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500">Load</span>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-[#6B7280] uppercase tracking-wider">Load</span>
           <span
             className={`font-medium ${
               agent.loadPercent > 80
-                ? "text-red-400"
+                ? "text-[#FF3B30]"
                 : agent.loadPercent > 50
-                ? "text-yellow-400"
-                : "text-green-400"
+                ? "text-[#FFB020]"
+                : "text-[#16C784]"
             }`}
           >
             {agent.loadPercent}%
           </span>
         </div>
-        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-1 bg-[#1F2226] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
               agent.loadPercent > 80
-                ? "bg-red-500"
+                ? "bg-[#FF3B30]"
                 : agent.loadPercent > 50
-                ? "bg-yellow-500"
-                : "bg-green-500"
+                ? "bg-[#FFB020]"
+                : "bg-[#16C784]"
             }`}
             style={{ width: `${agent.loadPercent}%` }}
           />
@@ -230,10 +244,10 @@ function AgentCard({ agent }: { agent: any }) {
       </div>
 
       {/* Footer */}
-      <div className="mt-4 pt-3 border-t border-gray-800 flex items-center justify-between">
-        <span className="text-xs text-gray-600">{agent.lastSeen}</span>
+      <div className="mt-3 pt-3 border-t border-[#1F2226] flex items-center justify-between">
+        <span className="text-[10px] text-[#6B7280]">{agent.lastSeen}</span>
         {agent.delegation_level && (
-          <span className="text-xs text-blue-400 capitalize bg-blue-500/10 px-2 py-0.5 rounded">
+          <span className="text-[10px] text-[#9BA3AF] capitalize bg-[#1F2226] px-2 py-0.5 rounded">
             {agent.delegation_level}
           </span>
         )}

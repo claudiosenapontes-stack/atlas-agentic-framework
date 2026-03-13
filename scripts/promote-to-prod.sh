@@ -57,7 +57,7 @@ echo ""
 
 # Check Gate 4 status in source code
 echo "🔍 Checking Gate 4 status in source..."
-G4_STATUS=$(grep -o 'gate4.*=.*"[^"]*"' app/components/gate-status-mars.tsx | head -1 | grep -o 'operational\|in_progress\|pending\|degraded' || echo "unknown")
+G4_STATUS=$(grep -A5 "export function GateStatusMars" app/components/gate-status-mars.tsx | grep "gate4" | grep -o "'operational'\|'in_progress'\|'pending'\|'degraded'" | head -1 | tr -d "'" || echo "unknown")
 
 if [ "$G4_STATUS" == "operational" ]; then
   echo "   ✅ G4 status: VERIFIED (operational)"

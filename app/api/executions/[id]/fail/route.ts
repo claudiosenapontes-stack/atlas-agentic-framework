@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { 
+  calculateRetryDelay, 
+  isRetryable, 
+  type FailureClass,
+  DEFAULT_RETRY_POLICY 
+} from "@/lib/retry-engine";
 
-// Valid failure classifications
-type FailureClass = "transient" | "permanent" | "timeout" | "crash";
 const VALID_FAILURE_CLASSES: FailureClass[] = ["transient", "permanent", "timeout", "crash"];
 
 /**
@@ -82,17 +86,39 @@ export async function POST(
       );
     }
 
-    // Step 3: Get retry policy
+    // Step 3: Get retry policy and calculate retry
     const { data: retryPolicy } = await supabaseAdmin
       .from("retry_policies")
       .select("*")
-      .eq("name", "default")
+      .eq("name", exec.retry_policy_name || "default")
       .single();
 
-    const retryPolicyData = retryPolicy as { max_attempts?: number } | null;
-    const maxAttempts = retryPolicyData?.max_attempts ?? 3;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp: any = retryPolicy;
+    const policy = rp ? {
+      name: rp.name,
+      max_attempts: rp.max_attempts,
+      base_delay_ms: rp.base_delay_ms,
+      max_delay_ms: rp.max_delay_ms,
+      backoff_multiplier: rp.backoff_multiplier,
+      jitter_factor: rp.jitter_factor,
+      retryable_classes: rp.retryable_classes,
+      non_retryable_classes: rp.non_retryable_classes,
+    } : DEFAULT_RETRY_POLICY;
+
     const currentAttempt = exec.attempt_number || 1;
-    const shouldRetry = failure_class !== "permanent" && currentAttempt < maxAttempts;
+    const { retryable: shouldRetry, reason: retryReason } = isRetryable(
+      failure_class,
+      currentAttempt,
+      policy
+    );
+    
+    const retryDelayMs = shouldRetry 
+      ? calculateRetryDelay(currentAttempt, policy)
+      : 0;
+    const retryAt = shouldRetry 
+      ? new Date(now.getTime() + retryDelayMs)
+      : null;
 
     // Step 4: Create execution attempt record
     const { data: attempt, error: attemptError } = await supabaseAdmin
@@ -121,12 +147,14 @@ export async function POST(
 
     // Step 6: Update execution status
     const executionUpdates: any = {
-      status: shouldRetry ? "pending" : "failed", // Return to pending if retryable
+      status: shouldRetry ? "pending" : "failed",
       failure_class: failure_class,
       error_message: error_message || null,
       output_snapshot: output_snapshot || null,
       completed_at: shouldRetry ? null : now.toISOString(),
       attempt_number: currentAttempt + 1,
+      retry_count: (exec.retry_count || 0) + 1,
+      retry_at: shouldRetry ? retryAt?.toISOString() : null,
       updated_at: now.toISOString(),
     };
 
@@ -174,13 +202,17 @@ export async function POST(
         error_message,
         attempt_number: currentAttempt,
         should_retry: shouldRetry,
-        max_attempts: maxAttempts,
+        retry_delay_ms: shouldRetry ? retryDelayMs : null,
+        retry_at: retryAt ? retryAt.toISOString() : null,
       },
       attempt,
       retry: shouldRetry ? {
         eligible: true,
         next_attempt: currentAttempt + 1,
-        delay_ms: failure_class === "timeout" ? 10000 : failure_class === "crash" ? 30000 : 5000,
+        delay_ms: retryDelayMs,
+        next_attempt_at: retryAt?.toISOString(),
+        policy: policy.name,
+        reason: "exponential_backoff_with_jitter",
       } : {
         eligible: false,
         reason: failure_class === "permanent" ? "permanent_failure" : "max_attempts_reached",

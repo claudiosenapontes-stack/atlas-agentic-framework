@@ -27,6 +27,9 @@ interface Mission {
   actual_end_date?: string;
   success_criteria?: any[];
   evidence_bundle?: any;
+  henry_audit_verdict?: string;
+  current_blocker?: string | null;
+  closure_confidence?: number;
   metadata?: any;
   category?: string;
   company_id?: string;
@@ -129,8 +132,13 @@ export default function MissionDetailPage() {
     );
   }
 
-  const evidence = mission.evidence_bundle || {};
+  const evidence = mission.evidence_bundle || [];
   const successCriteria = mission.success_criteria || [];
+  
+  // Get Henry verdict from multiple possible field names
+  const henryVerdict = mission.henry_audit_verdict || (mission as any).henryAuditVerdict || 'pending';
+  const currentBlocker = mission.current_blocker || (mission as any).currentBlocker || null;
+  const closureConfidence = (mission as any).closure_confidence || (mission as any).closureConfidence || 0;
 
   return (
     <div className="min-h-screen bg-[#0B0B0C] p-6">
@@ -208,6 +216,69 @@ export default function MissionDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {/* Henry Audit Verdict */}
+          <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
+            <h3 className="text-sm font-medium text-white mb-3">Henry Audit Verdict</h3>
+            <div className={`p-3 rounded-lg ${
+              henryVerdict === 'approved' ? 'bg-[#16C784]/10 border border-[#16C784]/30' :
+              henryVerdict === 'needs_work' ? 'bg-[#FF3B30]/10 border border-[#FF3B30]/30' :
+              'bg-[#FFB020]/10 border border-[#FFB020]/30'
+            }`}>
+              <div className="flex items-center gap-2">
+                {henryVerdict === 'approved' ? <CheckCircle2 className="w-5 h-5 text-[#16C784]" /> :
+                 henryVerdict === 'needs_work' ? <AlertCircle className="w-5 h-5 text-[#FF3B30]" /> :
+                 <Clock className="w-5 h-5 text-[#FFB020]" />}
+                <span className={`text-sm font-semibold ${
+                  henryVerdict === 'approved' ? 'text-[#16C784]' :
+                  henryVerdict === 'needs_work' ? 'text-[#FF3B30]' :
+                  'text-[#FFB020]'
+                }`}>
+                  {henryVerdict.toUpperCase()}
+                </span>
+              </div>
+            </div>
+            {/* Closure Confidence */}
+            <div className="mt-4">
+              <p className="text-xs text-[#6B7280] mb-1">Closure Confidence</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-[#1F2226] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#16C784] rounded-full" style={{ width: `${closureConfidence}%` }} />
+                </div>
+                <span className="text-sm text-white font-medium">{closureConfidence}%</span>
+              </div>
+            </div>
+            {/* Current Blocker */}
+            {currentBlocker && (
+              <div className="mt-4 p-3 bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertCircle className="w-4 h-4 text-[#FF3B30]" />
+                  <span className="text-xs uppercase font-bold text-[#FF3B30]">Current Blocker</span>
+                </div>
+                <p className="text-sm text-[#FF3B30]/90">{currentBlocker}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Evidence Bundle */}
+          {evidence && (Array.isArray(evidence) ? evidence.length > 0 : Object.keys(evidence).length > 0) && (
+            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
+              <h3 className="text-sm font-medium text-white mb-3">Evidence Bundle</h3>
+              <div className="space-y-2">
+                {Array.isArray(evidence) ? evidence.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2 bg-[#1F2226] rounded">
+                    <FileText className="w-4 h-4 text-[#6B7280]" />
+                    <span className="text-sm text-[#9BA3AF]">{item}</span>
+                  </div>
+                )) : Object.entries(evidence).map(([key, value], idx) => (
+                  <div key={idx} className="p-2 bg-[#1F2226] rounded">
+                    <p className="text-xs text-[#6B7280]">{key}</p>
+                    <p className="text-sm text-[#9BA3AF]">{String(value)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Owner */}
           <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
             <h3 className="text-sm font-medium text-white mb-3">Ownership</h3>

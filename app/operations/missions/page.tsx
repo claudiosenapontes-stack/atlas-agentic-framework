@@ -178,14 +178,19 @@ export default function MissionsPage() {
                   )}
                 </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#6B7280]">{(mission.assigned_agents || mission.assignedAgents).length} agents</span>
-                  {henry !== 'pending' && (
-                    <span className={`text-xs font-medium ${henry === 'approved' ? 'text-[#16C784]' : 'text-[#FF3B30]'}`}>
-                      Henry: {henry.toUpperCase()}
-                    </span>
-                  )}
+                {/* Footer - Henry Verdict Always Visible */}
+                <div className="flex items-center justify-between pt-2 border-t border-[#1F2226]">
+                  <span className="text-xs text-[#6B7280]">
+                    <Users className="w-3 h-3 inline mr-1" />
+                    {(mission.assigned_agents || mission.assignedAgents).length} agents
+                  </span>
+                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                    henry === 'approved' ? 'bg-[#16C784]/10 text-[#16C784]' : 
+                    henry === 'needs_work' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
+                    'bg-[#FFB020]/10 text-[#FFB020]'
+                  }`}>
+                    Henry: {henry}
+                  </span>
                 </div>
               </div>
             </Link>

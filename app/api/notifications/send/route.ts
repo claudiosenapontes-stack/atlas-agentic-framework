@@ -86,91 +86,146 @@ export async function POST(request: NextRequest) {
       }
 
       case "meeting_prep": {
-        if (!body.event) {
+        // ATLAS-OPTIMUS-EO-BLOCKER-FIXES-043: Fetch event by ID
+        const eventId = body.event_id || (body.event?.id);
+        if (!eventId) {
           return NextResponse.json(
-            { sent: false, error: "Missing event data", timestamp: now },
+            { sent: false, error: "Missing event_id (fetch by ID)", timestamp: now },
             { status: 400 }
           );
         }
         
-        title = `Meeting Prep Required: ${body.event.title}`;
+        // Fetch real record from database
+        const { data: event, error: eventError } = await (supabase as any)
+          .from('executive_events')
+          .select('*')
+          .eq('id', eventId)
+          .single();
+        
+        if (eventError || !event) {
+          return NextResponse.json(
+            { sent: false, error: `Event not found: ${eventId}`, details: eventError?.message, timestamp: now },
+            { status: 404 }
+          );
+        }
+        
+        title = `Meeting Prep Required: ${event.title}`;
+        
+        const attendees = event.attendees || [];
+        const prepRequirements = event.prep_requirements || body.prep_requirements || [];
         
         messageText = [
           `📅 **${title}**`,
           ``,
-          `**When:** ${new Date(body.event.start_time).toLocaleString()}`,
-          `**Attendees:** ${body.event.attendees.join(', ')}`,
-          body.event.location ? `**Location:** ${body.event.location}` : null,
-          body.event.meet_link ? `**Link:** ${body.event.meet_link}` : null,
+          `**When:** ${new Date(event.start_time).toLocaleString()}`,
+          attendees.length > 0 ? `**Attendees:** ${Array.isArray(attendees) ? attendees.join(', ') : attendees}` : null,
+          event.location ? `**Location:** ${event.location}` : null,
+          event.meet_link ? `**Link:** ${event.meet_link}` : null,
           ``,
-          body.prep_requirements ? `**Prep Required:**` : null,
-          ...(body.prep_requirements || []).map((req: string) => `• ${req}`),
+          prepRequirements.length > 0 ? `**Prep Required:**` : null,
+          ...(prepRequirements || []).map((req: string) => `• ${req}`),
           ``,
           `Priority: ${(body.priority || 'normal').toUpperCase()}`,
         ].filter(Boolean).join("\n");
 
         metadata = {
-          event_id: body.event.id,
-          prep_requirements: body.prep_requirements || [],
+          event_id: event.id,
+          prep_requirements: prepRequirements,
+          fetched_at: now,
         };
         break;
       }
 
       case "approval_request": {
-        if (!body.approval) {
+        // ATLAS-OPTIMUS-EO-BLOCKER-FIXES-043: Fetch approval by ID
+        const approvalId = body.approval_id || (body.approval?.id);
+        if (!approvalId) {
           return NextResponse.json(
-            { sent: false, error: "Missing approval data", timestamp: now },
+            { sent: false, error: "Missing approval_id (fetch by ID)", timestamp: now },
             { status: 400 }
           );
         }
         
-        title = `Approval Request: ${body.approval.title}`;
+        // Fetch real record from database
+        const { data: approval, error: approvalError } = await (supabase as any)
+          .from('approval_requests')
+          .select('*')
+          .eq('id', approvalId)
+          .single();
+        
+        if (approvalError || !approval) {
+          return NextResponse.json(
+            { sent: false, error: `Approval not found: ${approvalId}`, details: approvalError?.message, timestamp: now },
+            { status: 404 }
+          );
+        }
+        
+        title = `Approval Request: ${approval.title}`;
         
         messageText = [
           `⏳ **${title}**`,
           ``,
-          `**Type:** ${body.approval.request_type}`,
-          body.approval.description ? `**Description:** ${body.approval.description}` : null,
-          body.approval.amount ? `**Amount:** $${body.approval.amount.toLocaleString()} ${body.approval.currency || 'USD'}` : null,
+          `**Type:** ${approval.request_type || 'General'}`,
+          approval.description ? `**Description:** ${approval.description}` : null,
+          approval.amount ? `**Amount:** $${Number(approval.amount).toLocaleString()} ${approval.currency || 'USD'}` : null,
           ``,
-          `**Requested by:** ${body.approval.requested_by}`,
-          `**Requested at:** ${new Date(body.approval.requested_at).toLocaleString()}`,
-          body.approval.expires_at ? `**Expires:** ${new Date(body.approval.expires_at).toLocaleString()}` : null,
+          `**Requested by:** ${approval.requester_id || approval.requested_by || 'Unknown'}`,
+          approval.created_at ? `**Requested at:** ${new Date(approval.created_at).toLocaleString()}` : null,
+          approval.expires_at ? `**Expires:** ${new Date(approval.expires_at).toLocaleString()}` : null,
           ``,
           `Priority: ${(body.priority || 'normal').toUpperCase()}`,
         ].filter(Boolean).join("\n");
 
         metadata = {
-          approval_id: body.approval.id,
-          request_type: body.approval.request_type,
+          approval_id: approval.id,
+          request_type: approval.request_type,
+          fetched_at: now,
         };
         break;
       }
 
       case "watchlist_alert": {
-        if (!body.watchlist_item) {
+        // ATLAS-OPTIMUS-EO-BLOCKER-FIXES-043: Fetch watchlist item by ID
+        const watchlistItemId = body.watchlist_item_id || (body.watchlist_item?.id);
+        if (!watchlistItemId) {
           return NextResponse.json(
-            { sent: false, error: "Missing watchlist_item data", timestamp: now },
+            { sent: false, error: "Missing watchlist_item_id (fetch by ID)", timestamp: now },
             { status: 400 }
           );
         }
         
-        title = `Watchlist Alert: ${body.watchlist_item.title}`;
+        // Fetch real record from database
+        const { data: watchlistItem, error: watchlistError } = await (supabase as any)
+          .from('watchlist_items')
+          .select('*')
+          .eq('id', watchlistItemId)
+          .single();
+        
+        if (watchlistError || !watchlistItem) {
+          return NextResponse.json(
+            { sent: false, error: `Watchlist item not found: ${watchlistItemId}`, details: watchlistError?.message, timestamp: now },
+            { status: 404 }
+          );
+        }
+        
+        title = `Watchlist Alert: ${watchlistItem.title}`;
         
         messageText = [
           `👁️ **${title}**`,
           ``,
-          `**Category:** ${body.watchlist_item.category}`,
-          body.watchlist_item.entity_type ? `**Entity Type:** ${body.watchlist_item.entity_type}` : null,
-          body.watchlist_item.entity_name ? `**Entity:** ${body.watchlist_item.entity_name}` : null,
-          body.watchlist_item.reason ? `**Reason:** ${body.watchlist_item.reason}` : null,
+          `**Category:** ${watchlistItem.category}`,
+          watchlistItem.entity_type ? `**Entity Type:** ${watchlistItem.entity_type}` : null,
+          watchlistItem.entity_name ? `**Entity:** ${watchlistItem.entity_name}` : null,
+          watchlistItem.reason ? `**Reason:** ${watchlistItem.reason}` : null,
+          watchlistItem.notes ? `**Notes:** ${watchlistItem.notes}` : null,
           ``,
-          `Priority: ${(body.priority || 'normal').toUpperCase()}`,
+          `Priority: ${(body.priority || watchlistItem.priority || 'normal').toUpperCase()}`,
         ].filter(Boolean).join("\n");
 
         metadata = {
-          watchlist_item_id: body.watchlist_item.id,
-          category: body.watchlist_item.category,
+          watchlist_item_id: watchlistItem.id,
+          category: watchlistItem.category,
+          fetched_at: now,
         };
         break;
       }
@@ -261,6 +316,11 @@ export async function GET() {
     supported_types: VALID_NOTIFICATION_TYPES,
     supported_channels: ["telegram", "in_app"],
     telegram_mappings: Object.keys(TELEGRAM_MAPPINGS),
+    features: [
+      "meeting_prep: fetches executive_events by event_id",
+      "approval_request: fetches approval_requests by approval_id", 
+      "watchlist_alert: fetches watchlist_items by watchlist_item_id"
+    ],
     timestamp: now,
   }, { status: 200 });
 }

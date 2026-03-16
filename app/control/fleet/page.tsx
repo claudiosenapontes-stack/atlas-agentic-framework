@@ -197,8 +197,11 @@ export default function FleetPage() {
 
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-white">Agent Fleet</h1>
-            <p className="text-sm text-[#6B7280] mt-0.5">Monitor and manage AI agents</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold text-white">Fleet</h1>
+              <span className="text-[10px] px-2 py-0.5 bg-[#16C784]/10 text-[#16C784] rounded-full uppercase tracking-wider">Runtime</span>
+            </div>
+            <p className="text-sm text-[#6B7280] mt-0.5">Live health, telemetry, and restart control</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-2 bg-[#16C784]/10 border border-[#16C784]/30 rounded-lg">
@@ -342,18 +345,12 @@ function FleetAgentCard({ agent, restartState, restartProgress, onBoostRestart }
         </div>
       )}
 
-      {/* TRUTH BADGE: Manual protocol required */}
-      <div className="mb-3 p-2 bg-[#FFB020]/5 rounded border border-[#FFB020]/20">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-3 h-3 text-[#FFB020]" />
-          <span className="text-[10px] text-[#FFB020]">Manual protocol required until backend verification complete</span>
-        </div>
-      </div>
-
+      {/* Boost Restart - Truthful State */}
       <button
         onClick={onBoostRestart}
         disabled={true}
         className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-[#1F2226] text-[#6B7280] border border-[#1F2226] cursor-not-allowed"
+        title="Per-agent boost restart endpoint not implemented"
       >
         <Zap className="w-3.5 h-3.5" />
         Not wired yet

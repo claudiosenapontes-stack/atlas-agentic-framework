@@ -104,8 +104,11 @@ export default function AgentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Agent Profiles</h1>
-            <p className="text-sm text-[#6B7280] mt-0.5">Skills, capabilities, and configuration</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-white">Agents</h1>
+              <span className="text-[10px] px-2 py-0.5 bg-[#3B82F6]/10 text-[#3B82F6] rounded-full uppercase tracking-wider">Profiles</span>
+            </div>
+            <p className="text-sm text-[#6B7280] mt-0.5">Skills, capabilities, model routing, and configuration</p>
           </div>
           <div className="flex items-center gap-3">
             {dataSource === 'live' ? (

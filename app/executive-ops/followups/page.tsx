@@ -78,11 +78,11 @@ export default function FollowUpsPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[10px] bg-[#FFB020]/10 border border-[#FFB020]/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-[#FFB020]/20 to-[#FFB020]/10 border border-[#FFB020]/30 flex items-center justify-center">
               <Clock className="w-5 h-5 text-[#FFB020]" />
             </div>
             <div>

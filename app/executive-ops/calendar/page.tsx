@@ -95,11 +95,11 @@ export default function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[10px] bg-[#3B82F6]/10 border border-[#3B82F6]/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-[#3B82F6]/20 to-[#3B82F6]/10 border border-[#3B82F6]/30 flex items-center justify-center">
               <Calendar className="w-5 h-5 text-[#3B82F6]" />
             </div>
             <div>

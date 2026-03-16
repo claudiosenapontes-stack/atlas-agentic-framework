@@ -1,115 +1,136 @@
-'use client';
+'.use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
   Target, ArrowLeft, Users, CheckCircle2, Clock, AlertCircle,
-  Flag, Shield, FileText, Rocket
+  Flag, Shield, FileText, Rocket, Loader2, CheckCircle
 } from 'lucide-react';
 
 interface Mission {
   id: string;
   title: string;
-  objective: string;
-  owner: string;
+  objective?: string;
+  description?: string;
+  owner_agent?: string;
+  owner_id?: string;
   phase: string;
   status: string;
-  realm: string;
-  percentComplete: number;
-  successCriteria: string;
-  assignedAgents: string[];
-  evidenceReceived: string[];
-  henryAuditVerdict: string;
-  currentBlocker: string | null;
-  childTasks: { id: string; title: string; status: string; assignee: string }[];
+  priority: string;
+  progress_percent: number;
+  child_task_count: number;
+  completed_task_count: number;
+  target_start_date?: string;
+  target_end_date?: string;
+  actual_start_date?: string;
+  actual_end_date?: string;
+  success_criteria?: any[];
+  evidence_bundle?: any;
+  metadata?: any;
+  category?: string;
+  company_id?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const demoMissions: Record<string, Mission> = {
-  "mission-001": {
-    id: "mission-001",
-    title: "ATLAS Gate 4 Verification",
-    objective: "Complete Gate 4 milestone verification with full evidence package",
-    owner: "Henry",
-    phase: "audit",
-    status: "in_progress",
-    realm: "Operations",
-    percentComplete: 75,
-    successCriteria: "All 5 audit points verified with documented evidence",
-    assignedAgents: ["Henry", "Olivia"],
-    evidenceReceived: ["Schema validation", "API contract tests", "Deployment logs"],
-    henryAuditVerdict: "pending",
-    currentBlocker: "Awaiting final deployment confirmation from Optimus",
-    childTasks: [
-      { id: "t1", title: "Verify schema migrations", status: "completed", assignee: "Olivia" },
-      { id: "t2", title: "Run integration tests", status: "in_progress", assignee: "Henry" },
-      { id: "t3", title: "Document findings", status: "pending", assignee: "Henry" },
-    ],
-  },
-  "mission-002": {
-    id: "mission-002",
-    title: "EO Backend Stability",
-    objective: "Resolve all Executive Ops backend timeouts and ensure 99% uptime",
-    owner: "Olivia",
-    phase: "stabilization",
-    status: "in_progress",
-    realm: "Executive Ops",
-    percentComplete: 60,
-    successCriteria: "All EO APIs respond < 2s, zero timeout errors for 24h",
-    assignedAgents: ["Olivia", "Optimus"],
-    evidenceReceived: ["Timeout logs analyzed", "DB connection pool optimized"],
-    henryAuditVerdict: "needs_work",
-    currentBlocker: "Supabase connection intermittent - needs retry logic",
-    childTasks: [
-      { id: "t1", title: "Add connection pooling", status: "completed", assignee: "Optimus" },
-      { id: "t2", title: "Implement retry logic", status: "in_progress", assignee: "Olivia" },
-      { id: "t3", title: "Add circuit breaker", status: "pending", assignee: "Optimus" },
-    ],
-  },
-  "mission-003": {
-    id: "mission-003",
-    title: "Knowledge Realm Standardization",
-    objective: "Standardize all realm visual patterns and full-width layouts",
-    owner: "Prime",
-    phase: "implementation",
-    status: "completed",
-    realm: "Knowledge",
-    percentComplete: 100,
-    successCriteria: "All 15+ pages use consistent Knowledge pattern",
-    assignedAgents: ["Prime"],
-    evidenceReceived: ["Visual audit complete", "All pages deployed", "Verification passed"],
-    henryAuditVerdict: "approved",
-    currentBlocker: null,
-    childTasks: [
-      { id: "t1", title: "Audit existing pages", status: "completed", assignee: "Prime" },
-      { id: "t2", title: "Apply standardization", status: "completed", assignee: "Prime" },
-      { id: "t3", title: "Deploy to production", status: "completed", assignee: "Prime" },
-    ],
-  },
-};
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  assignee_agent?: string;
+  assignee_id?: string;
+}
 
 const statusColors: Record<string, string> = {
+  draft: 'bg-[#6B7280]/10 text-[#6B7280] border-[#6B7280]/30',
   pending: 'bg-[#6B7280]/10 text-[#6B7280] border-[#6B7280]/30',
+  active: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/30',
   in_progress: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/30',
   completed: 'bg-[#16C784]/10 text-[#16C784] border-[#16C784]/30',
+  closed: 'bg-[#16C784]/10 text-[#16C784] border-[#16C784]/30',
+  cancelled: 'bg-[#FF3B30]/10 text-[#FF3B30] border-[#FF3B30]/30',
+};
+
+const phaseColors: Record<string, string> = {
+  planning: 'text-[#6B7280]',
+  execution: 'text-[#3B82F6]',
+  verification: 'text-[#FF6A00]',
+  closure: 'text-[#16C784]',
 };
 
 export default function MissionDetailPage() {
   const params = useParams();
   const missionId = params.id as string;
-  const mission = demoMissions[missionId];
+  
+  const [mission, setMission] = useState<Mission | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!mission) {
+  // Fetch mission data
+  useEffect(() => {
+    async function fetchMission() {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/missions/${missionId}?include_tasks=true`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Mission not found');
+            return;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.success) {
+          setMission(data.mission);
+          setTasks(data.mission?.mission_tasks?.map((mt: any) => ({
+            id: mt.task_id,
+            title: mt.tasks?.title || 'Untitled Task',
+            status: mt.tasks?.status || 'pending',
+            assignee_agent: mt.tasks?.assignee_agent,
+            assignee_id: mt.tasks?.assignee_id,
+          })) || []);
+        } else {
+          setError(data.error || 'Failed to load mission');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to load mission');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (missionId) {
+      fetchMission();
+    }
+  }, [missionId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0B0B0C] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-[#9BA3AF]">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Loading mission...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !mission) {
     return (
       <div className="min-h-screen bg-[#0B0B0C] p-6">
         <Link href="/operations/missions" className="text-[#9BA3AF] hover:text-white">← Back</Link>
         <div className="text-center py-20">
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-[#FF3B30]" />
-          <h2 className="text-xl font-semibold text-white">Mission not found</h2>
+          <h2 className="text-xl font-semibold text-white">{error || 'Mission not found'}</h2>
         </div>
       </div>
     );
   }
+
+  const evidence = mission.evidence_bundle || {};
+  const successCriteria = mission.success_criteria || [];
 
   return (
     <div className="min-h-screen bg-[#0B0B0C] p-6">
@@ -121,64 +142,120 @@ export default function MissionDetailPage() {
             <Rocket className="w-5 h-5 text-[#FF6A00]" />
           </div>
           <div>
-            <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${statusColors[mission.status]}`}>{mission.status}</span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${statusColors[mission.status] || statusColors.draft}`}>
+                {mission.status}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full bg-[#1F2226] ${phaseColors[mission.phase] || phaseColors.planning}`}>
+                {mission.phase}
+              </span>
+            </div>
             <h1 className="text-2xl font-semibold text-white mt-1">{mission.title}</h1>
           </div>
         </div>
-        <p className="text-sm text-[#9BA3AF]">{mission.objective}</p>
+        <p className="text-sm text-[#9BA3AF]">{mission.objective || mission.description || 'No objective set'}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Progress */}
           <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
-            <h3 className="text-sm font-medium text-white mb-3">Success Criteria</h3>
-            <p className="text-sm text-[#9BA3AF]">{mission.successCriteria}</p>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-white">Progress</h3>
+              <span className="text-sm text-white font-medium">{mission.progress_percent || 0}%</span>
+            </div>
+            <div className="h-2 bg-[#1F2226] rounded-full overflow-hidden mb-2">
+              <div className="h-full bg-[#FF6A00] rounded-full transition-all" style={{ width: `${mission.progress_percent || 0}%` }} />
+            </div>
+            <p className="text-xs text-[#6B7280]">
+              {mission.completed_task_count || 0} of {mission.child_task_count || 0} tasks completed
+            </p>
           </div>
 
-          <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
-            <h3 className="text-sm font-medium text-white mb-3">Tasks</h3>
-            <div className="space-y-2">
-              {mission.childTasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-3 p-3 bg-[#1F2226] rounded-lg">
-                  {task.status === 'completed' ? <CheckCircle2 className="w-4 h-4 text-[#16C784]" /> : <Clock className="w-4 h-4 text-[#3B82F6]" />}
-                  <span className="text-sm text-white">{task.title}</span>
-                  <span className="text-xs text-[#6B7280] ml-auto">{task.assignee}</span>
-                </div>
-              ))}
+          {/* Success Criteria */}
+          {successCriteria.length > 0 && (
+            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
+              <h3 className="text-sm font-medium text-white mb-3">Success Criteria</h3>
+              <ul className="space-y-2">
+                {successCriteria.map((criterion, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-[#9BA3AF]">
+                    <CheckCircle className="w-4 h-4 text-[#16C784] mt-0.5 flex-shrink-0" />
+                    <span>{typeof criterion === 'string' ? criterion : criterion.description || JSON.stringify(criterion)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
+          )}
+
+          {/* Tasks */}
+          {tasks.length > 0 && (
+            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
+              <h3 className="text-sm font-medium text-white mb-3">Tasks ({tasks.length})</h3>
+              <div className="space-y-2">
+                {tasks.map((task) => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 bg-[#1F2226] rounded-lg">
+                    {task.status === 'completed' ? 
+                      <CheckCircle2 className="w-4 h-4 text-[#16C784]" /> : 
+                      <Clock className="w-4 h-4 text-[#3B82F6]" />
+                    }
+                    <span className="text-sm text-white">{task.title}</span>
+                    <span className="text-xs text-[#6B7280] ml-auto">{task.assignee_agent || task.assignee_id || 'Unassigned'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
+          {/* Owner */}
           <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
-            <h3 className="text-sm font-medium text-white mb-3">Team</h3>
-            <p className="text-xs text-[#6B7280] mb-1">Owner</p>
-            <p className="text-sm text-white mb-3">{mission.owner}</p>
-            <p className="text-xs text-[#6B7280] mb-1">Assigned Agents</p>
-            <div className="flex flex-wrap gap-2">
-              {mission.assignedAgents.map((agent) => (
-                <span key={agent} className="px-2 py-1 bg-[#1F2226] rounded text-xs text-[#9BA3AF]">{agent}</span>
-              ))}
+            <h3 className="text-sm font-medium text-white mb-3">Ownership</h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">Owner Agent</p>
+                <p className="text-sm text-white">{mission.owner_agent || 'Unassigned'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">Priority</p>
+                <span className={`text-sm font-medium ${
+                  mission.priority === 'critical' ? 'text-[#FF3B30]' :
+                  mission.priority === 'high' ? 'text-[#FF6A00]' :
+                  mission.priority === 'medium' ? 'text-[#3B82F6]' :
+                  'text-[#6B7280]'
+                }`}>
+                  {mission.priority?.toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">Category</p>
+                <p className="text-sm text-white">{mission.category || 'Uncategorized'}</p>
+              </div>
             </div>
           </div>
 
+          {/* Timeline */}
           <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-5">
-            <h3 className="text-sm font-medium text-white mb-3">Henry's Verdict</h3>
-            <span className={`text-sm font-medium ${
-              mission.henryAuditVerdict === 'approved' ? 'text-[#16C784]' :
-              mission.henryAuditVerdict === 'needs_work' ? 'text-[#FF3B30]' :
-              'text-[#FFB020]'
-            }`}>
-              {mission.henryAuditVerdict.toUpperCase()}
-            </span>
-          </div>
-
-          {mission.currentBlocker && (
-            <div className="bg-[#FF3B30]/5 border border-[#FF3B30]/30 rounded-[10px] p-5">
-              <h3 className="text-sm font-medium text-[#FF3B30] mb-2">Current Blocker</h3>
-              <p className="text-sm text-white/80">{mission.currentBlocker}</p>
+            <h3 className="text-sm font-medium text-white mb-3">Timeline</h3>
+            <div className="space-y-3">
+              {mission.target_start_date && (
+                <div>
+                  <p className="text-xs text-[#6B7280] mb-1">Target Start</p>
+                  <p className="text-sm text-white">{new Date(mission.target_start_date).toLocaleDateString()}</p>
+                </div>
+              )}
+              {mission.target_end_date && (
+                <div>
+                  <p className="text-xs text-[#6B7280] mb-1">Target End</p>
+                  <p className="text-sm text-white">{new Date(mission.target_end_date).toLocaleDateString()}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-[#6B7280] mb-1">Created</p>
+                <p className="text-sm text-[#9BA3AF]">{new Date(mission.created_at).toLocaleDateString()}</p>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

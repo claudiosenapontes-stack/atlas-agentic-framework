@@ -24,7 +24,7 @@ export default function BudgetsPage() {
   async function fetchBudgets() {
     setLoading(true);
     try {
-      const res = await fetch('/api/finance/budgets', { cache: 'no-store' });
+      const res = await fetch('/api/finance/budgets?company_id=ARQIA', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setBudgets(data.budgets || []);

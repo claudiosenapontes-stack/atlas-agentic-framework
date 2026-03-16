@@ -22,7 +22,7 @@ export default function InvoicesPage() {
   async function fetchInvoices() {
     setLoading(true);
     try {
-      const res = await fetch('/api/finance/invoices', { cache: 'no-store' });
+      const res = await fetch('/api/finance/invoices?company_id=ARQIA', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setInvoices(data.invoices || []);

@@ -23,7 +23,7 @@ export default function FinanceApprovalsPage() {
   async function fetchApprovals() {
     setLoading(true);
     try {
-      const res = await fetch('/api/finance/approvals', { cache: 'no-store' });
+      const res = await fetch('/api/finance/approvals?company_id=ARQIA', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setApprovals(data.approvals || []);

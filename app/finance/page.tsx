@@ -24,7 +24,7 @@ export default function FinancePage() {
   async function fetchSnapshot() {
     setLoading(true);
     try {
-      const res = await fetch('/api/finance/snapshot', { cache: 'no-store' });
+      const res = await fetch('/api/finance/snapshot?company_id=ARQIA', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setSnapshot(data);

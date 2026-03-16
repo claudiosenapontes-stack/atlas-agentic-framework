@@ -24,7 +24,7 @@ export default function ContractsPage() {
   async function fetchContracts() {
     setLoading(true);
     try {
-      const res = await fetch('/api/finance/contracts', { cache: 'no-store' });
+      const res = await fetch('/api/finance/contracts?company_id=ARQIA', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setContracts(data.contracts || []);

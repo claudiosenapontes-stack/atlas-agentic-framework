@@ -141,16 +141,26 @@ export default function ControlPage() {
     }
     setBoostRestartState({ loading: true, success: false, error: false, disabled: true });
     try {
-      const res = await fetch('/api/agents/boost-restart-stuck', { method: 'POST' });
+      // ATLAS-PRIME-BOOST-RESTART-UI-TRUTH-FIX-001: Fixed endpoint
+      // Was: /api/agents/boost-restart-stuck (404 - does not exist)
+      // Now: /api/fleet/commands with action payload
+      const res = await fetch('/api/fleet/commands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'boost-restart-stuck', initiated_by: 'operator' })
+      });
       if (res.ok) {
         setBoostRestartState({ loading: false, success: true, error: false, disabled: false });
         setTimeout(() => setBoostRestartState(prev => ({ ...prev, success: false })), 3000);
         fetchLiveData();
       } else {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[ControlPage] Boost restart failed:', errorData);
         setBoostRestartState({ loading: false, success: false, error: true, disabled: false });
         setTimeout(() => setBoostRestartState(prev => ({ ...prev, error: false })), 3000);
       }
-    } catch {
+    } catch (error) {
+      console.error('[ControlPage] Boost restart error:', error);
       setBoostRestartState({ loading: false, success: false, error: true, disabled: false });
       setTimeout(() => setBoostRestartState(prev => ({ ...prev, error: false })), 3000);
     }
@@ -230,6 +240,13 @@ export default function ControlPage() {
           <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
             <Power className="w-4 h-4" />Fleet Commands
           </h2>
+          {/* TRUTH BADGE */}
+          <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
+            <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
+            <span className="text-[10px] text-[#3B82F6]">
+              Boost restart resets execution status only. No per-agent protocol implemented.
+            </span>
+          </div>
           <div className="flex flex-wrap gap-3">
             <FleetCommandButton label="Run Fleet Audit" icon={<ClipboardCheck className="w-4 h-4" />} state={fleetAuditState} onClick={runFleetAudit} variant="primary" />
             <FleetCommandButton label="Pause All Agents" icon={<Pause className="w-4 h-4" />} state={pauseAllState} onClick={pauseAllAgents} variant="warning" />

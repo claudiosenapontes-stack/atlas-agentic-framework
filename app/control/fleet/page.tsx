@@ -139,25 +139,10 @@ export default function FleetPage() {
   }
 
   const handleBoostRestart = async (agentId: string) => {
-    setRestartStates(prev => ({ ...prev, [agentId]: 'snapshot_saved' }));
-    setRestartProgress(prev => ({ ...prev, [agentId]: 'Snapshot saved...' }));
-    await new Promise(r => setTimeout(r, 700));
-    
-    setRestartStates(prev => ({ ...prev, [agentId]: 'restarting' }));
-    setRestartProgress(prev => ({ ...prev, [agentId]: 'Restarting session...' }));
-    await new Promise(r => setTimeout(r, 700));
-    
-    setRestartStates(prev => ({ ...prev, [agentId]: 'context_restored' }));
-    setRestartProgress(prev => ({ ...prev, [agentId]: 'Context restored...' }));
-    await new Promise(r => setTimeout(r, 700));
-    
-    setRestartStates(prev => ({ ...prev, [agentId]: 'resumed' }));
-    setRestartProgress(prev => ({ ...prev, [agentId]: 'Task resumed successfully' }));
-    
-    setTimeout(() => {
-      setRestartStates(prev => ({ ...prev, [agentId]: 'idle' }));
-      setRestartProgress(prev => ({ ...prev, [agentId]: '' }));
-    }, 3000);
+    // ATLAS-PRIME-BOOST-RESTART-UI-TRUTH-FIX-001: Not wired to backend
+    // Backend service exists at services/severino-realm/boost-restart.js
+    // but endpoint /api/agents/{id}/boost-restart does not exist
+    console.log(`[FleetPage] Boost restart not wired for agent: ${agentId}`);
   };
 
   const onlineCount = agents.filter(a => a.status === 'online').length;
@@ -363,33 +348,21 @@ function FleetAgentCard({ agent, restartState, restartProgress, onBoostRestart }
         </div>
       )}
 
-      {restartState === 'resumed' && (
-        <div className="mb-3 p-3 bg-[#16C784]/5 rounded border border-[#16C784]/20">
-          <div className="flex items-center gap-2 mb-1"><Check className="w-4 h-4 text-[#16C784]" /><span className="text-xs text-[#16C784]">Restart completed</span></div>
-          <p className="text-[10px] text-[#6B7280]">{restartProgress}</p>
+      {/* TRUTH BADGE: Manual protocol required */}
+      <div className="mb-3 p-2 bg-[#FFB020]/5 rounded border border-[#FFB020]/20">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-3 h-3 text-[#FFB020]" />
+          <span className="text-[10px] text-[#FFB020]">Manual protocol required until backend verification complete</span>
         </div>
-      )}
-
-      {restartState === 'failed' && (
-        <div className="mb-3 p-3 bg-[#FF3B30]/5 rounded border border-[#FF3B30]/20">
-          <div className="flex items-center gap-2 mb-1"><AlertCircle className="w-4 h-4 text-[#FF3B30]" /><span className="text-xs text-[#FF3B30]">Restart failed</span></div>
-          <p className="text-[10px] text-[#6B7280]">{restartProgress}</p>
-        </div>
-      )}
+      </div>
 
       <button
         onClick={onBoostRestart}
-        disabled={isRestarting || restartState === 'resumed'}
-        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-          restartState === 'resumed' 
-            ? 'bg-[#16C784]/20 text-[#16C784] border border-[#16C784]/30' 
-            : isRestarting 
-              ? 'bg-[#3B82F6]/20 text-[#3B82F6] border border-[#3B82F6]/30 cursor-wait'
-              : 'bg-[#FF6A00]/10 text-[#FF6A00] border border-[#FF6A00]/30 hover:bg-[#FF6A00]/20'
-        }`}
+        disabled={true}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-[#1F2226] text-[#6B7280] border border-[#1F2226] cursor-not-allowed"
       >
-        <Zap className={`w-3.5 h-3.5 ${isRestarting ? 'animate-pulse' : ''}`} />
-        {restartState === 'resumed' ? 'Restarted' : isRestarting ? 'Restarting...' : 'Boost Restart'}
+        <Zap className="w-3.5 h-3.5" />
+        Not wired yet
       </button>
     </div>
   );

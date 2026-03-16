@@ -161,13 +161,16 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   
   try {
-    // Count by status - @ts-ignore for group method
-    const { data: counts } = await supabase
-      .from('workflow_executions')
-      .select('status, count(*)')
-      .in('status', ['failed', 'retrying', 'running'])
-      // @ts-ignore
-      .group('status');
+    // Count by status using separate queries (avoid .group() which isn't supported)
+    const statusCounts: Record<string, number> = {};
+    for (const status of ['failed', 'retrying', 'running']) {
+      const { count } = await supabase
+        .from('workflow_executions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', status);
+      statusCounts[status] = count || 0;
+    }
+    const counts = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
     
     // Get upcoming retries
     const { data: upcoming } = await supabase

@@ -100,20 +100,13 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // Get activity type breakdown
-    let typeStats = {};
-    if (!lead_id) {
-      const { data: typeData } = await (supabase as any)
-        .from('lead_activities')
-        .select('activity_type', { count: 'exact' })
-        .group('activity_type');
-      
-      if (typeData) {
-        typeStats = typeData.reduce((acc: any, row: any) => {
-          acc[row.activity_type] = parseInt(row.count);
-          return acc;
-        }, {});
-      }
+    // Get activity type breakdown from fetched data (avoid .group())
+    let typeStats: Record<string, number> = {};
+    if (!lead_id && activities) {
+      activities.forEach((activity: any) => {
+        const type = activity.activity_type || 'unknown';
+        typeStats[type] = (typeStats[type] || 0) + 1;
+      });
     }
     
     return NextResponse.json({

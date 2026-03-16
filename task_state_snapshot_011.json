@@ -1,0 +1,2420 @@
+{
+  "snapshot_timestamp": "2026-03-16T10:59:46.945734",
+  "source": "redis://localhost:6379/0",
+  "tasks": [
+    {
+      "key": "task:task:11cb23764ffb",
+      "id": "task:11cb23764ffb",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Autonomy system test",
+        "platform": "documentation"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": null,
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:11:06.558030",
+      "claimed_at": "2026-03-16T04:11:07.311442",
+      "completed_at": "2026-03-16T04:11:09.325787",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Autonomy system test",
+          "platform": "documentation",
+          "content": "Content about Autonomy system test for documentation"
+        },
+        "completed_at": "2026-03-16T04:11:09.324776"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 61882
+    },
+    {
+      "key": "task:HARDEN_010_M1_CODE2",
+      "id": "HARDEN_010_M1_CODE2",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Add tests"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:49:43.510237",
+      "claimed_at": "2026-03-16T10:49:47.604372",
+      "completed_at": "2026-03-16T10:49:50.622595",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Add tests",
+          "output": "Code for Add tests generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:50.621919"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85804
+    },
+    {
+      "key": "task:AUTONOMY_TEST_CHILD_007_1",
+      "id": "AUTONOMY_TEST_CHILD_007_1",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Generate proof module"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:21:49.611276",
+      "claimed_at": "2026-03-16T04:21:51.175409",
+      "completed_at": "2026-03-16T04:21:54.188553",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate proof module",
+          "output": "Code for Generate proof module generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:21:54.187863"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62527
+    },
+    {
+      "key": "task:AUTONOMY_TEST_CHILD_007_3",
+      "id": "AUTONOMY_TEST_CHILD_007_3",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Proof documentation",
+        "platform": "internal"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:21:49.611281",
+      "claimed_at": "2026-03-16T04:21:50.286472",
+      "completed_at": "2026-03-16T04:21:52.299117",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Proof documentation",
+          "platform": "internal",
+          "content": "Content about Proof documentation for internal"
+        },
+        "completed_at": "2026-03-16T04:21:52.298494"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62525
+    },
+    {
+      "key": "task:task:2b56f7e1457e",
+      "id": "task:2b56f7e1457e",
+      "type": "research",
+      "status": "pending",
+      "payload": {
+        "description": "Child task 2 - Research query",
+        "topic": "autonomy systems"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": null,
+      "parent_id": "task:db8b2b6428e3",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:06:04.307397",
+      "claimed_at": null,
+      "completed_at": null,
+      "failed_at": null,
+      "result": null,
+      "has_result_json": false,
+      "has_result_payload": false,
+      "ttl_remaining": 61577
+    },
+    {
+      "key": "task:task:db8b2b6428e3",
+      "id": "task:db8b2b6428e3",
+      "type": "orchestrate",
+      "status": "completed",
+      "payload": {
+        "mission": "E2E Autonomy Proof",
+        "objective": "Verify full task lifecycle with 2 children"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": null,
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:06:04.300522",
+      "claimed_at": "2026-03-16T04:06:05.297619",
+      "completed_at": "2026-03-16T04:06:08.312725",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:06:08.312352"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 61581
+    },
+    {
+      "key": "task:AUTONOMY_TEST_CHILD_007_2",
+      "id": "AUTONOMY_TEST_CHILD_007_2",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "Autonomy verification"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:21:49.611279",
+      "claimed_at": "2026-03-16T04:21:51.316194",
+      "completed_at": "2026-03-16T04:21:53.333980",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Autonomy verification",
+          "summary": "Research on Autonomy verification completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:21:53.333622"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62526
+    },
+    {
+      "key": "task:HARDEN_003_C4",
+      "id": "HARDEN_003_C4",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "Analysis 1"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.806807",
+      "claimed_at": "2026-03-16T04:39:08.757831",
+      "completed_at": "2026-03-16T04:39:10.771990",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Analysis 1",
+          "summary": "Research on Analysis 1 completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:10.771146"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63564
+    },
+    {
+      "key": "task:HARDEN_001_PARENT",
+      "id": "HARDEN_001_PARENT",
+      "type": "orchestrate",
+      "status": "completed",
+      "payload": {
+        "mission": 1,
+        "mix": "balanced"
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_001_CODE",
+        "HARDEN_001_RESEARCH",
+        "HARDEN_001_CONTENT",
+        "HARDEN_001_FINANCE",
+        "HARDEN_001_SCHEDULE"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.946773",
+      "claimed_at": "2026-03-16T04:37:30.001568",
+      "completed_at": "2026-03-16T04:37:30.012805",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "orchestrated": true,
+          "children": 0
+        },
+        "completed_at": "2026-03-16T04:37:30.012520"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63463
+    },
+    {
+      "key": "task:HARDEN_010_M3_MONITOR",
+      "id": "HARDEN_010_M3_MONITOR",
+      "type": "monitoring",
+      "status": "completed",
+      "payload": {
+        "alert": "cpu_usage"
+      },
+      "target_agents": [
+        "severino"
+      ],
+      "assigned_to": "severino",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:58.679332",
+      "claimed_at": "2026-03-16T10:51:59.865616",
+      "completed_at": "2026-03-16T10:51:59.912530",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "status": "monitored"
+        },
+        "completed_at": "2026-03-16T10:51:59.912069"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "task:AUTONOMY_008_CHILD_1",
+      "id": "AUTONOMY_008_CHILD_1",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Generate test module"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:26:30.927072",
+      "claimed_at": "2026-03-16T04:26:35.023846",
+      "completed_at": "2026-03-16T04:26:38.039105",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate test module",
+          "output": "Code for Generate test module generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:26:38.038322"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62811
+    },
+    {
+      "key": "task:FAILURE_TEST_001",
+      "id": "FAILURE_TEST_001",
+      "type": "finance",
+      "status": "completed",
+      "payload": {
+        "test": "failure_case"
+      },
+      "target_agents": [
+        "harvey"
+      ],
+      "assigned_to": "harvey",
+      "parent_id": null,
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:40:24.278016",
+      "claimed_at": "2026-03-16T04:40:53.346733",
+      "completed_at": "2026-03-16T04:40:53.358671",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "report": "generated"
+        },
+        "completed_at": "2026-03-16T04:40:53.358408"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63666
+    },
+    {
+      "key": "task:task:98665b2fe224",
+      "id": "task:98665b2fe224",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "AI autonomy patterns",
+        "depth": "summary"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "task:c40843fa5774",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T03:23:05.023677",
+      "claimed_at": "2026-03-16T03:23:06.011076",
+      "completed_at": "2026-03-16T03:23:08.024582",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "AI autonomy patterns",
+          "summary": "Research on AI autonomy patterns completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T03:23:08.023538"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 59001
+    },
+    {
+      "key": "task:AUTONOMY_008_CHILD_2",
+      "id": "AUTONOMY_008_CHILD_2",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "System verification"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:26:30.931182",
+      "claimed_at": "2026-03-16T04:26:34.296268",
+      "completed_at": "2026-03-16T04:26:36.311094",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "System verification",
+          "summary": "Research on System verification completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:26:36.309821"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62809
+    },
+    {
+      "key": "task:HARDEN_010_M3_SCHEDULE",
+      "id": "HARDEN_010_M3_SCHEDULE",
+      "type": "schedule",
+      "status": "completed",
+      "payload": {
+        "meeting": "standup"
+      },
+      "target_agents": [
+        "olivia"
+      ],
+      "assigned_to": "olivia",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:58.679868",
+      "claimed_at": "2026-03-16T10:51:59.744365",
+      "completed_at": "2026-03-16T10:51:59.797809",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "calendar": "updated"
+        },
+        "completed_at": "2026-03-16T10:51:59.796617"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "task:task:77439acd3eab",
+      "id": "task:77439acd3eab",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Generate API endpoint",
+        "language": "python"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": null,
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:11:06.553576",
+      "claimed_at": "2026-03-16T04:11:07.552997",
+      "completed_at": "2026-03-16T04:11:10.566794",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate API endpoint",
+          "output": "Code for Generate API endpoint generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:11:10.565825"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 61884
+    },
+    {
+      "key": "task:HARDEN_001_CONTENT",
+      "id": "HARDEN_001_CONTENT",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Blog post",
+        "platform": "linkedin"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_001_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.954158",
+      "claimed_at": "2026-03-16T04:37:31.672952",
+      "completed_at": "2026-03-16T04:37:33.686254",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Blog post",
+          "platform": "linkedin",
+          "content": "Content about Blog post for linkedin"
+        },
+        "completed_at": "2026-03-16T04:37:33.685567"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63467
+    },
+    {
+      "key": "task:HARDEN_003_PARENT",
+      "id": "HARDEN_003_PARENT",
+      "type": "orchestrate",
+      "status": "completed",
+      "payload": {
+        "mission": 3,
+        "mix": "stress_test",
+        "count": 8
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_003_C1",
+        "HARDEN_003_C2",
+        "HARDEN_003_C3",
+        "HARDEN_003_C4",
+        "HARDEN_003_C5",
+        "HARDEN_003_C6",
+        "HARDEN_003_C7",
+        "HARDEN_003_C8"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.800957",
+      "claimed_at": "2026-03-16T04:39:09.689448",
+      "completed_at": "2026-03-16T04:39:09.708353",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "orchestrated": true,
+          "children": 0
+        },
+        "completed_at": "2026-03-16T04:39:09.708012"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63563
+    },
+    {
+      "key": "task:HARDEN_001_RESEARCH",
+      "id": "HARDEN_001_RESEARCH",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "Market trends"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "HARDEN_001_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.952810",
+      "claimed_at": "2026-03-16T04:37:31.184468",
+      "completed_at": "2026-03-16T04:37:33.200089",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Market trends",
+          "summary": "Research on Market trends completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:37:33.199375"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63466
+    },
+    {
+      "key": "task:AUTONOMY_008_CHILD_3",
+      "id": "AUTONOMY_008_CHILD_3",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Documentation",
+        "platform": "internal"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:26:30.931682",
+      "claimed_at": "2026-03-16T04:26:33.136374",
+      "completed_at": "2026-03-16T04:26:35.148678",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Documentation",
+          "platform": "internal",
+          "content": "Content about Documentation for internal"
+        },
+        "completed_at": "2026-03-16T04:26:35.148065"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62808
+    },
+    {
+      "key": "task:AUTONOMY_TEST_PARENT_007",
+      "id": "AUTONOMY_TEST_PARENT_007",
+      "type": "strategy",
+      "status": "completed",
+      "payload": {
+        "objective": "End-to-end autonomy proof",
+        "children_count": 3
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "AUTONOMY_TEST_CHILD_007_1",
+        "AUTONOMY_TEST_CHILD_007_2",
+        "AUTONOMY_TEST_CHILD_007_3"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:21:49.611262",
+      "claimed_at": "2026-03-16T04:22:39.892389",
+      "completed_at": "2026-03-16T04:22:39.902422",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "strategy": "planned"
+        },
+        "completed_at": "2026-03-16T04:22:39.902149"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62573
+    },
+    {
+      "key": "task:HARDEN_001_FINANCE",
+      "id": "HARDEN_001_FINANCE",
+      "type": "finance",
+      "status": "completed",
+      "payload": {
+        "report": "Q1 analysis"
+      },
+      "target_agents": [
+        "harvey"
+      ],
+      "assigned_to": "harvey",
+      "parent_id": "HARDEN_001_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.960848",
+      "claimed_at": "2026-03-16T04:37:30.702461",
+      "completed_at": "2026-03-16T04:37:30.715595",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "report": "generated"
+        },
+        "completed_at": "2026-03-16T04:37:30.715289"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63464
+    },
+    {
+      "key": "task:task:7badc96c0e43",
+      "id": "task:7badc96c0e43",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "description": "Child task 1 - Code generation",
+        "language": "python"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "task:db8b2b6428e3",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:06:04.305677",
+      "claimed_at": "2026-03-16T04:06:05.293567",
+      "completed_at": "2026-03-16T04:06:08.306507",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:06:08.305547"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 61581
+    },
+    {
+      "key": "task:task:fbb8bfcc2c12",
+      "id": "task:fbb8bfcc2c12",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Autonomy test results",
+        "platform": "documentation"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "task:c40843fa5774",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T03:23:05.028711",
+      "claimed_at": "2026-03-16T03:23:05.730454",
+      "completed_at": "2026-03-16T03:23:07.743311",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Autonomy test results",
+          "platform": "documentation",
+          "content": "Content about Autonomy test results for documentation"
+        },
+        "completed_at": "2026-03-16T03:23:07.742382"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 59001
+    },
+    {
+      "key": "task:HARDEN_010_M2_API",
+      "id": "HARDEN_010_M2_API",
+      "type": "api",
+      "status": "completed",
+      "payload": {
+        "endpoint": "/users"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:01.536853",
+      "claimed_at": "2026-03-16T10:51:03.276701",
+      "completed_at": "2026-03-16T10:51:06.311205",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:51:06.310323"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85879
+    },
+    {
+      "key": "task:HARDEN_002_DEV",
+      "id": "HARDEN_002_DEV",
+      "type": "development",
+      "status": "completed",
+      "payload": {
+        "feature": "auth"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_002_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:38:18.998620",
+      "claimed_at": "2026-03-16T04:38:23.685297",
+      "completed_at": "2026-03-16T04:38:26.699912",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:26.699052"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63520
+    },
+    {
+      "key": "task:HARDEN_002_DATA",
+      "id": "HARDEN_002_DATA",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "dataset": "sales"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "HARDEN_002_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:38:18.999074",
+      "claimed_at": "2026-03-16T04:38:21.475700",
+      "completed_at": "2026-03-16T04:38:23.487131",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "summary": "Research on unknown completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:23.486444"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63517
+    },
+    {
+      "key": "task:HARDEN_010_M2_PARENT",
+      "id": "HARDEN_010_M2_PARENT",
+      "type": "decision",
+      "status": "completed",
+      "payload": {
+        "mission": 2,
+        "mix": "content_decision_api"
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_010_M2_CONTENT1",
+        "HARDEN_010_M2_CONTENT2",
+        "HARDEN_010_M2_API"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:01.526819",
+      "claimed_at": "2026-03-16T10:51:03.919843",
+      "completed_at": "2026-03-16T10:51:03.934759",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "decision": "made"
+        },
+        "completed_at": "2026-03-16T10:51:03.934498"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85877
+    },
+    {
+      "key": "task:HARDEN_003_C5",
+      "id": "HARDEN_003_C5",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "Analysis 2"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.807156",
+      "claimed_at": "2026-03-16T04:39:10.789381",
+      "completed_at": "2026-03-16T04:39:12.803490",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Analysis 2",
+          "summary": "Research on Analysis 2 completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:12.802724"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63566
+    },
+    {
+      "key": "task:HARDEN_003_C1",
+      "id": "HARDEN_003_C1",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Module A"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.800977",
+      "claimed_at": "2026-03-16T04:39:08.947197",
+      "completed_at": "2026-03-16T04:39:11.963689",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Module A",
+          "output": "Code for Module A generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:11.962609"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63565
+    },
+    {
+      "key": "task:HARDEN_010_M2_CONTENT2",
+      "id": "HARDEN_010_M2_CONTENT2",
+      "type": "social_post",
+      "status": "completed",
+      "payload": {
+        "platform": "twitter"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:01.535690",
+      "claimed_at": "2026-03-16T10:51:04.390118",
+      "completed_at": "2026-03-16T10:51:06.411244",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "twitter",
+          "content": "Content about unknown for twitter"
+        },
+        "completed_at": "2026-03-16T10:51:06.410241"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85879
+    },
+    {
+      "key": "task:HARDEN_010_M3_INFRA",
+      "id": "HARDEN_010_M3_INFRA",
+      "type": "infrastructure",
+      "status": "completed",
+      "payload": {
+        "check": "servers"
+      },
+      "target_agents": [
+        "severino"
+      ],
+      "assigned_to": "severino",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:58.674402",
+      "claimed_at": "2026-03-16T10:51:59.743994",
+      "completed_at": "2026-03-16T10:51:59.797965",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "status": "stable"
+        },
+        "completed_at": "2026-03-16T10:51:59.796528"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "task:HARDEN_002_API",
+      "id": "HARDEN_002_API",
+      "type": "api",
+      "status": "completed",
+      "payload": {
+        "endpoint": "/users"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_002_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:38:18.994682",
+      "claimed_at": "2026-03-16T04:38:20.655504",
+      "completed_at": "2026-03-16T04:38:23.668867",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:23.668101"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63517
+    },
+    {
+      "key": "task:HARDEN_002_POST",
+      "id": "HARDEN_002_POST",
+      "type": "social_post",
+      "status": "completed",
+      "payload": {
+        "platform": "twitter"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_002_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:38:18.999699",
+      "claimed_at": "2026-03-16T04:38:21.975021",
+      "completed_at": "2026-03-16T04:38:23.995736",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "twitter",
+          "content": "Content about unknown for twitter"
+        },
+        "completed_at": "2026-03-16T04:38:23.994942"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63517
+    },
+    {
+      "key": "task:HARDEN_001_CODE",
+      "id": "HARDEN_001_CODE",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Build API"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_001_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.946792",
+      "claimed_at": "2026-03-16T04:37:29.383470",
+      "completed_at": "2026-03-16T04:37:32.394514",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Build API",
+          "output": "Code for Build API generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:37:32.393861"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63465
+    },
+    {
+      "key": "task:HARDEN_010_M2_CONTENT1",
+      "id": "HARDEN_010_M2_CONTENT1",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Blog post"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:01.526832",
+      "claimed_at": "2026-03-16T10:51:02.297905",
+      "completed_at": "2026-03-16T10:51:04.364849",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Blog post",
+          "platform": "general",
+          "content": "Content about Blog post for general"
+        },
+        "completed_at": "2026-03-16T10:51:04.363690"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85877
+    },
+    {
+      "key": "task:HARDEN_010_M3_PARENT",
+      "id": "HARDEN_010_M3_PARENT",
+      "type": "strategy",
+      "status": "completed",
+      "payload": {
+        "mission": 3,
+        "mix": "infra_monitoring_strategy"
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_010_M3_INFRA",
+        "HARDEN_010_M3_MONITOR",
+        "HARDEN_010_M3_SCHEDULE"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:51:58.674388",
+      "claimed_at": "2026-03-16T10:52:01.360962",
+      "completed_at": "2026-03-16T10:52:01.388941",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "strategy": "planned"
+        },
+        "completed_at": "2026-03-16T10:52:01.388611"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85934
+    },
+    {
+      "key": "task:HARDEN_002_PARENT",
+      "id": "HARDEN_002_PARENT",
+      "type": "orchestrate",
+      "status": "completed",
+      "payload": {
+        "mission": 2,
+        "mix": "code_heavy"
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_002_API",
+        "HARDEN_002_DEV",
+        "HARDEN_002_DATA",
+        "HARDEN_002_POST"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:38:18.994664",
+      "claimed_at": "2026-03-16T04:38:21.334151",
+      "completed_at": "2026-03-16T04:38:21.350504",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "orchestrated": true,
+          "children": 0
+        },
+        "completed_at": "2026-03-16T04:38:21.350221"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63514
+    },
+    {
+      "key": "task:HARDEN_003_C8",
+      "id": "HARDEN_003_C8",
+      "type": "finance",
+      "status": "completed",
+      "payload": {
+        "report": "P&L"
+      },
+      "target_agents": [
+        "harvey"
+      ],
+      "assigned_to": "harvey",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.808367",
+      "claimed_at": "2026-03-16T04:39:10.293821",
+      "completed_at": "2026-03-16T04:39:10.312905",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "report": "generated"
+        },
+        "completed_at": "2026-03-16T04:39:10.312596"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63563
+    },
+    {
+      "key": "task:HARDEN_010_M1_RESEARCH",
+      "id": "HARDEN_010_M1_RESEARCH",
+      "type": "research",
+      "status": "completed",
+      "payload": {
+        "topic": "API patterns"
+      },
+      "target_agents": [
+        "einstein"
+      ],
+      "assigned_to": "einstein",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:49:43.511221",
+      "claimed_at": "2026-03-16T10:49:46.440357",
+      "completed_at": "2026-03-16T10:49:48.469591",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "API patterns",
+          "summary": "Research on API patterns completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:48.468369"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85801
+    },
+    {
+      "key": "task:HARDEN_003_C6",
+      "id": "HARDEN_003_C6",
+      "type": "content",
+      "status": "completed",
+      "payload": {
+        "topic": "Doc A"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.807611",
+      "claimed_at": "2026-03-16T04:39:09.294008",
+      "completed_at": "2026-03-16T04:39:11.313118",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Doc A",
+          "platform": "general",
+          "content": "Content about Doc A for general"
+        },
+        "completed_at": "2026-03-16T04:39:11.312362"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63564
+    },
+    {
+      "key": "task:DEGRADED_TEST_001",
+      "id": "DEGRADED_TEST_001",
+      "type": "schedule",
+      "status": "completed",
+      "payload": {
+        "test": "degraded_behavior"
+      },
+      "target_agents": [
+        "olivia"
+      ],
+      "assigned_to": "olivia",
+      "parent_id": null,
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:54:28.779974",
+      "claimed_at": "2026-03-16T10:55:05.466543",
+      "completed_at": "2026-03-16T10:55:05.483719",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "calendar": "updated"
+        },
+        "completed_at": "2026-03-16T10:55:05.483388"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 86119
+    },
+    {
+      "key": "task:HARDEN_003_C2",
+      "id": "HARDEN_003_C2",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Module B"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.805960",
+      "claimed_at": "2026-03-16T04:39:11.982981",
+      "completed_at": "2026-03-16T04:39:15.000935",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Module B",
+          "output": "Code for Module B generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:15.000077"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63568
+    },
+    {
+      "key": "task:HARDEN_010_M1_PARENT",
+      "id": "HARDEN_010_M1_PARENT",
+      "type": "strategy",
+      "status": "completed",
+      "payload": {
+        "mission": 1,
+        "mix": "strategy_code_research"
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "HARDEN_010_M1_CODE1",
+        "HARDEN_010_M1_CODE2",
+        "HARDEN_010_M1_RESEARCH"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:49:43.505311",
+      "claimed_at": "2026-03-16T10:49:45.257868",
+      "completed_at": "2026-03-16T10:49:45.287600",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "strategy": "planned"
+        },
+        "completed_at": "2026-03-16T10:49:45.286780"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85798
+    },
+    {
+      "key": "task:HARDEN_003_C7",
+      "id": "HARDEN_003_C7",
+      "type": "social_post",
+      "status": "completed",
+      "payload": {
+        "platform": "linkedin"
+      },
+      "target_agents": [
+        "sophia"
+      ],
+      "assigned_to": "sophia",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.808009",
+      "claimed_at": "2026-03-16T04:39:11.330122",
+      "completed_at": "2026-03-16T04:39:13.343378",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "linkedin",
+          "content": "Content about unknown for linkedin"
+        },
+        "completed_at": "2026-03-16T04:39:13.342968"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63566
+    },
+    {
+      "key": "task:HARDEN_010_M1_CODE1",
+      "id": "HARDEN_010_M1_CODE1",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Build endpoint"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T10:49:43.505324",
+      "claimed_at": "2026-03-16T10:49:44.552519",
+      "completed_at": "2026-03-16T10:49:47.584579",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Build endpoint",
+          "output": "Code for Build endpoint generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:47.583391"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 85801
+    },
+    {
+      "key": "task:HARDEN_003_C3",
+      "id": "HARDEN_003_C3",
+      "type": "api",
+      "status": "completed",
+      "payload": {
+        "endpoint": "/v1/data"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "HARDEN_003_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:39:07.806427",
+      "claimed_at": "2026-03-16T04:39:15.015678",
+      "completed_at": "2026-03-16T04:39:18.027187",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:18.026293"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63571
+    },
+    {
+      "key": "task:HARDEN_001_SCHEDULE",
+      "id": "HARDEN_001_SCHEDULE",
+      "type": "schedule",
+      "status": "completed",
+      "payload": {
+        "calendar": "Team sync"
+      },
+      "target_agents": [
+        "olivia"
+      ],
+      "assigned_to": "olivia",
+      "parent_id": "HARDEN_001_PARENT",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:37:28.961582",
+      "claimed_at": "2026-03-16T04:37:31.749838",
+      "completed_at": "2026-03-16T04:37:31.768680",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "calendar": "updated"
+        },
+        "completed_at": "2026-03-16T04:37:31.768401"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 63465
+    },
+    {
+      "key": "task:AUTONOMY_008_PARENT",
+      "id": "AUTONOMY_008_PARENT",
+      "type": "orchestrate",
+      "status": "completed",
+      "payload": {
+        "objective": "Strict autonomy proof 008",
+        "child_count": 3
+      },
+      "target_agents": [
+        "henry"
+      ],
+      "assigned_to": "henry",
+      "parent_id": null,
+      "is_parent": true,
+      "child_ids": [
+        "AUTONOMY_008_CHILD_1",
+        "AUTONOMY_008_CHILD_2",
+        "AUTONOMY_008_CHILD_3"
+      ],
+      "created_by": "severino",
+      "created_at": "2026-03-16T04:26:30.927058",
+      "claimed_at": "2026-03-16T04:27:50.840721",
+      "completed_at": "2026-03-16T04:27:50.853252",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "orchestrated": true,
+          "children": 3
+        },
+        "completed_at": "2026-03-16T04:27:50.852933"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 62884
+    },
+    {
+      "key": "task:task:85437eca4c01",
+      "id": "task:85437eca4c01",
+      "type": "code",
+      "status": "completed",
+      "payload": {
+        "task": "Generate test handler",
+        "language": "python"
+      },
+      "target_agents": [
+        "optimus"
+      ],
+      "assigned_to": "optimus",
+      "parent_id": "task:c40843fa5774",
+      "is_parent": false,
+      "child_ids": [],
+      "created_by": "severino",
+      "created_at": "2026-03-16T03:23:05.027025",
+      "claimed_at": "2026-03-16T03:23:05.038779",
+      "completed_at": "2026-03-16T03:23:08.048719",
+      "failed_at": null,
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate test handler",
+          "output": "Code for Generate test handler generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T03:23:08.048156"
+      },
+      "has_result_json": true,
+      "has_result_payload": true,
+      "ttl_remaining": 59001
+    }
+  ],
+  "child_results": [
+    {
+      "key": "child_result:HARDEN_001_PARENT:HARDEN_001_SCHEDULE",
+      "child_id": "HARDEN_001_SCHEDULE",
+      "parent_id": "HARDEN_001_PARENT",
+      "completed_by": "olivia",
+      "completed_at": "2026-03-16T04:37:31.768680",
+      "result": {
+        "status": "success",
+        "result": {
+          "calendar": "updated"
+        },
+        "completed_at": "2026-03-16T04:37:31.768401"
+      },
+      "ttl_remaining": 63465
+    },
+    {
+      "key": "child_result:task:c40843fa5774:task:fbb8bfcc2c12",
+      "child_id": "task:fbb8bfcc2c12",
+      "parent_id": "task:c40843fa5774",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T03:23:07.743311",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Autonomy test results",
+          "platform": "documentation",
+          "content": "Content about Autonomy test results for documentation"
+        },
+        "completed_at": "2026-03-16T03:23:07.742382"
+      },
+      "ttl_remaining": 59001
+    },
+    {
+      "key": "child_result:HARDEN_001_PARENT:HARDEN_001_RESEARCH",
+      "child_id": "HARDEN_001_RESEARCH",
+      "parent_id": "HARDEN_001_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:37:33.200089",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Market trends",
+          "summary": "Research on Market trends completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:37:33.199375"
+      },
+      "ttl_remaining": 63466
+    },
+    {
+      "key": "child_result:HARDEN_001_PARENT:HARDEN_001_FINANCE",
+      "child_id": "HARDEN_001_FINANCE",
+      "parent_id": "HARDEN_001_PARENT",
+      "completed_by": "harvey",
+      "completed_at": "2026-03-16T04:37:30.715595",
+      "result": {
+        "status": "success",
+        "result": {
+          "report": "generated"
+        },
+        "completed_at": "2026-03-16T04:37:30.715289"
+      },
+      "ttl_remaining": 63464
+    },
+    {
+      "key": "child_result:HARDEN_001_PARENT:HARDEN_001_CONTENT",
+      "child_id": "HARDEN_001_CONTENT",
+      "parent_id": "HARDEN_001_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:37:33.686254",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Blog post",
+          "platform": "linkedin",
+          "content": "Content about Blog post for linkedin"
+        },
+        "completed_at": "2026-03-16T04:37:33.685567"
+      },
+      "ttl_remaining": 63467
+    },
+    {
+      "key": "child_result:AUTONOMY_TEST_PARENT_007:AUTONOMY_TEST_CHILD_007_3",
+      "child_id": "AUTONOMY_TEST_CHILD_007_3",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:21:52.299117",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Proof documentation",
+          "platform": "internal",
+          "content": "Content about Proof documentation for internal"
+        },
+        "completed_at": "2026-03-16T04:21:52.298494"
+      },
+      "ttl_remaining": 62525
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C8",
+      "child_id": "HARDEN_003_C8",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "harvey",
+      "completed_at": "2026-03-16T04:39:10.312905",
+      "result": {
+        "status": "success",
+        "result": {
+          "report": "generated"
+        },
+        "completed_at": "2026-03-16T04:39:10.312596"
+      },
+      "ttl_remaining": 63563
+    },
+    {
+      "key": "child_result:task:c40843fa5774:task:98665b2fe224",
+      "child_id": "task:98665b2fe224",
+      "parent_id": "task:c40843fa5774",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T03:23:08.024582",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "AI autonomy patterns",
+          "summary": "Research on AI autonomy patterns completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T03:23:08.023538"
+      },
+      "ttl_remaining": 59001
+    },
+    {
+      "key": "child_result:AUTONOMY_008_PARENT:AUTONOMY_008_CHILD_3",
+      "child_id": "AUTONOMY_008_CHILD_3",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:26:35.148678",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Documentation",
+          "platform": "internal",
+          "content": "Content about Documentation for internal"
+        },
+        "completed_at": "2026-03-16T04:26:35.148065"
+      },
+      "ttl_remaining": 62808
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C6",
+      "child_id": "HARDEN_003_C6",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:39:11.313118",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Doc A",
+          "platform": "general",
+          "content": "Content about Doc A for general"
+        },
+        "completed_at": "2026-03-16T04:39:11.312362"
+      },
+      "ttl_remaining": 63564
+    },
+    {
+      "key": "child_result:task:db8b2b6428e3:task:7badc96c0e43",
+      "child_id": "task:7badc96c0e43",
+      "parent_id": "task:db8b2b6428e3",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:06:08.306507",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:06:08.305547"
+      },
+      "ttl_remaining": 61581
+    },
+    {
+      "key": "child_result:HARDEN_010_M1_PARENT:HARDEN_010_M1_CODE2",
+      "child_id": "HARDEN_010_M1_CODE2",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T10:49:50.622595",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Add tests",
+          "output": "Code for Add tests generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:50.621919"
+      },
+      "ttl_remaining": 85804
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C1",
+      "child_id": "HARDEN_003_C1",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:39:11.963689",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Module A",
+          "output": "Code for Module A generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:11.962609"
+      },
+      "ttl_remaining": 63565
+    },
+    {
+      "key": "child_result:HARDEN_010_M3_PARENT:HARDEN_010_M3_MONITOR",
+      "child_id": "HARDEN_010_M3_MONITOR",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "completed_by": "severino",
+      "completed_at": "2026-03-16T10:51:59.912530",
+      "result": {
+        "status": "success",
+        "result": {
+          "status": "monitored"
+        },
+        "completed_at": "2026-03-16T10:51:59.912069"
+      },
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C5",
+      "child_id": "HARDEN_003_C5",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:39:12.803490",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Analysis 2",
+          "summary": "Research on Analysis 2 completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:12.802724"
+      },
+      "ttl_remaining": 63566
+    },
+    {
+      "key": "child_result:HARDEN_010_M1_PARENT:HARDEN_010_M1_RESEARCH",
+      "child_id": "HARDEN_010_M1_RESEARCH",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T10:49:48.469591",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "API patterns",
+          "summary": "Research on API patterns completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:48.468369"
+      },
+      "ttl_remaining": 85801
+    },
+    {
+      "key": "child_result:HARDEN_010_M2_PARENT:HARDEN_010_M2_CONTENT1",
+      "child_id": "HARDEN_010_M2_CONTENT1",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T10:51:04.364849",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Blog post",
+          "platform": "general",
+          "content": "Content about Blog post for general"
+        },
+        "completed_at": "2026-03-16T10:51:04.363690"
+      },
+      "ttl_remaining": 85877
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C4",
+      "child_id": "HARDEN_003_C4",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:39:10.771990",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Analysis 1",
+          "summary": "Research on Analysis 1 completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:10.771146"
+      },
+      "ttl_remaining": 63564
+    },
+    {
+      "key": "child_result:AUTONOMY_008_PARENT:AUTONOMY_008_CHILD_2",
+      "child_id": "AUTONOMY_008_CHILD_2",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:26:36.311094",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "System verification",
+          "summary": "Research on System verification completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:26:36.309821"
+      },
+      "ttl_remaining": 62809
+    },
+    {
+      "key": "child_result:AUTONOMY_TEST_PARENT_007:AUTONOMY_TEST_CHILD_007_2",
+      "child_id": "AUTONOMY_TEST_CHILD_007_2",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:21:53.333980",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "Autonomy verification",
+          "summary": "Research on Autonomy verification completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:21:53.333622"
+      },
+      "ttl_remaining": 62526
+    },
+    {
+      "key": "child_result:HARDEN_002_PARENT:HARDEN_002_API",
+      "child_id": "HARDEN_002_API",
+      "parent_id": "HARDEN_002_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:38:23.668867",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:23.668101"
+      },
+      "ttl_remaining": 63517
+    },
+    {
+      "key": "child_result:HARDEN_002_PARENT:HARDEN_002_POST",
+      "child_id": "HARDEN_002_POST",
+      "parent_id": "HARDEN_002_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:38:23.995736",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "twitter",
+          "content": "Content about unknown for twitter"
+        },
+        "completed_at": "2026-03-16T04:38:23.994942"
+      },
+      "ttl_remaining": 63517
+    },
+    {
+      "key": "child_result:HARDEN_002_PARENT:HARDEN_002_DATA",
+      "child_id": "HARDEN_002_DATA",
+      "parent_id": "HARDEN_002_PARENT",
+      "completed_by": "einstein",
+      "completed_at": "2026-03-16T04:38:23.487131",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "summary": "Research on unknown completed",
+          "sources": [
+            "source1",
+            "source2"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:23.486444"
+      },
+      "ttl_remaining": 63516
+    },
+    {
+      "key": "child_result:task:c40843fa5774:task:85437eca4c01",
+      "child_id": "task:85437eca4c01",
+      "parent_id": "task:c40843fa5774",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T03:23:08.048719",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate test handler",
+          "output": "Code for Generate test handler generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T03:23:08.048156"
+      },
+      "ttl_remaining": 59001
+    },
+    {
+      "key": "child_result:HARDEN_001_PARENT:HARDEN_001_CODE",
+      "child_id": "HARDEN_001_CODE",
+      "parent_id": "HARDEN_001_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:37:32.394514",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Build API",
+          "output": "Code for Build API generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:37:32.393861"
+      },
+      "ttl_remaining": 63465
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C3",
+      "child_id": "HARDEN_003_C3",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:39:18.027187",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:18.026293"
+      },
+      "ttl_remaining": 63571
+    },
+    {
+      "key": "child_result:HARDEN_002_PARENT:HARDEN_002_DEV",
+      "child_id": "HARDEN_002_DEV",
+      "parent_id": "HARDEN_002_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:38:26.699912",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:38:26.699052"
+      },
+      "ttl_remaining": 63520
+    },
+    {
+      "key": "child_result:HARDEN_010_M2_PARENT:HARDEN_010_M2_CONTENT2",
+      "child_id": "HARDEN_010_M2_CONTENT2",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T10:51:06.411244",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "twitter",
+          "content": "Content about unknown for twitter"
+        },
+        "completed_at": "2026-03-16T10:51:06.410241"
+      },
+      "ttl_remaining": 85879
+    },
+    {
+      "key": "child_result:HARDEN_010_M1_PARENT:HARDEN_010_M1_CODE1",
+      "child_id": "HARDEN_010_M1_CODE1",
+      "parent_id": "HARDEN_010_M1_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T10:49:47.584579",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Build endpoint",
+          "output": "Code for Build endpoint generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:49:47.583391"
+      },
+      "ttl_remaining": 85801
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C7",
+      "child_id": "HARDEN_003_C7",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "sophia",
+      "completed_at": "2026-03-16T04:39:13.343378",
+      "result": {
+        "status": "success",
+        "result": {
+          "topic": "unknown",
+          "platform": "linkedin",
+          "content": "Content about unknown for linkedin"
+        },
+        "completed_at": "2026-03-16T04:39:13.342968"
+      },
+      "ttl_remaining": 63566
+    },
+    {
+      "key": "child_result:HARDEN_010_M3_PARENT:HARDEN_010_M3_INFRA",
+      "child_id": "HARDEN_010_M3_INFRA",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "completed_by": "severino",
+      "completed_at": "2026-03-16T10:51:59.797965",
+      "result": {
+        "status": "success",
+        "result": {
+          "status": "stable"
+        },
+        "completed_at": "2026-03-16T10:51:59.796528"
+      },
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "child_result:AUTONOMY_TEST_PARENT_007:AUTONOMY_TEST_CHILD_007_1",
+      "child_id": "AUTONOMY_TEST_CHILD_007_1",
+      "parent_id": "AUTONOMY_TEST_PARENT_007",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:21:54.188553",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate proof module",
+          "output": "Code for Generate proof module generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:21:54.187863"
+      },
+      "ttl_remaining": 62527
+    },
+    {
+      "key": "child_result:HARDEN_010_M3_PARENT:HARDEN_010_M3_SCHEDULE",
+      "child_id": "HARDEN_010_M3_SCHEDULE",
+      "parent_id": "HARDEN_010_M3_PARENT",
+      "completed_by": "olivia",
+      "completed_at": "2026-03-16T10:51:59.797809",
+      "result": {
+        "status": "success",
+        "result": {
+          "calendar": "updated"
+        },
+        "completed_at": "2026-03-16T10:51:59.796617"
+      },
+      "ttl_remaining": 85933
+    },
+    {
+      "key": "child_result:HARDEN_003_PARENT:HARDEN_003_C2",
+      "child_id": "HARDEN_003_C2",
+      "parent_id": "HARDEN_003_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:39:15.000935",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Module B",
+          "output": "Code for Module B generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:39:15.000077"
+      },
+      "ttl_remaining": 63568
+    },
+    {
+      "key": "child_result:HARDEN_010_M2_PARENT:HARDEN_010_M2_API",
+      "child_id": "HARDEN_010_M2_API",
+      "parent_id": "HARDEN_010_M2_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T10:51:06.311205",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "unknown",
+          "output": "Code for unknown generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T10:51:06.310323"
+      },
+      "ttl_remaining": 85879
+    },
+    {
+      "key": "child_result:AUTONOMY_008_PARENT:AUTONOMY_008_CHILD_1",
+      "child_id": "AUTONOMY_008_CHILD_1",
+      "parent_id": "AUTONOMY_008_PARENT",
+      "completed_by": "optimus",
+      "completed_at": "2026-03-16T04:26:38.039105",
+      "result": {
+        "status": "success",
+        "result": {
+          "task": "Generate test module",
+          "output": "Code for Generate test module generated",
+          "files": [
+            "file1.py",
+            "file2.py"
+          ]
+        },
+        "completed_at": "2026-03-16T04:26:38.038322"
+      },
+      "ttl_remaining": 62811
+    }
+  ],
+  "queue_state": [
+    {
+      "task_id": "task:2b56f7e1457e",
+      "score": -1769648364.3074038
+    }
+  ]
+}

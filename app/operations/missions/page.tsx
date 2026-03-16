@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { 
   Target, ArrowLeft, Plus, Search, Filter, CheckCircle2, Circle,
   Clock, AlertCircle, PauseCircle, XCircle, TrendingUp, Users,
-  Calendar, Flag, ChevronRight, MoreHorizontal
+  Calendar, Flag, ChevronRight, MoreHorizontal, Shield, Lock,
+  FileCheck, Hourglass, AlertTriangle, User, Bot, Sparkles
 } from 'lucide-react';
 
 interface Mission {
@@ -27,15 +28,23 @@ interface Mission {
   updated_at: string;
   tags?: string[];
   blocked_reason?: string;
+  evidence_bundle?: {
+    verification_claimed?: boolean;
+    verification_proven?: boolean;
+    closure_claimed?: boolean;
+    closure_proven?: boolean;
+    verified_by?: string;
+    closed_by?: string;
+  };
 }
 
 const statusConfig = {
-  draft: { icon: Circle, color: 'text-[#6B7280]', bg: 'bg-[#6B7280]/10', label: 'Draft' },
-  active: { icon: TrendingUp, color: 'text-[#16C784]', bg: 'bg-[#16C784]/10', label: 'Active' },
-  in_progress: { icon: Clock, color: 'text-[#FFB020]', bg: 'bg-[#FFB020]/10', label: 'In Progress' },
-  completed: { icon: CheckCircle2, color: 'text-[#16C784]', bg: 'bg-[#16C784]/10', label: 'Completed' },
-  closed: { icon: PauseCircle, color: 'text-[#6B7280]', bg: 'bg-[#6B7280]/10', label: 'Closed' },
-  cancelled: { icon: XCircle, color: 'text-[#FF3B30]', bg: 'bg-[#FF3B30]/10', label: 'Cancelled' },
+  draft: { icon: Circle, color: 'text-[#6B7280]', bg: 'bg-[#6B7280]/10', border: 'border-[#6B7280]/30', label: 'Draft' },
+  active: { icon: TrendingUp, color: 'text-[#16C784]', bg: 'bg-[#16C784]/10', border: 'border-[#16C784]/30', label: 'Active' },
+  in_progress: { icon: Clock, color: 'text-[#FFB020]', bg: 'bg-[#FFB020]/10', border: 'border-[#FFB020]/30', label: 'In Progress' },
+  completed: { icon: CheckCircle2, color: 'text-[#16C784]', bg: 'bg-[#16C784]/10', border: 'border-[#16C784]/30', label: 'Completed' },
+  closed: { icon: Lock, color: 'text-[#6B7280]', bg: 'bg-[#6B7280]/10', border: 'border-[#6B7280]/30', label: 'Closed' },
+  cancelled: { icon: XCircle, color: 'text-[#FF3B30]', bg: 'bg-[#FF3B30]/10', border: 'border-[#FF3B30]/30', label: 'Cancelled' },
 };
 
 const priorityConfig = {
@@ -46,10 +55,10 @@ const priorityConfig = {
 };
 
 const phaseConfig = {
-  planning: { icon: Target, label: 'Planning' },
-  execution: { icon: TrendingUp, label: 'Execution' },
-  verification: { icon: CheckCircle2, label: 'Verification' },
-  closure: { icon: Flag, label: 'Closure' },
+  planning: { icon: Target, label: 'Planning', desc: 'Defining scope & objectives' },
+  execution: { icon: TrendingUp, label: 'Execution', desc: 'Active work in progress' },
+  verification: { icon: Shield, label: 'Verification', desc: 'Henry validating outcomes' },
+  closure: { icon: Lock, label: 'Closure', desc: 'Finalizing & archiving' },
 };
 
 export default function MissionsPage() {
@@ -76,7 +85,8 @@ export default function MissionsPage() {
 
   const filteredMissions = missions.filter(m => {
     const matchesSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         m.description?.toLowerCase().includes(searchQuery.toLowerCase());
+                         m.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         m.owner_agent?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || m.priority === priorityFilter;
     const matchesPhase = phaseFilter === 'all' || m.phase === phaseFilter;
@@ -88,7 +98,8 @@ export default function MissionsPage() {
     return acc; 
   }, {});
 
-  const getProgressBarColor = (percent: number) => {
+  const getProgressBarColor = (percent: number, blocked?: boolean) => {
+    if (blocked) return 'bg-[#FF3B30]';
     if (percent >= 80) return 'bg-[#16C784]';
     if (percent >= 50) return 'bg-[#FFB020]';
     if (percent >= 20) return 'bg-[#FF6A00]';
@@ -99,19 +110,19 @@ export default function MissionsPage() {
     const config = statusConfig[mission.status];
     const Icon = config.icon;
     
-    if (mission.status === 'in_progress' && mission.blocked_reason) {
+    if (mission.blocked_reason) {
       return (
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${config.bg} ${config.color}`}>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#FF3B30]/10 border border-[#FF3B30]/30 text-[#FF3B30]">
             <AlertCircle className="w-3.5 h-3.5" />
-            <span className="text-xs font-medium">Blocked</span>
+            <span className="text-xs font-medium">BLOCKED</span>
           </div>
         </div>
       );
     }
     
     return (
-      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${config.bg} ${config.color}`}>
+      <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${config.bg} ${config.border} ${config.color}`}>
         <Icon className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">{config.label}</span>
       </div>
@@ -128,8 +139,8 @@ export default function MissionsPage() {
               <Target className="w-5 h-5 text-[#FF6A00]" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-white">Missions</h1>
-              <p className="text-sm text-[#6B7280]">Track Henry and Olivia across all active missions</p>
+              <h1 className="text-xl font-semibold text-white">Mission Control</h1>
+              <p className="text-sm text-[#6B7280]">Track ownership, blockers, verification & closure status</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -144,7 +155,7 @@ export default function MissionsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
           {Object.entries(statusConfig).map(([status, config]) => {
             const count = missionsByStatus[status] || 0;
             const Icon = config.icon;
@@ -160,13 +171,36 @@ export default function MissionsPage() {
           })}
         </div>
 
+        {/* Legend */}
+        <div className="mb-6 p-4 bg-[#111214]/50 border border-[#1F2226] rounded-[10px]">
+          <p className="text-xs text-[#6B7280] mb-3">Quick Reference</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#FFB020]" />
+              <span className="text-[#9BA3AF]">Henry verifying</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-[#16C784]" />
+              <span className="text-[#9BA3AF]">Verified & proven</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-[#FFB020]" />
+              <span className="text-[#9BA3AF]">Closure claimed (pending proof)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-[#16C784]" />
+              <span className="text-[#9BA3AF]">Closed & proven</span>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#6B7280]" />
             <input
               type="text"
-              placeholder="Search missions..."
+              placeholder="Search missions, objectives, or owners..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00]/50"
@@ -194,11 +228,22 @@ export default function MissionsPage() {
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </select>
+            <select 
+              value={phaseFilter}
+              onChange={(e) => setPhaseFilter(e.target.value)}
+              className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white"
+            >
+              <option value="all">All Phases</option>
+              <option value="planning">Planning</option>
+              <option value="execution">Execution</option>
+              <option value="verification">Verification</option>
+              <option value="closure">Closure</option>
+            </select>
           </div>
         </div>
 
         {/* Mission Board */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {loading ? (
             <div className="col-span-full flex items-center justify-center py-12">
               <Clock className="w-6 h-6 text-[#6B7280] animate-spin" />
@@ -212,24 +257,29 @@ export default function MissionsPage() {
             filteredMissions.map((mission) => {
               const PhaseIcon = phaseConfig[mission.phase].icon;
               const priorityCfg = priorityConfig[mission.priority];
+              const isBlocked = !!mission.blocked_reason;
+              
               return (
                 <Link key={mission.id} href={`/operations/missions/${mission.id}`}>
-                  <div className="group p-5 bg-[#111214] border border-[#1F2226] rounded-[10px] hover:border-[#FF6A00]/50 transition-all cursor-pointer h-full">
+                  <div className={`group p-5 bg-[#111214] border ${isBlocked ? 'border-[#FF3B30]/50' : 'border-[#1F2226]'} rounded-[10px] hover:border-[#FF6A00]/50 transition-all cursor-pointer h-full`}>
+                    {/* Header Row */}
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getStatusDisplay(mission)}
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${priorityCfg.bg} ${priorityCfg.color}`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${priorityCfg.bg} ${priorityCfg.color} ${priorityCfg.border}`}>
                           {mission.priority}
                         </span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#FF6A00] transition-colors" />
                     </div>
 
+                    {/* Title */}
                     <h3 className="text-lg font-medium text-white mb-1">{mission.title}</h3>
                     {mission.objective && (
                       <p className="text-sm text-[#9BA3AF] mb-3 line-clamp-2">{mission.objective}</p>
                     )}
 
+                    {/* Phase & Owner */}
                     <div className="flex items-center gap-2 mb-3 text-xs text-[#6B7280]">
                       <PhaseIcon className="w-3.5 h-3.5" />
                       <span>{phaseConfig[mission.phase].label}</span>
@@ -237,42 +287,10 @@ export default function MissionsPage() {
                         <>
                           <span className="mx-1">•</span>
                           <Users className="w-3.5 h-3.5" />
-                          <span>{mission.owner_agent}</span>
+                          <span className="text-[#9BA3AF]">Owner: {mission.owner_agent}</span>
                         </>
                       )}
                     </div>
 
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-[#6B7280]">Progress</span>
-                        <span className="text-white font-medium">{mission.progress_percent}%</span>
-                      </div>
-                      <div className="h-1.5 bg-[#1F2226] rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all ${getProgressBarColor(mission.progress_percent)}`}
-                          style={{ width: `${mission.progress_percent}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#6B7280]">
-                        {mission.completed_task_count}/{mission.child_task_count} tasks
-                      </span>
-                      {mission.blocked_reason && (
-                        <span className="flex items-center gap-1 text-[#FF3B30]">
-                          <AlertCircle className="w-3 h-3" />
-                          Blocked
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                    {/* Progress Bar */}
+                    <div className="mb-4">

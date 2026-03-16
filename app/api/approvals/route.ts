@@ -3,7 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
-// Cache-bust: 2026-03-16T19:59:00Z
+export const revalidate = 0;
+// Build: 2026-03-16T20:00:00Z
 
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
@@ -15,15 +16,32 @@ export async function GET(request: NextRequest) {
     const { data, error } = await (supabase as any)
       .from('approval_requests')
       .select('*')
+      .order('created_at', { ascending: false })
       .limit(limit);
     
     if (error) {
-      return NextResponse.json({ success: true, approvals: [], count: 0, timestamp, error: error.message });
+      console.error('GET /api/approvals error:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: error.message, 
+        code: error.code,
+        timestamp 
+      }, { status: 500 });
     }
     
-    return NextResponse.json({ success: true, approvals: data || [], count: data?.length || 0, timestamp });
+    return NextResponse.json({ 
+      success: true, 
+      approvals: data || [], 
+      count: data?.length || 0, 
+      timestamp 
+    });
   } catch (error: any) {
-    return NextResponse.json({ success: true, approvals: [], count: 0, timestamp, error: error.message });
+    console.error('GET /api/approvals exception:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message, 
+      timestamp 
+    }, { status: 500 });
   }
 }
 
@@ -31,26 +49,60 @@ export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString();
   try {
     const body = await request.json();
-    const { title } = body;
+    const { title, description, amount, requester_id } = body;
     
-    if (!title) {
-      return NextResponse.json({ success: false, error: 'title required', timestamp }, { status: 400 });
+    // Validate required fields
+    if (!title || typeof title !== 'string') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'title is required and must be a string', 
+        timestamp 
+      }, { status: 400 });
     }
     
     const supabase = getSupabaseAdmin();
     const id = randomUUID();
     
-    // Insert only id - schema unknown
-    const { error } = await (supabase as any)
+    // Build insert payload with only provided fields
+    const insertPayload: any = { 
+      id, 
+      title,
+      status: 'pending'
+    };
+    
+    if (description) insertPayload.description = description;
+    if (amount !== undefined) insertPayload.amount = amount;
+    if (requester_id) insertPayload.requester_id = requester_id;
+    
+    const { data, error } = await (supabase as any)
       .from('approval_requests')
-      .insert({ id });
+      .insert(insertPayload)
+      .select()
+      .single();
     
     if (error) {
-      return NextResponse.json({ success: false, error: error.message, code: error.code, timestamp }, { status: 500 });
+      console.error('POST /api/approvals error:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: error.message, 
+        code: error.code, 
+        timestamp 
+      }, { status: 500 });
     }
     
-    return NextResponse.json({ success: true, id, status: "created", timestamp }, { status: 201 });
+    return NextResponse.json({ 
+      success: true, 
+      approval: data,
+      id, 
+      status: "created", 
+      timestamp 
+    }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message, timestamp }, { status: 500 });
+    console.error('POST /api/approvals exception:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message, 
+      timestamp 
+    }, { status: 500 });
   }
 }

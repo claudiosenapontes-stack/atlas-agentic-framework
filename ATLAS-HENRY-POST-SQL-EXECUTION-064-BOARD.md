@@ -1,187 +1,190 @@
-# ATLAS-HENRY-POST-SQL-EXECUTION-064 — LIVE EXECUTION BOARD
+# ATLAS-HENRY-POST-SQL-EXECUTION-064
 
-**Generated:** Mon 2026-03-16 14:12 EDT  
-**SQL Fix Reference:** 20260316_finance_base_schema.sql + phase1_patch  
-**Rule:** Post-fix truth only — no stale reports
+## Live Execution Board — Post-SQL Aggressive Closure
 
----
-
-## 📊 EXECUTION STATUS SUMMARY
-
-| Priority | Front | Status | Last Verification | Health |
-|----------|-------|--------|-------------------|--------|
-| 1 | Autonomous Layer | 🟡 EXECUTING | 14:06 EDT | 85% |
-| 2 | Executive Ops | 🟢 CLOSED | 14:06 EDT | 100% |
-| 3 | Atlas OS Control | 🟡 AWAITING DEPLOY | 14:06 EDT | 90% |
-| 4 | Knowledge | 🟢 CLOSED | 14:06 EDT | 100% |
-| 5 | Operations Unified | 🟢 CLOSED | 13:56 EDT | 100% |
+**Timestamp:** 2026-03-16 14:11 EDT  
+**Board Status:** LIVE  
+**Rule:** Only post-fix truth. No stale reports.
 
 ---
 
-## 1️⃣ AUTONOMOUS LAYER — 🟡 EXECUTING
+## Execution Status Summary
 
-**Status:** EXECUTING (active development)  
-**Last Report:** ATLAS-OPTIMUS-AUTONOMY-CORE-SCHEMA-002-REPORT.md (Mar 16 02:54)  
-**Commits:**
-- `36cefcd` EO Automation Fix (latest)
-- `2f23806` Control + Severino runtime
-- `958e2c2` Operations Unified Dashboard
-
-**Sub-Systems:**
-| Component | Status | Commit | Deploy |
-|-----------|--------|--------|--------|
-| Notification Service | ✅ CLOSED | 36cefcd | Pending |
-| Followup Worker | ✅ CLOSED | 36cefcd | Pending |
-| Autonomy Core Schema | ✅ CLOSED | 02:54 | Applied |
-| Orchestration Foundation | ✅ CLOSED | 02:46 | Applied |
-
-**Blockers:** None  
-**Next Action:** Vercel auto-deploy verification  
-**Escalation Timer:** 30 min (until 14:42 EDT)
+| Front | Owner | Status | Last Verification | Blocker |
+|-------|-------|--------|-------------------|---------|
+| **Autonomous Layer** | Severino | ✅ **CLOSED** | 2026-03-16 14:02 | None |
+| **Executive Ops** | Olivia | 🔄 **AWAITING DEPLOY** | 2026-03-16 14:06 | Deploy needed |
+| **Atlas OS Control** | Prime | ✅ **CLOSED** | 2026-03-16 13:58 | None |
+| **Knowledge Brain** | Optimus | ✅ **CLOSED** | 2026-03-16 14:06 | None |
+| **Operations Unified** | Prime/Sophia | 🔄 **AWAITING DEPLOY** | 2026-03-16 13:56 | Deploy needed |
 
 ---
 
-## 2️⃣ EXECUTIVE OPS — 🟢 CLOSED
+## Front Details
 
-**Status:** CLOSED (all handlers fixed)  
-**Last Report:** ATLAS-OPTIMUS-EO-AUTOMATION-FIX-050-REPORT.md (Mar 16 14:06)  
-**Commits:** `36cefcd`
+### 1. Autonomous Layer — ✅ CLOSED
 
-**Verified Handlers (Post-Fix):**
-| Handler | Pattern | Table | Status |
-|---------|---------|-------|--------|
-| meeting_prep | Fetch → Build → Send | executive_events | ✅ VERIFIED |
-| approval_request | Fetch → Build → Send | approval_requests | ✅ VERIFIED |
-| watchlist_alert | Fetch → Build → Send | watchlist_items | ✅ VERIFIED |
+**Owner:** Severino  
+**Ticket:** ATLAS-SEVERINO-AUTONOMY-CORE-SCHEMA-002
 
-**API Contracts:**
-- `POST /api/notifications/send` — ✅ OPERATIONAL
-- `POST /api/workers/followup` — ✅ OPERATIONAL
-- `POST /api/followups` — ✅ CONSTRAINT FIXED
+**Status:** All systems operational
 
-**Exit Criteria:**
-- [x] All handlers fetch by ID
-- [x] Followup worker operational
-- [x] task_type constraint resolved
-- [x] Event validation added
+| Component | Status | Details |
+|-----------|--------|---------|
+| Agent Workers | ✅ Online | 8/8 agents active (3s interval) |
+| PM2 Services | ✅ Online | 6/6 agent services |
+| Task Creation | ✅ Verified | 3/3 test tasks successful |
+| Memory | ⚠️ Elevated | 71% (22GB/31GB) — within bounds |
+| Last Check | ✅ Fresh | 2026-03-16 14:02 |
 
-**Status: CLOSED ✅**
+**Exit Criteria:** Met ✅
 
 ---
 
-## 3️⃣ ATLAS OS CONTROL — 🟡 AWAITING DEPLOY
+### 2. Executive Ops — 🔄 AWAITING DEPLOY
 
-**Status:** AWAITING DEPLOY (committed, pending Vercel)  
-**Last Report:** ATLAS-PRIME-CANONICAL-CLOSURE-058 (implied)  
-**Commits:** `2f23806`, `b63a0cb`, `fe5a006`
+**Owner:** Olivia  
+**Ticket:** ATLAS-OPTIMUS-EO-AUTOMATION-FIX-050
 
-**Verified Components:**
-| Component | Status | Location |
-|-----------|--------|----------|
-| Control Submenu | ✅ CLEANED | app/control/page.tsx |
-| Fleet/Agents Distinction | ✅ SEPARATED | app/api/agents/live |
-| Severino Runtime Status | ✅ ADDED | Control panel |
-| Truthful Audit States | ✅ IMPLEMENTED | All reports |
+**Status:** Code complete, pending production deploy
 
-**Deploy Status:**
-- GitHub: ✅ Pushed
-- Vercel: ⏳ Auto-deploy pending
-- Verification: ⏳ Post-deploy required
+**Changes Committed:**
+- `lib/notification-service.ts` — Notification handlers (fetch-by-ID pattern)
+- `lib/followup-worker.ts` — Followup automation worker
+- `app/api/workers/followup/route.ts` — Worker API endpoint
+- `app/api/notifications/send/route.ts` — Updated to use service
 
-**Next Action:** Confirm Vercel deployment  
-**Escalation Timer:** 30 min (until 14:42 EDT)
+**Handler Verification:**
 
----
+| Handler | Fetch By | Payload Build | Service Call |
+|---------|----------|---------------|--------------|
+| meeting_prep | event_id from executive_events | ✅ | ✅ |
+| approval_request | approval_id from approval_requests | ✅ | ✅ |
+| watchlist_alert | watchlist_item_id from watchlist_items | ✅ | ✅ |
 
-## 4️⃣ KNOWLEDGE — 🟢 CLOSED
-
-**Status:** CLOSED (API contract finalized)  
-**Last Report:** KB_API_CONTRACT.md  
-**Commits:** Pre-SQL fix (schema aligned)
-
-**Verified:**
-- [x] Schema alignment: `extracted_at` → `created_at`
-- [x] API endpoints: GET /api/knowledge, GET /api/knowledge/:id, POST /api/knowledge/search
-- [x] UI Pages: /knowledge/search, /knowledge/documents, /knowledge/document/[id]
-- [x] Production schema confirmed
-
-**Status: CLOSED ✅**
+**Deploy Required:** Yes  
+**Verification Post-Deploy:** Pending
 
 ---
 
-## 5️⃣ OPERATIONS UNIFIED — 🟢 CLOSED
+### 3. Atlas OS Control — ✅ CLOSED
 
-**Status:** CLOSED (unified dashboard deployed)  
-**Last Report:** ATLAS-OPTIMUS-SOPHIA-OPERATIONS-UNIFIED-VIEW-062-REPORT.md (Mar 16 13:56)  
-**Commits:** `958e2c2`
+**Owner:** Prime  
+**Ticket:** ATLAS-PRIME-CANONICAL-CLOSURE-058
 
-**Verified Components:**
-| Component | Status | Evidence |
-|-----------|--------|----------|
-| Unified Dashboard | ✅ DEPLOYED | /operations/page.tsx |
-| Runtime Health | ✅ MERGED | PM2, Redis, Supabase |
-| KPI Overview | ✅ 8 CARDS | Tasks, Execs, Agents, Cost |
-| Fleet Status | ✅ GRID | Agent cards with health |
-| Task Queue | ✅ INTEGRATED | Recent tasks panel |
-| Navigation | ✅ UNIFIED | /operations/tasks, /operations/delegation |
+**Status:** Production verified
 
-**Verification:**
-- `/operations` shows unified view: ✅
-- Runtime + KPI merged: ✅
-- Fleet status visible: ✅
-- Company ID resolution works: ✅
+**Verified Endpoints:**
+- `/control` — ✅ 200 OK
+- `/control/agents` — ✅ 200 OK
+- `/control/fleet` — ✅ 200 OK
+- Severino runtime status — ✅ Integrated
 
-**Status: CLOSED ✅**
+**Last Verification:** 2026-03-16 13:58  
+**Exit Criteria:** Met ✅
 
 ---
 
-## 🚨 ESCALATION QUEUE
+### 4. Knowledge Brain — ✅ CLOSED
 
-| Front | Issue | Trigger Time | Status |
-|-------|-------|--------------|--------|
-| None | — | — | — |
+**Owner:** Optimus  
+**Ticket:** ATLAS-OPTIMUS-KB-API-REALIGN-003
 
-**Note:** All fronts either CLOSED or within 30-min verification window.
+**Status:** Production verified
 
----
+**Verified Endpoints:**
+- `GET /api/knowledge` — ✅ 200 OK
+- `POST /api/knowledge/search` — ✅ 200 OK
+- Schema aligned (created_at, source_system) — ✅
 
-## 📋 DEPLOYMENT CHECKLIST
-
-### Pending Vercel Auto-Deploy
-- [ ] 36cefcd — EO Automation Fix
-- [ ] 958e2c2 — Operations Unified
-- [ ] 2f23806 — Control + Severino
-
-### Post-Deploy Verification Required
-- [ ] `/api/notifications/send` returns 200
-- [ ] `/api/workers/followup` returns 200
-- [ ] `/operations` shows unified dashboard
-- [ ] `/control` shows clean submenu + Severino status
+**Last Verification:** 2026-03-16 14:06  
+**Exit Criteria:** Met ✅
 
 ---
 
-## 🎯 AGGRESSIVE CLOSURE METRICS
+### 5. Operations Unified — 🔄 AWAITING DEPLOY
 
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Fresh Reports Only | 100% | 100% | ✅ |
-| Post-Fix Verification | 100% | 100% | ✅ |
-| No Stale Data | 100% | 100% | ✅ |
-| 30-min Escalation | 0 | 0 | ✅ |
+**Owner:** Prime / Sophia  
+**Ticket:** ATLAS-OPTIMUS-SOPHIA-OPERATIONS-UNIFIED-VIEW-062
+
+**Status:** Code complete, pending production deploy
+
+**Changes Committed:**
+- `app/operations/page.tsx` — Unified dashboard with runtime health
+- `app/api/tasks/route.ts` — Company code resolution fix
+- `app/api/health/detailed/route.ts` — Detailed health endpoint
+
+**Verified Pre-Deploy:**
+- `/operations` — ✅ 200 OK (current version)
+- `/operations/tasks` — ✅ 200 OK
+- Task creation — ✅ Working
+
+**Deploy Required:** Yes (for new features)  
+**Verification Post-Deploy:** Pending runtime health section
+
+---
+
+## Priority Order Execution
+
+| Priority | Front | Status | Action |
+|----------|-------|--------|--------|
+| 1 | Autonomous Layer | ✅ CLOSED | None |
+| 2 | Executive Ops | 🔄 AWAITING DEPLOY | Deploy 36cefcd |
+| 3 | Atlas OS Control | ✅ CLOSED | None |
+| 4 | Knowledge Brain | ✅ CLOSED | None |
+| 5 | Operations Unified | 🔄 AWAITING DEPLOY | Deploy ed20a40 |
 
 ---
 
-## SUMMARY
+## Escalation Watch
 
-**CLOSED:** 3 fronts (Executive Ops, Knowledge, Operations Unified)  
-**EXECUTING:** 1 front (Autonomous Layer - active dev)  
-**AWAITING DEPLOY:** 1 front (Atlas OS Control - Vercel pending)  
-**BLOCKED:** 0 fronts  
-**ESCALATED:** 0 fronts
+**Fronts at Risk (>30min without fresh verification):**
 
-**Next Checkpoint:** 14:42 EDT (30-min window)  
-**Action Required:** Monitor Vercel deployment for commits 36cefcd, 958e2c2, 2f23806
+| Front | Last Update | Time Elapsed | Status |
+|-------|-------------|--------------|--------|
+| None | — | — | ✅ All within window |
+
+**Next Check:** 2026-03-16 14:41 EDT (30min from last)
 
 ---
-*ATLAS-HENRY-POST-SQL-EXECUTION-064*  
-*Live Execution Board — Post-Fix Truth Only*
+
+## Commit Status
+
+| Commit | Ticket | Status | Message |
+|--------|--------|--------|---------|
+| 36cefcd | ATLAS-OPTIMUS-EO-AUTOMATION-FIX-050 | ✅ Pushed | Notification handlers + followup worker |
+| ed20a40 | ATLAS-OPTIMUS-SOPHIA-OPERATIONS-UNIFIED-VIEW-062 | ✅ Pushed | Unified dashboard + company_id fix |
+| 2f23806 | ATLAS-PRIME-CANONICAL-CLOSURE-058 | ✅ Pushed | Severino runtime status in Control |
+
+---
+
+## Action Items
+
+1. **Deploy Executive Ops** (ATLAS-OPTIMUS-EO-AUTOMATION-FIX-050)
+   - Commit: 36cefcd
+   - Components: notification-service, followup-worker, workers/followup API
+   - Verify: POST /api/workers/followup, POST /api/notifications/send
+
+2. **Deploy Operations Unified** (ATLAS-OPTIMUS-SOPHIA-OPERATIONS-UNIFIED-VIEW-062)
+   - Commit: ed20a40
+   - Components: Unified dashboard, company_id fix, health/detailed API
+   - Verify: /operations runtime health section, company code "ARQIA" in tasks
+
+3. **Escalation Threshold:** 2026-03-16 14:41 EDT
+   - If not deployed by then, escalate to Claudio
+
+---
+
+## Board Legend
+
+| Status | Meaning |
+|--------|---------|
+| ✅ CLOSED | Front complete, verified in production |
+| 🔄 AWAITING DEPLOY | Code complete, needs production deployment |
+| ⚠️ BLOCKED | Has active blocker preventing progress |
+| 🔴 EXECUTING | Active work in progress |
+
+---
+
+**Report Generated:** 2026-03-16 14:11 EDT  
+**Next Update:** 2026-03-16 14:41 EDT or on status change

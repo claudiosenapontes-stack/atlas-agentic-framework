@@ -1,9 +1,14 @@
 /**
  * ATLAS-KNOWLEDGE-BRAIN API
- * ATLAS-BACKEND-KNOWLEDGE-BRAIN-API-START-001
+ * ATLAS-OPTIMUS-KB-API-REALIGN-003
  * 
  * POST /api/knowledge
  * Ingest/register a document record
+ * 
+ * REALIGNED to production schema:
+ * - Uses knowledge_registry (not knowledge_documents)
+ * - doc_id TEXT primary key (not UUID)
+ * - doc_class (not doc_type)
  * 
  * Requirements:
  * - explicit JSON responses
@@ -15,56 +20,45 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
 
-// Valid document types
-const VALID_DOC_TYPES = [
-  'article',
-  'document',
-  'pdf',
-  'meeting_notes',
-  'transcript',
-  'briefing',
-  'research',
-  'proposal',
-  'contract',
-  'email_thread',
-  'other'
+// Valid document classes (from Einstein V1 taxonomy)
+const VALID_DOC_CLASSES = [
+  'LEGAL',
+  'RESEARCH', 
+  'EXEC',
+  'PRODUCT',
+  'MKTG',
+  'INFRA',
+  'FIN',
+  'MEET'
 ];
 
-// Valid content formats
-const VALID_CONTENT_FORMATS = [
-  'text',
-  'markdown',
-  'html',
-  'json',
-  'structured'
-];
+// Valid sources
+const VALID_SOURCES = ['local', 'google_drive', 'github'];
 
 interface CreateKnowledgeRequest {
+  doc_id?: string; // Optional, will generate if not provided
   title: string;
-  description?: string;
-  content?: string;
-  content_format?: string;
-  doc_type: string;
+  summary: string;
+  doc_class: string;
+  source: string;
+  source_path: string;
   source_url?: string;
-  source_type?: string;
-  author_id?: string;
-  author_name?: string;
-  company_id?: string;
-  project_id?: string;
-  tags?: string[];
-  metadata?: Record<string, any>;
-  is_public?: boolean;
+  keywords?: string[];
+  entities?: Record<string, any>;
+  checksum?: string;
+  size_bytes?: number;
+  classification_confidence?: number;
+  extraction_confidence?: number;
 }
 
 // POST /api/knowledge
 // Ingest/register a document record
 export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString();
-  const source = 'knowledge_documents';
+  const source = 'knowledge_registry';
   
   try {
     const body: CreateKnowledgeRequest = await request.json();
@@ -72,85 +66,92 @@ export async function POST(request: NextRequest) {
     // Validation: required fields
     if (!body.title || body.title.trim() === '') {
       return NextResponse.json(
+        { success: false, error: 'title is required', timestamp, source },
+        { status: 400 }
+      );
+    }
+    
+    if (!body.summary || body.summary.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'summary is required', timestamp, source },
+        { status: 400 }
+      );
+    }
+    
+    if (!body.doc_class) {
+      return NextResponse.json(
+        { success: false, error: 'doc_class is required', timestamp, source },
+        { status: 400 }
+      );
+    }
+    
+    // Validation: doc_class must be valid
+    if (!VALID_DOC_CLASSES.includes(body.doc_class)) {
+      return NextResponse.json(
         { 
           success: false, 
-          error: 'title is required',
-          timestamp,
+          error: `doc_class must be one of: ${VALID_DOC_CLASSES.join(', ')}`,
+          timestamp, 
           source 
         },
         { status: 400 }
       );
     }
     
-    if (!body.doc_type) {
+    if (!body.source) {
+      return NextResponse.json(
+        { success: false, error: 'source is required', timestamp, source },
+        { status: 400 }
+      );
+    }
+    
+    if (!VALID_SOURCES.includes(body.source)) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'doc_type is required',
-          timestamp,
+          error: `source must be one of: ${VALID_SOURCES.join(', ')}`,
+          timestamp, 
           source 
         },
         { status: 400 }
       );
     }
     
-    // Validation: doc_type must be valid
-    if (!VALID_DOC_TYPES.includes(body.doc_type)) {
+    if (!body.source_path || body.source_path.trim() === '') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: `doc_type must be one of: ${VALID_DOC_TYPES.join(', ')}`,
-          timestamp,
-          source 
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Validation: content_format must be valid if provided
-    if (body.content_format && !VALID_CONTENT_FORMATS.includes(body.content_format)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `content_format must be one of: ${VALID_CONTENT_FORMATS.join(', ')}`,
-          timestamp,
-          source 
-        },
+        { success: false, error: 'source_path is required', timestamp, source },
         { status: 400 }
       );
     }
     
     const supabase = getSupabaseAdmin();
-    const documentId = randomUUID();
+    const docId = body.doc_id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     
-    // Build document record
+    // Build document record for knowledge_registry
     const documentRecord = {
-      id: documentId,
+      doc_id: docId,
       title: body.title.trim(),
-      description: body.description?.trim() || null,
-      content: body.content || null,
-      content_format: body.content_format || 'text',
-      doc_type: body.doc_type,
+      summary: body.summary.trim(),
+      doc_class: body.doc_class,
+      source: body.source,
+      source_path: body.source_path.trim(),
       source_url: body.source_url?.trim() || null,
-      source_type: body.source_type || 'manual',
-      author_id: body.author_id || null,
-      author_name: body.author_name?.trim() || null,
-      company_id: body.company_id || null,
-      project_id: body.project_id || null,
-      tags: body.tags || [],
-      metadata: body.metadata || {},
-      is_public: body.is_public !== undefined ? body.is_public : true,
-      version: 1,
-      created_at: timestamp,
-      updated_at: timestamp,
-      indexed_at: null,
-      embedding_id: null,
-      status: 'active'
+      keywords: body.keywords || [],
+      entities: body.entities || {},
+      checksum: body.checksum || '',
+      size_bytes: body.size_bytes || 0,
+      extracted_at: timestamp,
+      extracted_by: 'api',
+      classification_confidence: body.classification_confidence || 0.5,
+      extraction_confidence: body.extraction_confidence || 0.5,
+      status: 'active',
+      last_ingested_at: timestamp,
+      ingest_version: 1
     };
     
-    // Insert into knowledge_documents table
+    // Insert into knowledge_registry table (production schema)
     const { data, error } = await (supabase as any)
-      .from('knowledge_documents')
+      .from('knowledge_registry')
       .insert(documentRecord)
       .select()
       .single();
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: true, 
-        document_id: documentId,
+        doc_id: docId,
         document: data,
         timestamp,
         source 
@@ -184,26 +185,15 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('[Knowledge] POST error:', err);
     
-    // Handle JSON parse errors
     if (err instanceof SyntaxError) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Invalid JSON in request body',
-          timestamp,
-          source 
-        },
+        { success: false, error: 'Invalid JSON in request body', timestamp, source },
         { status: 400 }
       );
     }
     
     return NextResponse.json(
-      { 
-        success: false, 
-        error: err.message || 'Internal server error',
-        timestamp,
-        source 
-      },
+      { success: false, error: err.message || 'Internal server error', timestamp, source },
       { status: 500 }
     );
   }
@@ -213,65 +203,50 @@ export async function POST(request: NextRequest) {
 // List knowledge documents with filtering
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
-  const source = 'knowledge_documents';
+  const source = 'knowledge_registry';
   
   try {
     const { searchParams } = new URL(request.url);
     
-    // Parse query parameters
-    const doc_type = searchParams.get('doc_type');
-    const author_id = searchParams.get('author_id');
-    const company_id = searchParams.get('company_id');
-    const project_id = searchParams.get('project_id');
+    // Parse query parameters (mapped to production schema)
+    const doc_class = searchParams.get('doc_class');
+    const source_filter = searchParams.get('source');
     const status = searchParams.get('status') || 'active';
-    const is_public = searchParams.get('is_public');
-    const tags = searchParams.get('tags')?.split(',').filter(Boolean);
+    const keywords = searchParams.get('keywords')?.split(',').filter(Boolean);
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
-    const sort_by = searchParams.get('sort_by') || 'created_at';
+    const sort_by = searchParams.get('sort_by') || 'extracted_at';
     const sort_order = searchParams.get('sort_order') || 'desc';
     
     const supabase = getSupabaseAdmin();
     
-    // Build query
+    // Build query against knowledge_registry
     let query = (supabase as any)
-      .from('knowledge_documents')
+      .from('knowledge_registry')
       .select('*', { count: 'exact' });
     
     // Apply filters
-    if (doc_type) {
-      query = query.eq('doc_type', doc_type);
+    if (doc_class) {
+      query = query.eq('doc_class', doc_class);
     }
     
-    if (author_id) {
-      query = query.eq('author_id', author_id);
-    }
-    
-    if (company_id) {
-      query = query.eq('company_id', company_id);
-    }
-    
-    if (project_id) {
-      query = query.eq('project_id', project_id);
+    if (source_filter) {
+      query = query.eq('source', source_filter);
     }
     
     if (status) {
       query = query.eq('status', status);
     }
     
-    if (is_public !== null) {
-      query = query.eq('is_public', is_public === 'true');
-    }
-    
-    if (tags && tags.length > 0) {
-      // Filter by any of the provided tags (overlap)
-      query = query.contains('tags', tags);
+    if (keywords && keywords.length > 0) {
+      // Check if any keyword overlaps
+      query = query.overlaps('keywords', keywords);
     }
     
     if (search) {
-      // Basic text search on title and description
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+      // Full-text search using PostgreSQL
+      query = query.textSearch('title', search);
     }
     
     // Apply sorting
@@ -288,7 +263,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Failed to query knowledge documents',
+          error: 'Failed to query knowledge registry',
           details: error.message,
           timestamp,
           source 
@@ -310,13 +285,10 @@ export async function GET(request: NextRequest) {
           has_more: count ? offset + limit < count : false
         },
         filters: {
-          doc_type,
-          author_id,
-          company_id,
-          project_id,
+          doc_class,
+          source: source_filter,
           status,
-          is_public,
-          tags,
+          keywords,
           search
         },
         timestamp,
@@ -328,12 +300,7 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('[Knowledge] GET error:', err);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: err.message || 'Internal server error',
-        timestamp,
-        source 
-      },
+      { success: false, error: err.message || 'Internal server error', timestamp, source },
       { status: 500 }
     );
   }

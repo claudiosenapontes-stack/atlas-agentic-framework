@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
           status: status.toLowerCase(),
           prep_required: !!prep_required,
           prep_task_id: null,
-          calendar_event_id: null,
+          calendar_event_id: metadata?.calendar_event_id || null,
           metadata,
           created_at: timestamp,
           updated_at: timestamp,

@@ -64,12 +64,21 @@ const HEARTBEAT_POLL_INTERVAL_MS = 1000; // 1 second
  * BoostRestartService - Real implementation for agent session restart
  */
 export class BoostRestartService {
-  private supabase: any;
-  private openclaw: ReturnType<typeof getOpenClawClient>;
+  private _supabase: any = null;
+  private _openclaw: ReturnType<typeof getOpenClawClient> | null = null;
 
-  constructor() {
-    this.supabase = getSupabaseAdmin();
-    this.openclaw = getOpenClawClient();
+  private get supabase() {
+    if (!this._supabase) {
+      this._supabase = getSupabaseAdmin();
+    }
+    return this._supabase;
+  }
+
+  private get openclaw() {
+    if (!this._openclaw) {
+      this._openclaw = getOpenClawClient();
+    }
+    return this._openclaw;
   }
 
   /**

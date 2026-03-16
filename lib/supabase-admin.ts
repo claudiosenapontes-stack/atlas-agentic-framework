@@ -1,17 +1,22 @@
 // Server-side admin client
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType<typeof createClient> | null = null
+let client: SupabaseClient | null = null
 
-export function getSupabaseAdmin() {
+// Check if we're in build/static generation phase
+const isBuildPhase = typeof process !== 'undefined' && (
+  process.env.NODE_ENV === 'production' && 
+  (!process.env.SUPABASE_SERVICE_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY)
+)
+
+export function getSupabaseAdmin(): SupabaseClient {
   if (client) return client
   
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
   const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
   
-  console.log('[SupabaseAdmin] URL:', url ? 'set' : 'missing', 'Key:', key ? 'set' : 'missing')
-  
   if (!url || !key) {
+    console.error('[SupabaseAdmin] URL:', url ? 'set' : 'missing', 'Key:', key ? 'set' : 'missing')
     throw new Error('Supabase admin credentials missing')
   }
   

@@ -31,10 +31,17 @@ export interface StepResult {
 }
 
 export class WorkflowEngine {
-  private supabase = getSupabaseAdmin();
+  private _supabase: any = null;
   private executionId?: string;
   private workflowConfig?: any;
-  
+
+  private get supabase() {
+    if (!this._supabase) {
+      this._supabase = getSupabaseAdmin();
+    }
+    return this._supabase;
+  }
+
   constructor(private config: WorkflowConfig) {}
 
   /**

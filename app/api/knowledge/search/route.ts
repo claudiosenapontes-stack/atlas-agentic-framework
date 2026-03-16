@@ -1,9 +1,13 @@
 /**
  * ATLAS-KNOWLEDGE-BRAIN API - Search
- * ATLAS-BACKEND-KNOWLEDGE-BRAIN-API-START-001
+ * ATLAS-OPTIMUS-KB-API-REALIGN-003
  * 
  * POST /api/knowledge/search
- * Basic search (semantic/vector search only if schema ready)
+ * Full-text search on knowledge_registry
+ * 
+ * REALIGNED to production schema:
+ * - Uses knowledge_registry (not knowledge_documents)
+ * - Searches title, summary, keywords
  * 
  * Requirements:
  * - explicit JSON responses
@@ -20,47 +24,43 @@ export const dynamic = 'force-dynamic';
 // Valid search fields
 const VALID_SEARCH_FIELDS = [
   'title',
-  'description',
-  'content',
-  'tags',
+  'summary',
+  'keywords',
   'all'
 ];
 
 // Valid sort options
 const VALID_SORT_OPTIONS = [
   'relevance',
-  'created_at',
-  'updated_at',
-  'title'
+  'extracted_at',
+  'last_ingested_at',
+  'title',
+  'classification_confidence'
 ];
 
 interface SearchRequest {
   query: string;
   fields?: string[];
   filters?: {
-    doc_type?: string | string[];
-    author_id?: string;
-    company_id?: string;
-    project_id?: string;
+    doc_class?: string | string[];
+    source?: string;
     status?: string;
-    is_public?: boolean;
-    tags?: string[];
-    created_after?: string;
-    created_before?: string;
+    keywords?: string[];
+    extracted_after?: string;
+    extracted_before?: string;
   };
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
-  include_content?: boolean;
-  semantic_search?: boolean; // Future: vector search
+  semantic_search?: boolean;
 }
 
 // POST /api/knowledge/search
 // Search knowledge documents
 export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString();
-  const source = 'knowledge_documents';
+  const source = 'knowledge_registry';
   
   try {
     const body: SearchRequest = await request.json();
@@ -68,12 +68,7 @@ export async function POST(request: NextRequest) {
     // Validation: query is required
     if (!body.query || body.query.trim() === '') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'query is required',
-          timestamp,
-          source 
-        },
+        { success: false, error: 'query is required', timestamp, source },
         { status: 400 }
       );
     }
@@ -85,8 +80,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { 
             success: false, 
-            error: `Invalid search fields: ${invalidFields.join(', ')}. Valid fields: ${VALID_SEARCH_FIELDS.join(', ')}`,
-            timestamp,
+            error: `Invalid search fields: ${invalidFields.join(', ')}. Valid: ${VALID_SEARCH_FIELDS.join(', ')}`,
+            timestamp, 
             source 
           },
           { status: 400 }
@@ -99,8 +94,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          error: `Invalid sort_by: ${body.sort_by}. Valid options: ${VALID_SORT_OPTIONS.join(', ')}`,
-          timestamp,
+          error: `Invalid sort_by: ${body.sort_by}. Valid: ${VALID_SORT_OPTIONS.join(', ')}`,
+          timestamp, 
           source 
         },
         { status: 400 }
@@ -112,34 +107,25 @@ export async function POST(request: NextRequest) {
     // Search parameters
     const searchQuery = body.query.trim();
     const searchFields = body.fields || ['all'];
-    const limit = Math.min(Math.max(body.limit || 20, 1), 100); // Clamp between 1-100
+    const limit = Math.min(Math.max(body.limit || 20, 1), 100);
     const offset = Math.max(body.offset || 0, 0);
-    const sortBy = body.sort_by || 'created_at';
+    const sortBy = body.sort_by || 'extracted_at';
     const sortOrder = body.sort_order || 'desc';
-    const includeContent = body.include_content !== false; // Default true
     
-    // Build search conditions
+    // Build search conditions for knowledge_registry
     let searchConditions: string[] = [];
     
     if (searchFields.includes('all') || searchFields.includes('title')) {
       searchConditions.push(`title.ilike.%${searchQuery}%`);
     }
-    if (searchFields.includes('all') || searchFields.includes('description')) {
-      searchConditions.push(`description.ilike.%${searchQuery}%`);
-    }
-    if (searchFields.includes('all') || searchFields.includes('content')) {
-      searchConditions.push(`content.ilike.%${searchQuery}%`);
-    }
-    if (searchFields.includes('all') || searchFields.includes('tags')) {
-      // For tags, we need to check if any tag contains the search query
-      // This is a simplified approach - exact tag match
-      searchConditions.push(`tags.cs.{"${searchQuery}"}`);
+    if (searchFields.includes('all') || searchFields.includes('summary')) {
+      searchConditions.push(`summary.ilike.%${searchQuery}%`);
     }
     
     // Build base query
     let query = (supabase as any)
-      .from('knowledge_documents')
-      .select(includeContent ? '*' : 'id, title, description, doc_type, tags, author_name, created_at, updated_at', { count: 'exact' });
+      .from('knowledge_registry')
+      .select('*', { count: 'exact' });
     
     // Apply search conditions
     if (searchConditions.length > 0) {
@@ -149,24 +135,16 @@ export async function POST(request: NextRequest) {
     // Apply filters
     const filters = body.filters || {};
     
-    if (filters.doc_type) {
-      if (Array.isArray(filters.doc_type)) {
-        query = query.in('doc_type', filters.doc_type);
+    if (filters.doc_class) {
+      if (Array.isArray(filters.doc_class)) {
+        query = query.in('doc_class', filters.doc_class);
       } else {
-        query = query.eq('doc_type', filters.doc_type);
+        query = query.eq('doc_class', filters.doc_class);
       }
     }
     
-    if (filters.author_id) {
-      query = query.eq('author_id', filters.author_id);
-    }
-    
-    if (filters.company_id) {
-      query = query.eq('company_id', filters.company_id);
-    }
-    
-    if (filters.project_id) {
-      query = query.eq('project_id', filters.project_id);
+    if (filters.source) {
+      query = query.eq('source', filters.source);
     }
     
     if (filters.status) {
@@ -176,25 +154,20 @@ export async function POST(request: NextRequest) {
       query = query.eq('status', 'active');
     }
     
-    if (filters.is_public !== undefined) {
-      query = query.eq('is_public', filters.is_public);
+    if (filters.keywords && filters.keywords.length > 0) {
+      query = query.overlaps('keywords', filters.keywords);
     }
     
-    if (filters.tags && filters.tags.length > 0) {
-      query = query.contains('tags', filters.tags);
+    if (filters.extracted_after) {
+      query = query.gte('extracted_at', filters.extracted_after);
     }
     
-    if (filters.created_after) {
-      query = query.gte('created_at', filters.created_after);
-    }
-    
-    if (filters.created_before) {
-      query = query.lte('created_at', filters.created_before);
+    if (filters.extracted_before) {
+      query = query.lte('extracted_at', filters.extracted_before);
     }
     
     // Apply sorting
-    // Note: For 'relevance' we default to created_at since we don't have relevance scoring yet
-    const sortColumn = sortBy === 'relevance' ? 'created_at' : sortBy;
+    const sortColumn = sortBy === 'relevance' ? 'extracted_at' : sortBy;
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' });
     
     // Apply pagination
@@ -208,7 +181,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Failed to search knowledge documents',
+          error: 'Failed to search knowledge registry',
           details: error.message,
           timestamp,
           source 
@@ -217,37 +190,29 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Calculate relevance scores (basic text matching for now)
-    // In the future, this could use vector similarity
+    // Calculate relevance scores (basic text matching)
     const documents = (data || []).map((doc: any) => {
       let relevanceScore = 0;
       const queryLower = searchQuery.toLowerCase();
       const titleLower = (doc.title || '').toLowerCase();
-      const descLower = (doc.description || '').toLowerCase();
-      const contentLower = (doc.content || '').toLowerCase();
+      const summaryLower = (doc.summary || '').toLowerCase();
       
       // Title match (highest weight)
       if (titleLower.includes(queryLower)) {
         relevanceScore += 100;
-        if (titleLower === queryLower) relevanceScore += 50; // Exact match
+        if (titleLower === queryLower) relevanceScore += 50;
       }
       
-      // Description match (medium weight)
-      if (descLower.includes(queryLower)) {
+      // Summary match (medium weight)
+      if (summaryLower.includes(queryLower)) {
         relevanceScore += 50;
+        const occurrences = (summaryLower.match(new RegExp(queryLower, 'g')) || []).length;
+        relevanceScore += Math.min(occurrences * 5, 50);
       }
       
-      // Content match (lower weight)
-      if (contentLower.includes(queryLower)) {
-        relevanceScore += 25;
-        // Count occurrences
-        const occurrences = (contentLower.match(new RegExp(queryLower, 'g')) || []).length;
-        relevanceScore += Math.min(occurrences * 5, 50); // Cap at 50 bonus points
-      }
-      
-      // Tag match
-      if (doc.tags && doc.tags.some((tag: string) => tag.toLowerCase() === queryLower)) {
-        relevanceScore += 75; // Exact tag match
+      // Keyword match
+      if (doc.keywords && doc.keywords.some((kw: string) => kw.toLowerCase() === queryLower)) {
+        relevanceScore += 75;
       }
       
       return {
@@ -273,7 +238,6 @@ export async function POST(request: NextRequest) {
           filters,
           sort_by: sortBy,
           sort_order: sortOrder,
-          include_content: includeContent,
           semantic_search: body.semantic_search || false
         },
         pagination: {
@@ -292,23 +256,13 @@ export async function POST(request: NextRequest) {
     
     if (err instanceof SyntaxError) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Invalid JSON in request body',
-          timestamp,
-          source 
-        },
+        { success: false, error: 'Invalid JSON in request body', timestamp, source },
         { status: 400 }
       );
     }
     
     return NextResponse.json(
-      { 
-        success: false, 
-        error: err.message || 'Internal server error',
-        timestamp,
-        source 
-      },
+      { success: false, error: err.message || 'Internal server error', timestamp, source },
       { status: 500 }
     );
   }
@@ -318,7 +272,7 @@ export async function POST(request: NextRequest) {
 // Alternative search via query parameters
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
-  const source = 'knowledge_documents';
+  const source = 'knowledge_registry';
   
   try {
     const { searchParams } = new URL(request.url);
@@ -327,12 +281,7 @@ export async function GET(request: NextRequest) {
     
     if (!query) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Query parameter "q" or "query" is required',
-          timestamp,
-          source 
-        },
+        { success: false, error: 'Query parameter "q" or "query" is required', timestamp, source },
         { status: 400 }
       );
     }
@@ -343,33 +292,16 @@ export async function GET(request: NextRequest) {
     
     // Parse filters
     const filters: any = {};
-    if (searchParams.get('doc_type')) filters.doc_type = searchParams.get('doc_type') || undefined;
-    if (searchParams.get('author_id')) filters.author_id = searchParams.get('author_id') || undefined;
-    if (searchParams.get('company_id')) filters.company_id = searchParams.get('company_id') || undefined;
-    if (searchParams.get('project_id')) filters.project_id = searchParams.get('project_id') || undefined;
+    if (searchParams.get('doc_class')) filters.doc_class = searchParams.get('doc_class') || undefined;
+    if (searchParams.get('source')) filters.source = searchParams.get('source') || undefined;
     if (searchParams.get('status')) filters.status = searchParams.get('status') || undefined;
-    if (searchParams.get('is_public')) filters.is_public = searchParams.get('is_public') === 'true';
-    if (searchParams.get('tags')) filters.tags = (searchParams.get('tags') || '').split(',').filter(Boolean);
+    if (searchParams.get('keywords')) filters.keywords = (searchParams.get('keywords') || '').split(',').filter(Boolean);
     
-    // Build search request
-    const searchRequest: SearchRequest = {
-      query,
-      fields,
-      filters,
-      sort_by: searchParams.get('sort_by') || 'created_at',
-      sort_order: (searchParams.get('sort_order') as 'asc' | 'desc') || 'desc',
-      limit: parseInt(searchParams.get('limit') || '20'),
-      offset: parseInt(searchParams.get('offset') || '0'),
-      include_content: searchParams.get('include_content') !== 'false'
-    };
-    
-    // Forward to POST handler logic
-    // We'll make an internal call to avoid code duplication
     const supabase = getSupabaseAdmin();
     
     const searchQuery = query.trim();
-    const limit = Math.min(Math.max(searchRequest.limit || 20, 1), 100);
-    const offset = Math.max(searchRequest.offset || 0, 0);
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const offset = parseInt(searchParams.get('offset') || '0');
     
     // Build search conditions
     let searchConditions: string[] = [];
@@ -377,15 +309,12 @@ export async function GET(request: NextRequest) {
     if (fields.includes('all') || fields.includes('title')) {
       searchConditions.push(`title.ilike.%${searchQuery}%`);
     }
-    if (fields.includes('all') || fields.includes('description')) {
-      searchConditions.push(`description.ilike.%${searchQuery}%`);
-    }
-    if (fields.includes('all') || fields.includes('content')) {
-      searchConditions.push(`content.ilike.%${searchQuery}%`);
+    if (fields.includes('all') || fields.includes('summary')) {
+      searchConditions.push(`summary.ilike.%${searchQuery}%`);
     }
     
     let dbQuery = (supabase as any)
-      .from('knowledge_documents')
+      .from('knowledge_registry')
       .select('*', { count: 'exact' });
     
     if (searchConditions.length > 0) {
@@ -395,6 +324,11 @@ export async function GET(request: NextRequest) {
     // Apply status filter
     dbQuery = dbQuery.eq('status', filters.status || 'active');
     
+    // Apply source filter
+    if (filters.source) {
+      dbQuery = dbQuery.eq('source', filters.source);
+    }
+    
     // Apply pagination
     dbQuery = dbQuery.range(offset, offset + limit - 1);
     
@@ -403,12 +337,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[Knowledge Search] GET error:', error);
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Failed to search knowledge documents',
-          timestamp,
-          source 
-        },
+        { success: false, error: 'Failed to search knowledge registry', timestamp, source },
         { status: 500 }
       );
     }
@@ -429,12 +358,7 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('[Knowledge Search] GET error:', err);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: err.message || 'Internal server error',
-        timestamp,
-        source 
-      },
+      { success: false, error: err.message || 'Internal server error', timestamp, source },
       { status: 500 }
     );
   }

@@ -63,10 +63,13 @@ export interface AggregationResult {
  * Core service for parent-child task orchestration
  */
 export class AutonomyOrchestrationService {
-  private supabase: any;
+  private _supabase: any = null;
 
-  constructor() {
-    this.supabase = getSupabaseAdmin();
+  private get supabase() {
+    if (!this._supabase) {
+      this._supabase = getSupabaseAdmin();
+    }
+    return this._supabase;
   }
 
   /**

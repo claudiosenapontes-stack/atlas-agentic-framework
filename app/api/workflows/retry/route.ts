@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
         if (execution.attempt_number >= execution.max_attempts) {
           await supabase
             .from('workflow_executions')
-            // @ts-expect-error - Supabase type inference issue
             .update({ status: 'dead_letter' })
             .eq('id', execution.id);
           
@@ -79,7 +78,6 @@ export async function POST(request: NextRequest) {
         const newAttemptNumber = execution.attempt_number + 1;
         await supabase
           .from('workflow_executions')
-          // @ts-expect-error - Supabase type inference
           .update({
             status: 'running',
             attempt_number: newAttemptNumber,
@@ -115,7 +113,6 @@ export async function POST(request: NextRequest) {
         
         await supabase
           .from('workflow_executions')
-          // @ts-expect-error - Supabase type inference
           .update({
             status: 'retrying',
             retry_at: nextRetryAt.toISOString(),

@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     const insertPayload: any = { 
       id, 
       title,
+      type: 'general',  // Required by schema (not-null constraint)
       status: 'pending'
     };
     

@@ -357,27 +357,41 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Create meeting_task link if event_id provided
-    if (event_id || source_id) {
+    // ATLAS-OPTIMUS-EO-BLOCKER-FIXES-043: Create meeting_task link if event_id provided
+    // Only create link if event_id exists and is valid in executive_events
+    const finalEventId = event_id || source_id;
+    if (finalEventId) {
       try {
-        const linkResult = await (supabase as any)
-          .from('meeting_tasks')
-          .insert({
-            id: randomUUID(),
-            event_id: event_id || source_id,
-            task_id: taskId,
-            extracted_from_transcript: extracted_from_transcript || false,
-            transcript_timestamp: extracted_from_transcript ? timestamp : null,
-            context_quote: context_quote || null,
-            assigned_by: assigned_to || assignee_id || null,
-            created_at: timestamp,
-          })
-          .select()
+        // First verify the event exists to avoid FK constraint violation
+        const { data: eventExists, error: eventCheckError } = await (supabase as any)
+          .from('executive_events')
+          .select('id')
+          .eq('id', finalEventId)
           .single();
         
-        if (linkResult.error) {
-          // Non-fatal: log but don't fail the whole request
-          console.log('[Followups POST] Meeting task link error (non-fatal):', linkResult.error);
+        if (eventCheckError || !eventExists) {
+          console.log(`[Followups POST] Event ${finalEventId} not found, skipping meeting_task link`);
+        } else {
+          // Event exists, create the link
+          const linkResult = await (supabase as any)
+            .from('meeting_tasks')
+            .insert({
+              id: randomUUID(),
+              event_id: finalEventId,
+              task_id: taskId,
+              extracted_from_transcript: extracted_from_transcript || false,
+              transcript_timestamp: extracted_from_transcript ? timestamp : null,
+              context_quote: context_quote || null,
+              assigned_by: assigned_to || assignee_id || null,
+              created_at: timestamp,
+            })
+            .select()
+            .single();
+          
+          if (linkResult.error) {
+            // Non-fatal: log but don't fail the whole request
+            console.log('[Followups POST] Meeting task link error (non-fatal):', linkResult.error);
+          }
         }
       } catch (linkError: any) {
         console.log('[Followups POST] Meeting task link exception (non-fatal):', linkError);

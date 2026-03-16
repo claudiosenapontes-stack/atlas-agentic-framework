@@ -293,7 +293,9 @@ async function buildWatchlistAlertNotification(payload: NotificationPayload): Pr
   }
   
   // 2. Build payload
-  const title = `Watchlist Alert: ${watchlistItem.title}`;
+  // Schema uses 'subject' not 'title' for watchlist_items
+  const itemTitle = watchlistItem.subject || watchlistItem.title || 'Untitled';
+  const title = `Watchlist Alert: ${itemTitle}`;
   
   const messageLines = [
     `👁️ **${title}**`,

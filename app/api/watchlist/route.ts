@@ -200,10 +200,13 @@ export async function POST(request: NextRequest) {
       // Insert watchlist item
       let data;
       try {
-        // Build insert data dynamically to handle missing columns
+        // Build insert data dynamically to match actual schema
+        // Schema: id, rule_id, source, sender, subject, content_preview, ai_summary, 
+        //         priority, status, draft_reply, created_at, updated_at, category, 
+        //         company_id, description, entity_id, entity_type, entity_name, owner_id, reason
         const insertData: any = {
           id: watchlistId,
-          title: title.trim(),
+          subject: title.trim(),  // Table uses 'subject' not 'title'
           description: description || null,
           category: category || 'other',
           entity_type: entity_type || null,
@@ -216,6 +219,8 @@ export async function POST(request: NextRequest) {
           reason: reason || null,
           created_at: timestamp,
           updated_at: timestamp,
+          // Map description to content_preview if needed
+          content_preview: description || null,
         };
         
         // Only add metadata if provided and table likely supports it

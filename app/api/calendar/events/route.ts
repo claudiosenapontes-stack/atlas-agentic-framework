@@ -29,6 +29,7 @@ const VALID_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed'];
 
 // GET /api/calendar/events
 // Query executive events with filters
+// ATLAS-OPTIMUS-EO-TIMEOUT-CLOSEOUT-097: Bounded results, table check
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
   
@@ -41,10 +42,29 @@ export async function GET(request: NextRequest) {
     const event_type = searchParams.get('event_type');
     const from_date = searchParams.get('from');
     const to_date = searchParams.get('to');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     
     const supabase = getSupabaseAdmin();
+    
+    // Check table exists first (fast check)
+    const { error: tableCheckError } = await (supabase as any)
+      .from('executive_events')
+      .select('id', { count: 'exact', head: true });
+    
+    if (tableCheckError) {
+      console.error('[Calendar Events GET] Table check error:', tableCheckError);
+      return NextResponse.json({
+        success: false,
+        events: [],
+        count: 0,
+        total: 0,
+        error: `Database error: ${tableCheckError.message}`,
+        code: tableCheckError.code,
+        timestamp,
+        source: 'executive_events',
+      }, { status: 500 });
+    }
     
     // Build query
     let query = (supabase as any)

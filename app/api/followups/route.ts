@@ -41,84 +41,98 @@ export async function GET(request: NextRequest) {
     const source_type = searchParams.get('source_type');
     const due_before = searchParams.get('due_before');
     const due_after = searchParams.get('due_after');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     const include_completed = searchParams.get('include_completed') === 'true';
     
     const supabase = getSupabaseAdmin();
     
-    // Query meeting_tasks join to get followups from meetings
-    let meetingTasksQuery = (supabase as any)
-      .from('meeting_tasks')
-      .select(`
-        id,
-        event_id,
-        task_id,
-        extracted_from_transcript,
-        transcript_timestamp,
-        context_quote,
-        assigned_by,
-        created_at,
-        tasks:task_id (*),
-        events:event_id (title, start_time, event_type)
-      `)
-      .limit(limit);
-    
-    // Query tasks that are prep tasks from executive_events
-    let prepTasksQuery = (supabase as any)
-      .from('executive_events')
-      .select(`
-        id,
-        title,
-        prep_task_id,
-        prep_required,
-        tasks:prep_task_id (*)
-      `)
-      .not('prep_task_id', 'is', null)
-      .limit(limit);
-    
-    // Get all followups
-    const { data: meetingTasks, error: meetingError } = await meetingTasksQuery;
-    const { data: prepTasks, error: prepError } = await prepTasksQuery;
-    
-    if (meetingError) {
-      console.error('[Followups GET] Meeting tasks query error:', meetingError);
-    }
-    
-    if (prepError) {
-      console.error('[Followups GET] Prep tasks query error:', prepError);
-    }
-    
-    // Transform meeting tasks into followup format
+    // ATLAS-OPTIMUS-EO-TIMEOUT-CLOSEOUT-097: Check tables exist first
     let followups: any[] = [];
+    let meetingTasksError = null;
+    let prepTasksError = null;
     
-    if (meetingTasks) {
-      followups = meetingTasks.map((mt: any) => ({
-        id: mt.task_id,
-        followup_id: mt.id,
-        source: 'meeting',
-        source_id: mt.event_id,
-        source_title: mt.events?.title || 'Unknown Meeting',
-        source_time: mt.events?.start_time,
-        source_type: mt.events?.event_type,
-        ...mt.tasks,
-        context_quote: mt.context_quote,
-        extracted_from_transcript: mt.extracted_from_transcript,
-        transcript_timestamp: mt.transcript_timestamp,
-        meeting_task_created_at: mt.created_at,
-      }));
+    // Query 1: meeting_tasks (bounded, no heavy joins)
+    try {
+      const { data: meetingTasks, error: mtError } = await (supabase as any)
+        .from('meeting_tasks')
+        .select('id, event_id, task_id, extracted_from_transcript, context_quote, assigned_by, created_at')
+        .limit(limit);
+      
+      if (mtError) {
+        meetingTasksError = mtError.message;
+        console.log('[Followups GET] meeting_tasks query error:', mtError.message);
+      } else if (meetingTasks && meetingTasks.length > 0) {
+        // Fetch linked tasks separately (bounded)
+        const taskIds = meetingTasks.map((mt: any) => mt.task_id).filter(Boolean);
+        let tasksMap: Record<string, any> = {};
+        
+        if (taskIds.length > 0) {
+          const { data: tasks } = await (supabase as any)
+            .from('tasks')
+            .select('id, title, description, status, priority, assigned_agent_id, due_at, created_at')
+            .in('id', taskIds.slice(0, limit));
+          
+          if (tasks) {
+            tasksMap = Object.fromEntries(tasks.map((t: any) => [t.id, t]));
+          }
+        }
+        
+        followups = meetingTasks.map((mt: any) => ({
+          id: mt.task_id,
+          followup_id: mt.id,
+          source: 'meeting',
+          source_id: mt.event_id,
+          ...tasksMap[mt.task_id],
+          context_quote: mt.context_quote,
+          extracted_from_transcript: mt.extracted_from_transcript,
+          assigned_by: mt.assigned_by,
+          meeting_task_created_at: mt.created_at,
+        }));
+      }
+    } catch (e: any) {
+      meetingTasksError = e.message;
+      console.log('[Followups GET] meeting_tasks exception:', e.message);
     }
     
-    // Add prep tasks
-    if (prepTasks) {
-      const prepFollowups = prepTasks.map((pt: any) => ({
-        ...pt.tasks,
-        id: pt.prep_task_id,
-        source: 'event_prep',
-        source_id: pt.id,
-        source_title: pt.title,
-        source_type: 'prep_required',
-      }));
-      followups = [...followups, ...prepFollowups];
+    // Query 2: executive_events prep tasks (separate, bounded)
+    try {
+      const { data: prepTasks, error: ptError } = await (supabase as any)
+        .from('executive_events')
+        .select('id, title, prep_task_id, prep_required')
+        .not('prep_task_id', 'is', null)
+        .limit(limit);
+      
+      if (ptError) {
+        prepTasksError = ptError.message;
+        console.log('[Followups GET] executive_events query error:', ptError.message);
+      } else if (prepTasks && prepTasks.length > 0) {
+        const prepTaskIds = prepTasks.map((pt: any) => pt.prep_task_id).filter(Boolean);
+        
+        if (prepTaskIds.length > 0) {
+          const { data: prepTaskData } = await (supabase as any)
+            .from('tasks')
+            .select('id, title, description, status, priority, assigned_agent_id, due_at, created_at')
+            .in('id', prepTaskIds.slice(0, limit));
+          
+          if (prepTaskData) {
+            const prepMap = Object.fromEntries(prepTaskData.map((t: any) => [t.id, t]));
+            const prepFollowups = prepTasks
+              .filter((pt: any) => prepMap[pt.prep_task_id])
+              .map((pt: any) => ({
+                ...prepMap[pt.prep_task_id],
+                id: pt.prep_task_id,
+                source: 'event_prep',
+                source_id: pt.id,
+                source_title: pt.title,
+                source_type: 'prep_required',
+              }));
+            followups = [...followups, ...prepFollowups];
+          }
+        }
+      }
+    } catch (e: any) {
+      prepTasksError = e.message;
+      console.log('[Followups GET] executive_events exception:', e.message);
     }
     
     // Apply filters
@@ -173,7 +187,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      followups,
+      followups: followups.slice(0, limit),
       count: followups.length,
       stats,
       filters: {
@@ -188,6 +202,10 @@ export async function GET(request: NextRequest) {
       },
       timestamp,
       source: 'meeting_tasks + executive_events prep_tasks',
+      errors: {
+        meeting_tasks: meetingTasksError,
+        prep_tasks: prepTasksError,
+      },
     });
     
   } catch (error: any) {

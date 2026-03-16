@@ -19,6 +19,31 @@ interface Agent {
   stalled?: boolean;
 }
 
+interface SeverinoRuntime {
+  status: 'running' | 'paused' | 'error';
+  scheduler: {
+    enabled: boolean;
+    last_cycle: string | null;
+    next_cycle: string | null;
+    cycle_count: number;
+  };
+  missions: {
+    active: number;
+    completed: number;
+    failed: number;
+    log: MissionEntry[];
+  };
+}
+
+interface MissionEntry {
+  id: string;
+  name: string;
+  status: 'active' | 'completed' | 'failed' | 'blocked';
+  started_at: string;
+  completed_at?: string;
+  blockers?: string[];
+}
+
 interface ButtonState {
   loading: boolean;
   success: boolean;

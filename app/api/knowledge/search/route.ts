@@ -326,7 +326,7 @@ export async function GET(request: NextRequest) {
     
     // Apply source filter
     if (filters.source) {
-      dbQuery = dbQuery.eq('source', filters.source);
+      dbQuery = dbQuery.eq('source_system', filters.source);
     }
     
     // Apply pagination

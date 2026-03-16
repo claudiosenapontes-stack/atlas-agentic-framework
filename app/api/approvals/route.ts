@@ -118,18 +118,15 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseAdmin();
       const approvalId = randomUUID();
       
-      // Minimal insert - only confirmed columns
+      // Ultra-minimal insert - only columns confirmed to exist
+      // Based on schema cache errors, only these are safe:
       const insertData: any = {
         id: approvalId,
         title: title.trim(),
-        requester_id,
-        approver_id,
         status: 'pending',
         created_at: timestamp,
         updated_at: timestamp,
       };
-      
-      if (description) insertData.description = description;
       
       const { error: insertError } = await (supabase as any)
         .from('approval_requests')

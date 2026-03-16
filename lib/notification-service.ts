@@ -92,6 +92,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<No
         sent: false,
         error: `Failed to store notification: ${dbError.message}`,
         timestamp,
+        channels: [],
       };
     }
 
@@ -111,6 +112,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<No
       sent: false,
       error: error.message || "Internal server error",
       timestamp,
+      channels: [],
     };
   }
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  BarChart3,
   GitBranch,
   Flag,
   Users,
@@ -12,7 +11,10 @@ import {
   Activity,
   CheckCircle2,
   Clock,
-  AlertCircle
+  Server,
+  Database,
+  Layers,
+  RefreshCw
 } from "lucide-react";
 
 interface Task {
@@ -36,13 +38,24 @@ interface Agent {
   status: string;
 }
 
-// Simple UI Components
+interface SystemHealth {
+  pm2: { status: string; processes: number; online: number };
+  redis: { status: string; queues: number; memory: string };
+  supabase: { status: string; latency: number };
+  queues: Record<string, number>;
+  timestamp: string;
+}
+
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`bg-[#111214] border border-[#1F2226] rounded-lg ${className}`}>{children}</div>;
 }
 
 function CardContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <div className={`p-4 ${className}`}>{children}</div>;
+}
+
+function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`px-4 py-3 border-b border-[#1F2226] ${className}`}>{children}</div>;
 }
 
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -56,33 +69,33 @@ const navItems = [
   { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "Performance metrics", color: "text-[#FF6A00]" },
 ];
 
-export default function OperationsDashboard() {
+export default function UnifiedOperationsDashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     try {
-      const [tasksRes, execsRes, agentsRes] = await Promise.all([
+      const [tasksRes, execsRes, agentsRes, healthRes] = await Promise.all([
         fetch("/api/tasks?limit=100"),
         fetch("/api/executions?limit=100"),
         fetch("/api/agents/live"),
+        fetch("/api/health/detailed"),
       ]);
 
-      const [tasksData, execsData, agentsData] = await Promise.all([
+      const [tasksData, execsData, agentsData, healthData] = await Promise.all([
         tasksRes.json(),
         execsRes.json(),
         agentsRes.json(),
+        healthRes.json(),
       ]);
 
       setTasks(tasksData.tasks || []);
       setExecutions(execsData.executions || []);
       setAgents(agentsData.agents || []);
+      setHealth(healthData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     } finally {
@@ -90,19 +103,49 @@ export default function OperationsDashboard() {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const completedTasks = tasks.filter(t => t.status === "completed").length;
   const inProgressTasks = tasks.filter(t => t.status === "in_progress").length;
-  const completedExecutions = executions.filter(e => e.status === "completed").length;
   const onlineAgents = agents.filter(a => a.status === "online").length;
+
+  const getHealthBadgeClass = (status: string, type: 'pm2' | 'redis' | 'supabase') => {
+    if (!health) return 'bg-[#6B7280]/20 text-[#6B7280]';
+    const isGood = 
+      (type === 'pm2' && health.pm2.online === health.pm2.processes) ||
+      (type === 'redis' && status === 'connected') ||
+      (type === 'supabase' && status === 'connected');
+    return isGood ? 'bg-[#16C784]/20 text-[#16C784]' : 'bg-[#FF3B30]/20 text-[#FF3B30]';
+  };
+
+  const getQueueBadgeClass = (depth: number) => {
+    if (depth > 10) return 'bg-[#FF3B30]/20 text-[#FF3B30]';
+    if (depth > 0) return 'bg-[#FFB020]/20 text-[#FFB020]';
+    return 'bg-[#6B7280]/20 text-[#6B7280]';
+  };
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Tactical Operations</h1>
-        <p className="text-[#9BA3AF]">Command center for task orchestration and agent productivity</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Operations Center</h1>
+          <p className="text-[#9BA3AF]">Unified view: runtime health, task orchestration, and agent metrics</p>
+        </div>
+        <button 
+          onClick={fetchData}
+          className="flex items-center gap-2 px-3 py-2 bg-[#1F2226] hover:bg-[#2A2D32] text-white rounded-lg text-sm transition-colors"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
-      {/* Navigation Grid — Tasks is primary sub-surface */}
+      {/* Navigation Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -126,53 +169,137 @@ export default function OperationsDashboard() {
         })}
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Activity className="w-5 h-5 text-[#FF6A00]" />
-              <div>
-                <p className="text-[#9BA3AF] text-sm">Total Tasks</p>
-                <p className="text-2xl font-bold text-white">{tasks.length}</p>
+      {/* Runtime Health Section */}
+      <section>
+        <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Activity className="w-4 h-4" />
+          Runtime Health
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Server className="w-4 h-4 text-[#9BA3AF]" />
+                  <span className="text-sm font-medium text-white">PM2 Services</span>
+                </div>
+                <Badge className={getHealthBadgeClass(health?.pm2?.status || '', 'pm2')}>
+                  {health ? `${health.pm2.online}/${health.pm2.processes}` : '—'}
+                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-[#FF6A00]" />
-              <div>
-                <p className="text-[#9BA3AF] text-sm">In Progress</p>
-                <p className="text-2xl font-bold text-white">{inProgressTasks}</p>
+              <div className="text-2xl font-bold text-white">{health?.pm2?.processes || '—'}</div>
+              <p className="text-xs text-[#6B7280]">Total processes</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#9BA3AF]" />
+                  <span className="text-sm font-medium text-white">Redis</span>
+                </div>
+                <Badge className={getHealthBadgeClass(health?.redis?.status || '', 'redis')}>
+                  {health?.redis?.status || '—'}
+                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <div>
-                <p className="text-[#9BA3AF] text-sm">Completed</p>
-                <p className="text-2xl font-bold text-white">{completedTasks}</p>
+              <div className="text-2xl font-bold text-white">{health?.redis?.queues || '—'}</div>
+              <p className="text-xs text-[#6B7280]">Active queues</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-[#9BA3AF]" />
+                  <span className="text-sm font-medium text-white">Supabase</span>
+                </div>
+                <Badge className={getHealthBadgeClass(health?.supabase?.status || '', 'supabase')}>
+                  {health ? `${health.supabase.latency}ms` : '—'}
+                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-blue-400" />
-              <div>
-                <p className="text-[#9BA3AF] text-sm">Online Agents</p>
-                <p className="text-2xl font-bold text-white">{onlineAgents}/{agents.length}</p>
+              <div className="text-2xl font-bold text-white capitalize">{health?.supabase?.status || '—'}</div>
+              <p className="text-xs text-[#6B7280]">Database latency</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {health && (
+          <Card className="mt-4">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#9BA3AF]" />
+                <span className="font-medium text-white">Queue Depths</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {Object.entries(health.queues).map(([queue, depth]) => (
+                  <div key={queue} className="flex justify-between items-center p-2.5 bg-[#0B0B0C] rounded-lg">
+                    <span className="text-xs font-medium text-[#9BA3AF] capitalize">{queue.replace(/_/g, ' ')}</span>
+                    <Badge className={getQueueBadgeClass(depth)}>{depth}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* Task Metrics */}
+      <section>
+        <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
+          <GitBranch className="w-4 h-4" />
+          Task Orchestration
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Activity className="w-5 h-5 text-[#FF6A00]" />
+                <div>
+                  <p className="text-[#9BA3AF] text-sm">Total Tasks</p>
+                  <p className="text-2xl font-bold text-white">{tasks.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-[#FF6A00]" />
+                <div>
+                  <p className="text-[#9BA3AF] text-sm">In Progress</p>
+                  <p className="text-2xl font-bold text-white">{inProgressTasks}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-[#16C784]" />
+                <div>
+                  <p className="text-[#9BA3AF] text-sm">Completed</p>
+                  <p className="text-2xl font-bold text-white">{completedTasks}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-blue-400" />
+                <div>
+                  <p className="text-[#9BA3AF] text-sm">Online Agents</p>
+                  <p className="text-2xl font-bold text-white">{onlineAgents}/{agents.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,10 +313,10 @@ export default function OperationsDashboard() {
                     <p className="text-white text-sm truncate">{task.title}</p>
                     <p className="text-[#9BA3AF] text-xs">{task.agent_id || "Unassigned"}</p>
                   </div>
-                  <Badge className={task.status === "completed" ? "bg-green-500/20 text-green-500" : task.status === "in_progress" ? "bg-[#FF6A00]/20 text-[#FF6A00]" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
+                  <Badge className={task.status === "completed" ? "bg-[#16C784]/20 text-[#16C784]" : task.status === "in_progress" ? "bg-[#FF6A00]/20 text-[#FF6A00]" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
                     {task.status}
                   </Badge>
-                </div>
+                </div
               ))}
               {tasks.length === 0 && <p className="text-[#9BA3AF] text-center py-4">No tasks found</p>}
             </div>
@@ -206,7 +333,7 @@ export default function OperationsDashboard() {
                     <p className="text-white text-sm">{exec.id.slice(0, 8)}</p>
                     <p className="text-[#9BA3AF] text-xs">{exec.agent_name || "Unknown"}</p>
                   </div>
-                  <Badge className={exec.status === "completed" ? "bg-green-500/20 text-green-500" : exec.status === "failed" ? "bg-red-500/20 text-red-500" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
+                  <Badge className={exec.status === "completed" ? "bg-[#16C784]/20 text-[#16C784]" : exec.status === "failed" ? "bg-[#FF3B30]/20 text-[#FF3B30]" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
                     {exec.status}
                   </Badge>
                 </div>

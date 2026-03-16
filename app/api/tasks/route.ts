@@ -53,6 +53,55 @@ const TASK_TYPE_MAP: Record<string, string> = {
   'analysis': 'analysis',
 };
 
+// Valid company codes that can be used instead of UUIDs
+const VALID_COMPANY_CODES = ['ARQIA', 'XGROUP', 'SENA'];
+
+// Company code to UUID mapping cache
+let companyIdCache: Record<string, string | null> = {};
+
+// Resolve company identifier (code or UUID) to UUID
+async function resolveCompanyId(supabase: any, companyId: string | null): Promise<string | null> {
+  if (!companyId) return null;
+  
+  // If it's already a UUID format, return as-is
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(companyId)) {
+    return companyId;
+  }
+  
+  // Check cache first
+  if (companyIdCache[companyId.toUpperCase()] !== undefined) {
+    return companyIdCache[companyId.toUpperCase()];
+  }
+  
+  // Look up company by code
+  const code = companyId.toUpperCase();
+  if (!VALID_COMPANY_CODES.includes(code)) {
+    companyIdCache[code] = null;
+    return null;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id')
+      .ilike('code', code)
+      .maybeSingle();
+    
+    if (error || !data) {
+      // If company not found, return null (will use null in DB)
+      companyIdCache[code] = null;
+      return null;
+    }
+    
+    companyIdCache[code] = data.id;
+    return data.id;
+  } catch {
+    companyIdCache[code] = null;
+    return null;
+  }
+}
+
 // POST - Create new task (Executive Ops write path)
 export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString();
@@ -136,6 +185,9 @@ export async function POST(request: NextRequest) {
     // Map task type to database-valid value
     const dbTaskType = TASK_TYPE_MAP[task_type.toLowerCase()] || 'implementation';
     
+    // Resolve company_id (handles both UUIDs and codes like "ARQIA")
+    const resolvedCompanyId = await resolveCompanyId(supabase, company_id);
+    
     // Generate UUID
     const taskId = randomUUID();
     
@@ -148,7 +200,7 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       priority: priority.toLowerCase(),
       assigned_agent_id: assigned_agent_id.toLowerCase(),
-      company_id: company_id || null,
+      company_id: resolvedCompanyId,
       parent_task_id: parent_task_id || null,
       command_id: command_id || null,
       execution_id: execution_id || null,
@@ -159,6 +211,8 @@ export async function POST(request: NextRequest) {
         source: source || 'api',
         initiator: initiator || 'unknown',
         original_task_type: task_type,
+        original_company_id: company_id,
+        resolved_company_id: resolvedCompanyId,
         created_via: 'ATLAS-SOPHIA-EO-WRITE-API-FIX-001',
         created_at: timestamp,
       },
@@ -214,6 +268,8 @@ export async function POST(request: NextRequest) {
         status: task.status,
         priority: task.priority,
         assigned_agent_id: task.assigned_agent_id,
+        company_id: resolvedCompanyId,
+        company_code: company_id,
         created_at: task.created_at,
       },
       timestamp,

@@ -29,36 +29,7 @@ export async function GET(
   const startTime = Date.now();
   
   try {
-    const { searchParams } = new URL(request.url);
-    const includeTasks = searchParams.get('include_tasks') === 'true';
-    
-    const supabase = getSupabaseAdmin();
-    
-    let query = supabase
-      .from('missions')
-      .select('*')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
-    
-    if (includeTasks) {
-      query = supabase
-        .from('missions')
-        .select(`
-          *,
-          mission_tasks(
-            task_id,
-            tasks(*)
-          )
-        `)
-        .eq('id', missionId)
-        .is('deleted_at', null)
-        .single();
-    }
-    
-    const { data: mission, error } = await query;
-    
-    // Demo missions for detail view
+    // Demo missions for detail view - return immediately if ID matches
     const demoMissions: Record<string, any> = {
       "mission-001": {
         id: "mission-001",
@@ -161,19 +132,51 @@ export async function GET(
       },
     };
     
-    // Check demo data if database returns nothing
+    // Return demo data immediately for known mission IDs
+    if (demoMissions[missionId]) {
+      return NextResponse.json({
+        success: true,
+        mission: demoMissions[missionId],
+        timestamp,
+        requestId,
+        duration: Date.now() - startTime,
+      });
+    }
+    
+    // Otherwise, try database
+    const { searchParams } = new URL(request.url);
+    const includeTasks = searchParams.get('include_tasks') === 'true';
+    
+    const supabase = getSupabaseAdmin();
+    
+    let query = supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
+    
+    if (includeTasks) {
+      query = supabase
+        .from('missions')
+        .select(`
+          *,
+          mission_tasks(
+            task_id,
+            tasks(*)
+          )
+        `)
+        .eq('id', missionId)
+        .is('deleted_at', null)
+        .single();
+    }
+    
+    const { data: mission, error } = await query;
+    
+    // Log diagnostic info
+    console.log(`[${requestId}] Supabase query result: error=${error?.code || 'none'}, hasMission=${!!mission}, duration: ${Date.now() - startTime}ms`);
+    
     if (error || !mission) {
-      const demoMission = demoMissions[missionId];
-      if (demoMission) {
-        return NextResponse.json({
-          success: true,
-          mission: demoMission,
-          timestamp,
-          requestId,
-          duration: Date.now() - startTime,
-        });
-      }
-      
       if (error && error.code === 'PGRST116') {
         return NextResponse.json({
           success: false,

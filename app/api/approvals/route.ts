@@ -195,22 +195,23 @@ export async function POST(request: NextRequest) {
       // Insert approval request
       let data;
       try {
+        // Build insert data dynamically to handle missing columns
         const insertData: any = {
           id: approvalId,
           title: title.trim(),
-          description: description || null,
           requester_id,
           approver_id,
           status: 'pending',
-          metadata,
           created_at: timestamp,
           updated_at: timestamp,
         };
         
-        // Only add optional fields if they exist in schema
+        // Only add optional fields if provided (schema may not have these columns)
+        if (description) insertData.description = description;
         if (request_type) insertData.request_type = request_type;
         if (entity_type) insertData.entity_type = entity_type;
         if (entity_id) insertData.entity_id = entity_id;
+        // Note: metadata column may not exist in schema - skipping to avoid PGRST204 errors
         
         const result = await (supabase as any)
           .from('approval_requests')

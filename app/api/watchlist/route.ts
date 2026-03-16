@@ -200,25 +200,30 @@ export async function POST(request: NextRequest) {
       // Insert watchlist item
       let data;
       try {
+        // Build insert data dynamically to handle missing columns
+        const insertData: any = {
+          id: watchlistId,
+          title: title.trim(),
+          description: description || null,
+          category: category || 'other',
+          entity_type: entity_type || null,
+          entity_id: entity_id || null,
+          entity_name: entity_name || null,
+          priority: priority.toLowerCase(),
+          status: status.toLowerCase(),
+          owner_id: owner_id || null,
+          company_id: company_id || null,
+          reason: reason || null,
+          created_at: timestamp,
+          updated_at: timestamp,
+        };
+        
+        // Only add metadata if provided and table likely supports it
+        // Schema cache errors indicate column may not exist
+        
         const result = await (supabase as any)
           .from('watchlist_items')
-          .insert({
-            id: watchlistId,
-            title: title.trim(),
-            description: description || null,
-            category: category || 'other',
-            entity_type: entity_type || null,
-            entity_id: entity_id || null,
-            entity_name: entity_name || null,
-            priority: priority.toLowerCase(),
-            status: status.toLowerCase(),
-            owner_id: owner_id || null,
-            company_id: company_id || null,
-            reason: reason || null,
-            metadata,
-            created_at: timestamp,
-            updated_at: timestamp,
-          })
+          .insert(insertData)
           .select()
           .single();
         

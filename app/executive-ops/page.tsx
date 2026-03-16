@@ -59,6 +59,33 @@ async function getDecisions(): Promise<Decision[]> {
   } catch { return []; }
 }
 
+function StatCard({ icon: Icon, label, value, loading }: { icon: any; label: string; value?: number; loading: boolean }) {
+  return (
+    <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4 text-[#6B7280]" />
+        <span className="text-xs text-[#6B7280]">{label}</span>
+      </div>
+      <p className="text-2xl font-semibold text-white">{loading ? '-' : (value || 0)}</p>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, action, children }: { title: string; icon: any; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-[#6B7280]" />
+          <span className="text-sm font-medium text-white">{title}</span>
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function ExecutiveOpsPage() {
   const [snapshot, setSnapshot] = useState<ExecutiveSnapshot | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -85,122 +112,88 @@ export default function ExecutiveOpsPage() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const quickNavItems = [
-    { href: '/executive-ops/calendar', label: 'Calendar', icon: Calendar, count: snapshot?.meetingsToday, urgent: false },
-    { href: '/executive-ops/watchlist', label: 'Watchlist', icon: Eye, count: snapshot?.watchlistItems, urgent: false },
-    { href: '/executive-ops/approvals', label: 'Approvals', icon: CheckCircle2, count: snapshot?.pendingApprovals, urgent: (snapshot?.pendingApprovals || 0) > 3 },
-    { href: '/executive-ops/followups', label: 'Follow-ups', icon: Clock, count: snapshot?.pendingFollowups, urgent: (snapshot?.pendingFollowups || 0) > 5 },
+    { href: '/executive-ops/calendar', label: 'Calendar', icon: Calendar, count: snapshot?.meetingsToday, color: 'from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400' },
+    { href: '/executive-ops/watchlist', label: 'Watchlist', icon: Eye, count: snapshot?.watchlistItems, color: 'from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400' },
+    { href: '/executive-ops/approvals', label: 'Approvals', icon: CheckCircle2, count: snapshot?.pendingApprovals, color: 'from-green-500/20 to-green-600/10 border-green-500/30 text-green-400' },
+    { href: '/executive-ops/followups', label: 'Follow-ups', icon: Clock, count: snapshot?.pendingFollowups, color: 'from-amber-500/20 to-amber-600/10 border-amber-500/30 text-amber-400' },
   ];
-
-  const handleCommandSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commandInput.trim()) return;
-    setCommandInput('');
-  };
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Header - Knowledge Pattern */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-[12px] bg-gradient-to-br from-[#FF6A00]/20 to-[#FF3B30]/10 border border-[#FF6A00]/30 flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-[#FF6A00]" />
+            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-[#FF6A00]/20 to-[#FF3B30]/10 border border-[#FF6A00]/30 flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-[#FF6A00]" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-white">Executive Ops</h1>
-              <p className="text-sm text-[#6B7280]">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+              <h1 className="text-xl font-semibold text-white">Executive Ops</h1>
+              <p className="text-sm text-[#6B7280]">Daily operations & decision center</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {unreadCount > 0 && (
-              <button className="flex items-center gap-2 px-3 py-2 bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded-lg">
-                <Bell className="w-4 h-4 text-[#FF3B30]" />
-                <span className="text-sm text-[#FF3B30]">{unreadCount} new</span>
-              </button>
+              <span className="px-2 py-1 bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded text-xs text-[#FF3B30]">{unreadCount} new</span>
             )}
             {totalActionItems > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#FF6A00]/10 border border-[#FF6A00]/30 rounded-lg">
-                <Zap className="w-4 h-4 text-[#FF6A00]" />
-                <span className="text-sm text-[#FF6A00]">{totalActionItems} pending</span>
-              </div>
+              <span className="px-2 py-1 bg-[#FF6A00]/10 border border-[#FF6A00]/30 rounded text-xs text-[#FF6A00]">{totalActionItems} pending</span>
             )}
-            {dataSource === 'live' ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#16C784]/10 border border-[#16C784]/30">
-                <div className="w-2 h-2 rounded-full bg-[#16C784] animate-pulse" />
-                <span className="text-xs text-[#16C784]">LIVE</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#6B7280]/10 border border-[#6B7280]/30">
-                <AlertCircle className="w-4 h-4 text-[#6B7280]" />
-                <span className="text-xs text-[#6B7280]">OFFLINE</span>
-              </div>
-            )}
+            <span className={`px-2 py-1 border rounded text-xs ${dataSource === 'live' ? 'bg-[#16C784]/10 border-[#16C784]/30 text-[#16C784]' : 'bg-[#6B7280]/10 border-[#6B7280]/30 text-[#6B7280]'}`}>
+              {dataSource === 'live' ? 'Live' : 'Offline'}
+            </span>
           </div>
         </div>
 
-        {/* Top Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <StatPill icon={<Target className="w-4 h-4" />} label="Priorities" value={snapshot?.priorities?.length} loading={loading} color="text-[#FF3B30]" />
-          <StatPill icon={<Calendar className="w-4 h-4" />} label="Meetings" value={snapshot?.meetingsToday} loading={loading} color="text-[#3B82F6]" />
-          <StatPill icon={<GitBranch className="w-4 h-4" />} label="Decisions" value={snapshot?.pendingDecisions} loading={loading} color="text-[#FFB020]" />
-          <StatPill icon={<Eye className="w-4 h-4" />} label="Watchlist" value={snapshot?.watchlistItems} loading={loading} color="text-[#16C784]" />
-          <StatPill icon={<CheckCircle2 className="w-4 h-4" />} label="Approvals" value={snapshot?.pendingApprovals} loading={loading} color="text-[#10B981]" />
-          <StatPill icon={<Clock className="w-4 h-4" />} label="Follow-ups" value={snapshot?.pendingFollowups} loading={loading} color="text-[#F59E0B]" />
+        {/* Stats - Knowledge Pattern */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <StatCard icon={Target} label="Priorities" value={snapshot?.priorities?.length} loading={loading} />
+          <StatCard icon={Calendar} label="Meetings" value={snapshot?.meetingsToday} loading={loading} />
+          <StatCard icon={GitBranch} label="Decisions" value={snapshot?.pendingDecisions} loading={loading} />
+          <StatCard icon={Eye} label="Watchlist" value={snapshot?.watchlistItems} loading={loading} />
+          <StatCard icon={CheckCircle2} label="Approvals" value={snapshot?.pendingApprovals} loading={loading} />
+          <StatCard icon={Clock} label="Follow-ups" value={snapshot?.pendingFollowups} loading={loading} />
         </div>
 
-        {/* Main Grid */}
+        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Quick Navigation */}
+            {/* Quick Access Cards - Knowledge Pattern */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider">Quick Access</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-4">Quick Access</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {quickNavItems.map((item) => {
                   const Icon = item.icon;
                   return (
-                    <Link key={item.href} href={item.href} className={`group flex items-center gap-4 p-4 bg-[#111214] border rounded-[10px] hover:border-[#FF6A00]/50 hover:bg-[#1F2226] transition-all ${item.urgent ? 'border-[#FF3B30]/50' : 'border-[#1F2226]'}`}>
-                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${item.urgent ? 'bg-[#FF3B30]/10 border-[#FF3B30]/30 text-[#FF3B30]' : 'bg-[#1F2226] border-[#2A2D32] text-[#6B7280] group-hover:text-[#FF6A00]'}`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-white truncate">{item.label}</span>
-                          {item.count !== undefined && item.count > 0 && (
-                            <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${item.urgent ? 'bg-[#FF3B30]/20 text-[#FF3B30]' : 'bg-[#FF6A00]/20 text-[#FF6A00]'}`}>{item.count}</span>
-                          )}
+                    <Link key={item.href} href={item.href} className={`group p-5 bg-gradient-to-br ${item.color} rounded-[10px] hover:opacity-90 transition-all`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                          <Icon className="w-5 h-5 text-white" />
                         </div>
-                        <p className="text-sm text-[#6B7280] truncate">Click to view {item.label.toLowerCase()}</p>
+                        {item.count !== undefined && item.count > 0 && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70">{item.count}</span>
+                        )}
                       </div>
-                      <ArrowUpRight className="w-5 h-5 text-[#6B7280] group-hover:text-[#FF6A00] opacity-0 group-hover:opacity-100 transition-all" />
+                      <h3 className="text-lg font-medium text-white mb-1">{item.label}</h3>
+                      <p className="text-sm text-white/60">Click to view {item.label.toLowerCase()}</p>
                     </Link>
                   );
                 })}
               </div>
             </div>
 
-            {/* Decisions Section */}
-            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <GitBranch className="w-4 h-4 text-[#FFB020]" />
-                  <span className="text-sm font-medium text-white">Pending Decisions</span>
-                  {decisions.length > 0 && (
-                    <span className="px-2 py-0.5 bg-[#FFB020]/20 text-[#FFB020] text-xs rounded-full">{decisions.length}</span>
-                  )}
-                </div>
-                <button className="flex items-center gap-1 px-2 py-1 text-xs text-[#6B7280] hover:text-white bg-[#1F2226] rounded hover:bg-[#2A2D32] transition-colors">
-                  <Plus className="w-3 h-3" /> New
-                </button>
-              </div>
+            {/* Decisions */}
+            <SectionCard title="Pending Decisions" icon={GitBranch} action={
+              <button className="flex items-center gap-1 px-2 py-1 text-xs text-[#6B7280] hover:text-white bg-[#1F2226] rounded hover:bg-[#2A2D32] transition-colors">
+                <Plus className="w-3 h-3" /> New
+              </button>
+            }>
               {decisions.length === 0 ? (
                 <p className="text-sm text-[#6B7280] text-center py-4">No pending decisions</p>
               ) : (
                 <div className="space-y-2">
-                  {decisions.slice(0, 3).map((decision) => (
+                  {decisions.map((decision) => (
                     <div key={decision.id} className="flex items-center gap-3 p-3 bg-[#1F2226] rounded-lg">
                       <div className={`w-2 h-2 rounded-full ${
                         decision.impact === 'critical' ? 'bg-[#FF3B30]' :
@@ -209,27 +202,17 @@ export default function ExecutiveOpsPage() {
                       }`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white truncate">{decision.title}</p>
-                        {decision.dueDate && (
-                          <p className="text-xs text-[#6B7280]">Due {new Date(decision.dueDate).toLocaleDateString()}</p>
-                        )}
                       </div>
                       <span className="px-2 py-0.5 text-xs rounded bg-[#2A2D32] text-[#9BA3AF] capitalize">{decision.status}</span>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </SectionCard>
 
-            {/* Commands Section */}
-            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-[#3B82F6]" />
-                  <span className="text-sm font-medium text-white">Voice & Text Commands</span>
-                </div>
-              </div>
-              
-              <form onSubmit={handleCommandSubmit} className="flex gap-2 mb-4">
+            {/* Commands */}
+            <SectionCard title="Voice & Text Commands" icon={Terminal}>
+              <div className="flex gap-2 mb-4">
                 <div className="flex-1 relative">
                   <input
                     type="text"
@@ -240,17 +223,16 @@ export default function ExecutiveOpsPage() {
                   />
                   <Mic className="absolute right-3 top-2.5 w-4 h-4 text-[#6B7280]" />
                 </div>
-                <button type="submit" className="px-3 py-2 bg-[#FF6A00]/20 border border-[#FF6A00]/30 rounded-lg text-[#FF6A00] hover:bg-[#FF6A00]/30 transition-colors">
+                <button className="px-3 py-2 bg-[#FF6A00]/20 border border-[#FF6A00]/30 rounded-lg text-[#FF6A00] hover:bg-[#FF6A00]/30 transition-colors">
                   <Send className="w-4 h-4" />
                 </button>
-              </form>
-
+              </div>
               <div className="p-3 bg-[#1F2226] rounded-lg">
                 <p className="text-sm text-[#6B7280] italic">&quot;Create task to follow up with TechCorp&quot;</p>
                 <p className="text-xs text-[#3B82F6] mt-1">create_task(subject: TechCorp)</p>
                 <p className="text-xs text-[#6B7280]">92% confidence • pending</p>
               </div>
-            </div>
+            </SectionCard>
           </div>
 
           {/* Right Column: Notifications */}
@@ -273,7 +255,6 @@ export default function ExecutiveOpsPage() {
                       <div className="flex-1">
                         <p className="text-sm font-medium text-white">{notif.title}</p>
                         <p className="text-xs text-[#6B7280]">{notif.message}</p>
-                        <p className="text-xs text-[#6B7280] mt-1">{new Date(notif.createdAt).toLocaleTimeString()}</p>
                       </div>
                     </div>
                   </div>
@@ -283,15 +264,6 @@ export default function ExecutiveOpsPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatPill({ icon, label, value, loading, color }: { icon: React.ReactNode; label: string; value?: number; loading: boolean; color: string }) {
-  return (
-    <div className="p-3 bg-[#111214] border border-[#1F2226] rounded-lg">
-      <div className={`flex items-center gap-2 mb-1 ${color}`}>{icon}<span className="text-xs text-[#6B7280]">{label}</span></div>
-      {loading ? <Loader2 className="w-4 h-4 text-[#6B7280] animate-spin" /> : <p className="text-xl font-bold text-white">{value || 0}</p>}
     </div>
   );
 }

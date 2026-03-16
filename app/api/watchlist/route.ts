@@ -225,11 +225,30 @@ export async function POST(request: NextRequest) {
         // Only add metadata if provided and table likely supports it
         // Schema cache errors indicate column may not exist
         
-        const result = await (supabase as any)
+        // Insert without .select() to avoid schema cache issues on read
+        const { error: insertError } = await (supabase as any)
           .from('watchlist_items')
-          .insert(insertData)
-          .select()
-          .single();
+          .insert(insertData);
+        
+        if (insertError) {
+          throw insertError;
+        }
+        
+        // Return the data we sent (since we can't select without knowing schema)
+        return NextResponse.json({
+          success: true,
+          id: watchlistId,
+          status: "created",
+          item: {
+            id: watchlistId,
+            subject: title.trim(),
+            category: category || 'other',
+            priority: priority.toLowerCase(),
+            status: status.toLowerCase(),
+            created_at: timestamp,
+          },
+          timestamp,
+        }, { status: 201 });
         
         if (result.error) {
           console.error('[Watchlist POST] DB insert error:', result.error);

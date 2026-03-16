@@ -62,12 +62,38 @@ export default function ControlPage() {
   const [pauseAllState, setPauseAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.pauseAll });
   const [resumeAllState, setResumeAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.resumeAll });
   const [boostRestartState, setBoostRestartState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.boostRestart });
+  
+  // Severino runtime state
+  const [severino, setSeverino] = useState<SeverinoRuntime | null>(null);
+  const [severinoLoading, setSeverinoLoading] = useState(true);
 
   useEffect(() => {
     fetchLiveData();
-    const interval = setInterval(fetchLiveData, 30000);
+    fetchSeverinoData();
+    const interval = setInterval(() => {
+      fetchLiveData();
+      fetchSeverinoData();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  async function fetchSeverinoData() {
+    setSeverinoLoading(true);
+    try {
+      const res = await fetch('/api/severino/status', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setSeverino(data);
+      } else {
+        setSeverino(null);
+      }
+    } catch (err) {
+      console.error('[ControlPage] Severino fetch error:', err);
+      setSeverino(null);
+    } finally {
+      setSeverinoLoading(false);
+    }
+  }
 
   async function fetchLiveData() {
     setAgentsLoading(true);
@@ -272,6 +298,101 @@ export default function ControlPage() {
             <FleetCommandButton label="Resume All Agents" icon={<Play className="w-4 h-4" />} state={resumeAllState} onClick={resumeAllAgents} variant="success" />
             <FleetCommandButton label="Boost Restart All Stuck" icon={<RotateCw className="w-4 h-4" />} state={boostRestartState} onClick={boostRestartAllStuck} variant="danger" />
           </div>
+        </section>
+
+        {/* Severino Runtime Status */}
+        <section className="mb-6">
+          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Clock className="w-4 h-4" />Severino Runtime
+          </h2>
+          {severinoLoading ? (
+            <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-[#6B7280] animate-spin" />
+                <span className="text-sm text-[#9BA3AF]">Loading runtime status...</span>
+              </div>
+            </div>
+          ) : severino ? (
+            <div className="space-y-3">
+              {/* Scheduler Status */}
+              <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${severino.status === 'running' ? 'bg-[#16C784] animate-pulse' : severino.status === 'paused' ? 'bg-[#FFB020]' : 'bg-[#FF3B30]'}`} />
+                    <span className="text-sm font-medium text-white">Scheduler {severino.status}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${severino.scheduler.enabled ? 'bg-[#16C784]/20 text-[#16C784]' : 'bg-[#6B7280]/20 text-[#6B7280]'}`}>
+                    {severino.scheduler.enabled ? 'ENABLED' : 'DISABLED'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-[#6B7280]">Last Cycle:</span>
+                    <span className="text-[#9BA3AF] ml-2">{severino.scheduler.last_cycle ? new Date(severino.scheduler.last_cycle).toLocaleTimeString() : 'Never'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#6B7280]">Next Cycle:</span>
+                    <span className="text-[#9BA3AF] ml-2">{severino.scheduler.next_cycle ? new Date(severino.scheduler.next_cycle).toLocaleTimeString() : '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#6B7280]">Total Cycles:</span>
+                    <span className="text-white ml-2 font-mono">{severino.scheduler.cycle_count}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mission Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
+                  <div className="text-lg font-bold text-[#3B82F6]">{severino.missions.active}</div>
+                  <div className="text-[10px] text-[#6B7280]">Active Missions</div>
+                </div>
+                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
+                  <div className="text-lg font-bold text-[#16C784]">{severino.missions.completed}</div>
+                  <div className="text-[10px] text-[#6B7280]">Completed</div>
+                </div>
+                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
+                  <div className="text-lg font-bold text-[#FF3B30]">{severino.missions.failed}</div>
+                  <div className="text-[10px] text-[#6B7280]">Failed</div>
+                </div>
+              </div>
+
+              {/* Mission Log */}
+              {severino.missions.log.length > 0 && (
+                <div className="bg-[#111214] rounded-lg border border-[#1F2226] overflow-hidden">
+                  <div className="px-4 py-2 border-b border-[#1F2226]">
+                    <span className="text-xs font-medium text-[#9BA3AF]">Recent Mission Log</span>
+                  </div>
+                  <div className="divide-y divide-[#1F2226]">
+                    {severino.missions.log.slice(0, 5).map((mission) => (
+                      <div key={mission.id} className="px-4 py-2 flex items-center justify-between">
+                        <div>
+                          <span className="text-sm text-white">{mission.name}</span>
+                          {mission.blockers && mission.blockers.length > 0 && (
+                            <span className="text-xs text-[#FF3B30] ml-2">({mission.blockers.length} blockers)</span>
+                          )}
+                        </div>
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          mission.status === 'completed' ? 'bg-[#16C784]/20 text-[#16C784]' :
+                          mission.status === 'failed' ? 'bg-[#FF3B30]/20 text-[#FF3B30]' :
+                          mission.status === 'blocked' ? 'bg-[#FFB020]/20 text-[#FFB020]' :
+                          'bg-[#3B82F6]/20 text-[#3B82F6]'
+                        }`}>
+                          {mission.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4 text-center">
+              <AlertCircle className="w-5 h-5 mx-auto mb-2 text-[#6B7280]" />
+              <p className="text-sm text-[#9BA3AF]">Severino runtime not connected</p>
+              <p className="text-xs text-[#6B7280] mt-1">Scheduler telemetry unavailable</p>
+            </div>
+          )}
         </section>
 
         {/* System Summary */}

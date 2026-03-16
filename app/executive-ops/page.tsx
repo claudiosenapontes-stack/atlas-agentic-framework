@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Briefcase, Calendar, GitBranch, Eye, Terminal, Target, Clock, CheckCircle2,
-  Loader2, AlertCircle, Zap, ArrowUpRight, Bell, Users
+  Loader2, AlertCircle, Zap, ArrowUpRight, Bell, Send, Mic, Plus
 } from 'lucide-react';
 
 interface ExecutiveSnapshot {
@@ -26,6 +26,14 @@ interface Notification {
   read: boolean;
 }
 
+interface Decision {
+  id: string;
+  title: string;
+  impact: 'low' | 'medium' | 'high' | 'critical';
+  status: string;
+  dueDate?: string;
+}
+
 async function getExecutiveSnapshot(): Promise<ExecutiveSnapshot | null> {
   try {
     const res = await fetch('/api/executive-ops/snapshot', { cache: 'no-store' });
@@ -43,16 +51,31 @@ async function getNotifications(): Promise<Notification[]> {
   } catch { return []; }
 }
 
+async function getDecisions(): Promise<Decision[]> {
+  try {
+    const res = await fetch('/api/decisions?limit=3', { cache: 'no-store' });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
 export default function ExecutiveOpsPage() {
   const [snapshot, setSnapshot] = useState<ExecutiveSnapshot | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'live' | 'unavailable'>('unavailable');
+  const [commandInput, setCommandInput] = useState('');
 
   useEffect(() => {
-    Promise.all([getExecutiveSnapshot(), getNotifications()]).then(([snap, notifs]) => {
+    Promise.all([
+      getExecutiveSnapshot(),
+      getNotifications(),
+      getDecisions()
+    ]).then(([snap, notifs, decs]) => {
       setSnapshot(snap);
       setNotifications(notifs);
+      setDecisions(decs);
       setLoading(false);
       setDataSource(snap ? 'live' : 'unavailable');
     });
@@ -63,12 +86,16 @@ export default function ExecutiveOpsPage() {
 
   const quickNavItems = [
     { href: '/executive-ops/calendar', label: 'Calendar', icon: Calendar, count: snapshot?.meetingsToday, urgent: false },
-    { href: '/executive-ops/decisions', label: 'Decisions', icon: GitBranch, count: snapshot?.pendingDecisions, urgent: (snapshot?.pendingDecisions || 0) > 5 },
     { href: '/executive-ops/watchlist', label: 'Watchlist', icon: Eye, count: snapshot?.watchlistItems, urgent: false },
     { href: '/executive-ops/approvals', label: 'Approvals', icon: CheckCircle2, count: snapshot?.pendingApprovals, urgent: (snapshot?.pendingApprovals || 0) > 3 },
     { href: '/executive-ops/followups', label: 'Follow-ups', icon: Clock, count: snapshot?.pendingFollowups, urgent: (snapshot?.pendingFollowups || 0) > 5 },
-    { href: '/executive-ops/commands', label: 'Commands', icon: Terminal, count: undefined, urgent: false },
   ];
+
+  const handleCommandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commandInput.trim()) return;
+    setCommandInput('');
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
@@ -124,36 +151,109 @@ export default function ExecutiveOpsPage() {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Quick Navigation */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider">Operations</h2>
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick Navigation */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider">Quick Access</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {quickNavItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link key={item.href} href={item.href} className={`group flex items-center gap-4 p-4 bg-[#111214] border rounded-[10px] hover:border-[#FF6A00]/50 hover:bg-[#1F2226] transition-all ${item.urgent ? 'border-[#FF3B30]/50' : 'border-[#1F2226]'}`}>
+                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${item.urgent ? 'bg-[#FF3B30]/10 border-[#FF3B30]/30 text-[#FF3B30]' : 'bg-[#1F2226] border-[#2A2D32] text-[#6B7280] group-hover:text-[#FF6A00]'}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white truncate">{item.label}</span>
+                          {item.count !== undefined && item.count > 0 && (
+                            <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${item.urgent ? 'bg-[#FF3B30]/20 text-[#FF3B30]' : 'bg-[#FF6A00]/20 text-[#FF6A00]'}`}>{item.count}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-[#6B7280] truncate">Click to view {item.label.toLowerCase()}</p>
+                      </div>
+                      <ArrowUpRight className="w-5 h-5 text-[#6B7280] group-hover:text-[#FF6A00] opacity-0 group-hover:opacity-100 transition-all" />
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {quickNavItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link key={item.href} href={item.href} className={`group flex items-center gap-4 p-4 bg-[#111214] border rounded-[10px] hover:border-[#FF6A00]/50 hover:bg-[#1F2226] transition-all ${item.urgent ? 'border-[#FF3B30]/50' : 'border-[#1F2226]'}`}>
-                    <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${item.urgent ? 'bg-[#FF3B30]/10 border-[#FF3B30]/30 text-[#FF3B30]' : 'bg-[#1F2226] border-[#2A2D32] text-[#6B7280] group-hover:text-[#FF6A00]'}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-white truncate">{item.label}</span>
-                        {item.count !== undefined && item.count > 0 && (
-                          <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${item.urgent ? 'bg-[#FF3B30]/20 text-[#FF3B30]' : 'bg-[#FF6A00]/20 text-[#FF6A00]'}`}>{item.count}</span>
+
+            {/* Decisions Section */}
+            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-[#FFB020]" />
+                  <span className="text-sm font-medium text-white">Pending Decisions</span>
+                  {decisions.length > 0 && (
+                    <span className="px-2 py-0.5 bg-[#FFB020]/20 text-[#FFB020] text-xs rounded-full">{decisions.length}</span>
+                  )}
+                </div>
+                <button className="flex items-center gap-1 px-2 py-1 text-xs text-[#6B7280] hover:text-white bg-[#1F2226] rounded hover:bg-[#2A2D32] transition-colors">
+                  <Plus className="w-3 h-3" /> New
+                </button>
+              </div>
+              {decisions.length === 0 ? (
+                <p className="text-sm text-[#6B7280] text-center py-4">No pending decisions</p>
+              ) : (
+                <div className="space-y-2">
+                  {decisions.slice(0, 3).map((decision) => (
+                    <div key={decision.id} className="flex items-center gap-3 p-3 bg-[#1F2226] rounded-lg">
+                      <div className={`w-2 h-2 rounded-full ${
+                        decision.impact === 'critical' ? 'bg-[#FF3B30]' :
+                        decision.impact === 'high' ? 'bg-[#FF6A00]' :
+                        decision.impact === 'medium' ? 'bg-[#FFB020]' : 'bg-[#16C784]'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{decision.title}</p>
+                        {decision.dueDate && (
+                          <p className="text-xs text-[#6B7280]">Due {new Date(decision.dueDate).toLocaleDateString()}</p>
                         )}
                       </div>
-                      <p className="text-sm text-[#6B7280] truncate">Click to view {item.label.toLowerCase()}</p>
+                      <span className="px-2 py-0.5 text-xs rounded bg-[#2A2D32] text-[#9BA3AF] capitalize">{decision.status}</span>
                     </div>
-                    <ArrowUpRight className="w-5 h-5 text-[#6B7280] group-hover:text-[#FF6A00] opacity-0 group-hover:opacity-100 transition-all" />
-                  </Link>
-                );
-              })}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Commands Section */}
+            <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-[#3B82F6]" />
+                  <span className="text-sm font-medium text-white">Voice & Text Commands</span>
+                </div>
+              </div>
+              
+              <form onSubmit={handleCommandSubmit} className="flex gap-2 mb-4">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={commandInput}
+                    onChange={(e) => setCommandInput(e.target.value)}
+                    placeholder="Type a command or use voice..."
+                    className="w-full px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00]/50"
+                  />
+                  <Mic className="absolute right-3 top-2.5 w-4 h-4 text-[#6B7280]" />
+                </div>
+                <button type="submit" className="px-3 py-2 bg-[#FF6A00]/20 border border-[#FF6A00]/30 rounded-lg text-[#FF6A00] hover:bg-[#FF6A00]/30 transition-colors">
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+
+              <div className="p-3 bg-[#1F2226] rounded-lg">
+                <p className="text-sm text-[#6B7280] italic">&quot;Create task to follow up with TechCorp&quot;</p>
+                <p className="text-xs text-[#3B82F6] mt-1">create_task(subject: TechCorp)</p>
+                <p className="text-xs text-[#6B7280]">92% confidence • pending</p>
+              </div>
             </div>
           </div>
 
-          {/* Notifications Panel */}
+          {/* Right Column: Notifications */}
           <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

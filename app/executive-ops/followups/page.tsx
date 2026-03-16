@@ -19,7 +19,7 @@ interface FollowUp {
 async function getFollowUps(): Promise<FollowUp[] | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
-    const res = await fetch(`${baseUrl}/api/executive-ops/followups`, { cache: 'no-store' });
+    const res = await fetch(`${baseUrl}/api/followups`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
     return await res.json();
   } catch {

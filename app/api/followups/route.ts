@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
           id: taskId,
           title: title.trim(),
           description: description || null,
-          task_type: 'follow_up',
+          task_type: 'implementation',  // ATLAS-OPTIMUS-EO-BLOCKER-FIXES-043: Use valid task_type from constraint
           status: status.toLowerCase(),
           priority: priority.toLowerCase(),
           assigned_agent_id: assigned_to || assignee_id || null,

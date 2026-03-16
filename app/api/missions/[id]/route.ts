@@ -10,6 +10,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Valid mission statuses and phases
 const VALID_STATUSES = ['draft', 'requested', 'decomposed', 'executing', 'remediating', 'verifying', 'blocked', 'closed', 'cancelled'];

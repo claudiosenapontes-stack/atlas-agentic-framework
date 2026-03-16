@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { captureAgentSnapshot, buildAndCaptureSnapshot } from '@/lib/agent-session-snapshot';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

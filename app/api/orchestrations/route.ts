@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAgentNames, clearAgentCache } from "@/lib/orchestration/agent-resolver";
 import { startExecutionRunner } from "@/lib/orchestration/execution-runner";
 
+export const dynamic = 'force-dynamic';
+
 // Valid workflow statuses
 const VALID_WORKFLOW_STATUSES = ["draft", "active", "paused", "archived"] as const;
 type WorkflowStatus = (typeof VALID_WORKFLOW_STATUSES)[number];

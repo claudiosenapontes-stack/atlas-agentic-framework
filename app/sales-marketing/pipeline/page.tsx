@@ -1,171 +1,358 @@
+/**
+ * ATLAS-SALES-PIPELINE-V2-FULL
+ * ATLAS-SOPHIA-SALES-PIPELINE-V2-014
+ * 
+ * Full 5-stage pipeline: new → contacted → qualified → proposal → deal
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Filter, Users, DollarSign, TrendingUp, Clock, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Target, AlertCircle, RefreshCw, ChevronRight, ChevronLeft, User, Building, DollarSign, Flame, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
 interface Lead {
   id: string;
   name: string;
+  email: string;
   company: string;
-  value: number;
-  stage: 'prospect' | 'qualified' | 'proposal' | 'negotiation' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  assignedTo: string;
-  lastActivity: string;
-  daysInStage: number;
+  score: number;
+  estimated_value?: number;
+  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'deal' | 'lost';
+  assigned_to?: string;
+  created_at: string;
+  last_contact_at?: string;
 }
 
-const mockLeads: Lead[] = [
-  { id: '1', name: 'Acme Corp', company: 'Acme Industries', value: 50000, stage: 'proposal', priority: 'high', assignedTo: 'Alice', lastActivity: '2026-03-15', daysInStage: 5 },
-  { id: '2', name: 'TechStart Inc', company: 'TechStart', value: 25000, stage: 'qualified', priority: 'medium', assignedTo: 'Bob', lastActivity: '2026-03-14', daysInStage: 3 },
-  { id: '3', name: 'Global Solutions', company: 'Global Solutions LLC', value: 100000, stage: 'negotiation', priority: 'high', assignedTo: 'Alice', lastActivity: '2026-03-16', daysInStage: 12 },
-  { id: '4', name: 'StartupXYZ', company: 'XYZ Startup', value: 15000, stage: 'prospect', priority: 'low', assignedTo: 'Charlie', lastActivity: '2026-03-10', daysInStage: 7 },
-  { id: '5', name: 'Enterprise Co', company: 'Enterprise Solutions', value: 200000, stage: 'closed', priority: 'high', assignedTo: 'Alice', lastActivity: '2026-03-12', daysInStage: 0 },
-];
+interface PipelineStage {
+  id: string;
+  name: string;
+  status: Lead['status'];
+  color: string;
+  count: number;
+  value: number;
+}
 
-const stages = [
-  { id: 'prospect', label: 'Prospect', color: 'bg-[#6B7280]' },
-  { id: 'qualified', label: 'Qualified', color: 'bg-[#3B82F6]' },
-  { id: 'proposal', label: 'Proposal', color: 'bg-[#FFB020]' },
-  { id: 'negotiation', label: 'Negotiation', color: 'bg-[#FF6A00]' },
-  { id: 'closed', label: 'Closed', color: 'bg-[#16C784]' },
+const PIPELINE_STAGES: PipelineStage[] = [
+  { id: 'new', name: 'New', status: 'new', color: '#3B82F6', count: 0, value: 0 },
+  { id: 'contacted', name: 'Contacted', status: 'contacted', color: '#F59E0B', count: 0, value: 0 },
+  { id: 'qualified', name: 'Qualified', status: 'qualified', color: '#8B5CF6', count: 0, value: 0 },
+  { id: 'proposal', name: 'Proposal', status: 'proposal', color: '#EC4899', count: 0, value: 0 },
+  { id: 'deal', name: 'Deal', status: 'deal', color: '#16C784', count: 0, value: 0 },
 ];
 
 export default function PipelinePage() {
-  const [leads, setLeads] = useState<Lead[]>(mockLeads);
-  const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
-  const [expandedStages, setExpandedStages] = useState<string[]>(stages.map(s => s.id));
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const filteredLeads = leads.filter(l => filter === 'all' || l.priority === filter);
+  useEffect(() => {
+    fetchLeads();
+  }, []);
 
-  const stats = {
-    totalValue: leads.reduce((sum, l) => sum + (l.stage === 'closed' ? l.value : 0), 0),
-    pipelineValue: leads.reduce((sum, l) => sum + (l.stage !== 'closed' ? l.value : 0), 0),
-    totalLeads: leads.length,
-    avgDealSize: leads.length > 0 ? leads.reduce((sum, l) => sum + l.value, 0) / leads.length : 0,
+  async function fetchLeads() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/leads?limit=100');
+      const data = await response.json();
+      
+      if (data.success) {
+        setLeads(data.leads || []);
+      } else {
+        setError(data.error || 'Failed to fetch leads');
+      }
+    } catch (err) {
+      setError('Network error fetching leads');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function transitionLead(leadId: string, newStatus: Lead['status']) {
+    setIsTransitioning(true);
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: newStatus,
+          last_contact_at: new Date().toISOString()
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setLeads(prev => prev.map(l => 
+          l.id === leadId ? { ...l, status: newStatus, last_contact_at: new Date().toISOString() } : l
+        ));
+        setSelectedLead(null);
+      } else {
+        setError(data.error || 'Failed to transition lead');
+      }
+    } catch (err) {
+      setError('Network error transitioning lead');
+    } finally {
+      setIsTransitioning(false);
+    }
+  }
+
+  const getStageLeads = (status: Lead['status']) => leads.filter(l => l.status === status);
+  
+  const getStageStats = (status: Lead['status']) => {
+    const stageLeads = getStageLeads(status);
+    return {
+      count: stageLeads.length,
+      value: stageLeads.reduce((sum, l) => sum + (l.estimated_value || 0), 0),
+    };
   };
 
-  const toggleStage = (stageId: string) => {
-    setExpandedStages(prev => 
-      prev.includes(stageId) ? prev.filter(s => s !== stageId) : [...prev, stageId]
-    );
+  const stages = PIPELINE_STAGES.map(stage => ({
+    ...stage,
+    ...getStageStats(stage.status),
+  }));
+
+  const totalValue = stages.reduce((sum, s) => sum + s.value, 0);
+  const totalLeads = leads.length;
+  const conversionRate = totalLeads > 0 ? (stages.find(s => s.id === 'deal')?.count || 0) / totalLeads * 100 : 0;
+
+  const getNextStage = (current: Lead['status']): Lead['status'] | null => {
+    const flow: Record<Lead['status'], Lead['status'] | null> = {
+      new: 'contacted',
+      contacted: 'qualified',
+      qualified: 'proposal',
+      proposal: 'deal',
+      deal: null,
+      lost: null,
+    };
+    return flow[current];
+  };
+
+  const getPrevStage = (current: Lead['status']): Lead['status'] | null => {
+    const flow: Record<Lead['status'], Lead['status'] | null> = {
+      new: null,
+      contacted: 'new',
+      qualified: 'contacted',
+      proposal: 'qualified',
+      deal: 'proposal',
+      lost: null,
+    };
+    return flow[current];
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0B0C]">
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#0B0B0C] text-white">
+      <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-green-500/20 to-emerald-600/10 border border-green-500/30 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-400" />
+            <div className="w-10 h-10 rounded-lg bg-[#FF6A00]/20 flex items-center justify-center">
+              <Target className="w-5 h-5 text-[#FF6A00]" />
             </div>
             <div>
               <h1 className="text-xl font-semibold text-white">Sales Pipeline</h1>
-              <p className="text-sm text-[#6B7280]">Track deals from prospect to close</p>
+              <p className="text-sm text-[#6B7280]">
+                {totalLeads} leads · ${totalValue.toLocaleString()} value · {conversionRate.toFixed(1)}% conversion
+              </p>
             </div>
           </div>
-          <Link href="/sales-marketing/leads/new" className="flex items-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors">
-            <Plus className="w-4 h-4" /> Add Lead
-          </Link>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Closed Revenue" value={`$${(stats.totalValue / 1000).toFixed(0)}k`} icon={<DollarSign className="w-4 h-4" />} color="text-green-400" />
-          <StatCard label="Pipeline Value" value={`$${(stats.pipelineValue / 1000).toFixed(0)}k`} icon={<TrendingUp className="w-4 h-4" />} color="text-blue-400" />
-          <StatCard label="Total Leads" value={stats.totalLeads} icon={<Users className="w-4 h-4" />} color="text-[#FF6A00]" />
-          <StatCard label="Avg Deal Size" value={`$${(stats.avgDealSize / 1000).toFixed(0)}k`} icon={<DollarSign className="w-4 h-4" />} color="text-purple-400" />
-        </div>
-
-        {/* Filters */}
-        <div className="flex items-center gap-2 mb-6">
-          <Filter className="w-4 h-4 text-[#6B7280]" />
-          {(['all', 'high', 'medium', 'low'] as const).map((f) => (
+          <div className="flex items-center gap-2">
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm capitalize transition-colors ${
-                filter === f
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'bg-[#1F2226] text-[#9BA3AF] hover:text-white'
-              }`}
+              onClick={fetchLeads}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1F2226] hover:bg-[#2A2D31] text-white transition-colors"
             >
-              {f}
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
-          ))}
+            <Link
+              href="/hot-leads"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF8533] text-white transition-colors"
+            >
+              <Flame className="w-4 h-4" />
+              Hot Leads
+            </Link>
+          </div>
         </div>
 
-        {/* Pipeline Stages */}
-        <div className="space-y-4">
-          {stages.map((stage) => {
-            const stageLeads = filteredLeads.filter(l => l.stage === stage.id);
-            const stageValue = stageLeads.reduce((sum, l) => sum + l.value, 0);
-            const isExpanded = expandedStages.includes(stage.id);
+        {/* Error */}
+        {error && (
+          <div className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2 text-red-400">
+            <AlertCircle className="w-4 h-4" />
+            {error}
+          </div>
+        )}
 
-            return (
-              <div key={stage.id} className="bg-[#111214] border border-[#1F2226] rounded-[10px] overflow-hidden">
-                <button
-                  onClick={() => toggleStage(stage.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-[#1F2226] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${stage.color}`} />
-                    <span className="font-medium text-white">{stage.label}</span>
-                    <span className="px-2 py-0.5 bg-[#1F2226] rounded text-xs text-[#9BA3AF]">{stageLeads.length}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-[#6B7280]">${(stageValue / 1000).toFixed(0)}k</span>
-                    {isExpanded ? <ChevronDown className="w-4 h-4 text-[#6B7280]" /> : <ChevronRight className="w-4 h-4 text-[#6B7280]" />}
-                  </div>
-                </button>
+        {/* Pipeline Board */}
+        <div className="grid grid-cols-5 gap-4">
+          {stages.map(stage => (
+            <div key={stage.id} className="bg-[#111214] rounded-lg border border-[#1F2226]">
+              {/* Stage Header */}
+              <div 
+                className="p-3 border-b border-[#1F2226] rounded-t-lg"
+                style={{ borderTop: `3px solid ${stage.color}` }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-medium text-white text-sm">{stage.name}</h3>
+                  <span 
+                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: `${stage.color}20`, color: stage.color }}
+                  >
+                    {stage.count}
+                  </span>
+                </div>
+                <p className="text-xs text-[#6B7280]">
+                  ${stage.value.toLocaleString()}
+                </p>
+              </div>
 
-                {isExpanded && stageLeads.length > 0 && (
-                  <div className="border-t border-[#1F2226]">
-                    {stageLeads.map((lead) => (
-                      <div key={lead.id} className="flex items-center justify-between p-4 hover:bg-[#1F2226]/50 transition-colors border-b border-[#1F2226] last:border-0">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-[#1F2226] flex items-center justify-center">
-                            <span className="text-lg font-semibold text-white">{lead.name.charAt(0)}</span>
-                          </div>
-                          <div>
-                            <p className="font-medium text-white">{lead.name}</p>
-                            <p className="text-sm text-[#6B7280]">{lead.company}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <p className="font-medium text-white">${(lead.value / 1000).toFixed(0)}k</p>
-                            <p className="text-xs text-[#6B7280]">{lead.daysInStage} days</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              lead.priority === 'high' ? 'bg-red-500/10 text-red-400' :
-                              lead.priority === 'medium' ? 'bg-yellow-500/10 text-yellow-400' :
-                              'bg-gray-500/10 text-gray-400'
-                            }`}>{lead.priority}</span>
-                            <span className="px-2 py-1 bg-[#1F2226] rounded text-xs text-[#9BA3AF]">{lead.assignedTo}</span>
-                          </div>
-                        </div>
+              {/* Stage Leads */}
+              <div className="p-2 space-y-2 min-h-[400px]">
+                {getStageLeads(stage.status).map(lead => (
+                  <div
+                    key={lead.id}
+                    onClick={() => setSelectedLead(lead)}
+                    className="p-3 rounded-lg bg-[#1A1D21] hover:bg-[#2A2D31] cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="font-medium text-sm truncate">{lead.name}</span>
+                      {lead.score >= 80 && <Flame className="w-4 h-4 text-[#FF6A00] flex-shrink-0" />}
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-xs text-[#6B7280] mb-1">
+                      <Building className="w-3 h-3" />
+                      <span className="truncate">{lead.company}</span>
+                    </div>
+                    
+                    {lead.estimated_value && (
+                      <div className="flex items-center gap-1 text-xs text-[#16C784]">
+                        <DollarSign className="w-3 h-3" />
+                        ${lead.estimated_value.toLocaleString()}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Quick Actions */}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2A2D31] opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          transitionLead(lead.id, 'lost');
+                        }}
+                        disabled={isTransitioning}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Lost
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {getPrevStage(lead.status) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              transitionLead(lead.id, getPrevStage(lead.status)!);
+                            }}
+                            disabled={isTransitioning}
+                            className="p-1 rounded hover:bg-[#3A3D41] text-[#6B7280]"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                        )}
+                        {getNextStage(lead.status) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              transitionLead(lead.id, getNextStage(lead.status)!);
+                            }}
+                            disabled={isTransitioning}
+                            className="p-1 rounded hover:bg-[#3A3D41] text-[#16C784]"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {getStageLeads(stage.status).length === 0 && (
+                  <div className="p-4 text-center text-xs text-[#6B7280]">
+                    No leads
                   </div>
                 )}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
-      </div>
-    </div>
-  );
-}
 
-function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: React.ReactNode; color: string }) {
-  return (
-    <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
-      <div className={`flex items-center gap-2 mb-2 ${color}`}>{icon}<span className="text-xs text-[#6B7280]">{label}</span></div>
-      <p className="text-xl font-bold text-white">{value}</p>
+        {/* Lead Detail Modal */}
+        {selectedLead && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Lead Details</h2>
+                <button onClick={() => setSelectedLead(null)} className="text-[#6B7280] hover:text-white">×</button>
+              </div>
+              
+              <div className="space-y-3 mb-6">
+                <div>
+                  <label className="text-xs text-[#6B7280]">Name</label>
+                  <p className="font-medium">{selectedLead.name}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-[#6B7280]">Email</label>
+                  <p className="text-sm">{selectedLead.email}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-[#6B7280]">Company</label>
+                  <p className="text-sm">{selectedLead.company}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-[#6B7280]">Stage</label>
+                  <p className="text-sm capitalize">{selectedLead.status}</p>
+                </div>
+                {selectedLead.estimated_value && (
+                  <div>
+                    <label className="text-xs text-[#6B7280]">Estimated Value</label>
+                    <p className="text-sm text-[#16C784]">${selectedLead.estimated_value.toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Stage Transition */}
+              <div className="flex items-center gap-2">
+                {getPrevStage(selectedLead.status) && (
+                  <button
+                    onClick={() => transitionLead(selectedLead.id, getPrevStage(selectedLead.status)!)}
+                    disabled={isTransitioning}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#1F2226] hover:bg-[#2A2D31] text-white"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back
+                  </button>
+                )}
+                <button
+                  onClick={() => transitionLead(selectedLead.id, 'lost')}
+                  disabled={isTransitioning}
+                  className="flex-1 px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400"
+                >
+                  Mark Lost
+                </button>
+                {getNextStage(selectedLead.status) && (
+                  <button
+                    onClick={() => transitionLead(selectedLead.id, getNextStage(selectedLead.status)!)}
+                    disabled={isTransitioning}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#16C784] hover:bg-[#16C784]/90 text-white"
+                  >
+                    Advance
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

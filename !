@@ -1,0 +1,329 @@
+Retrieving project…
+Deploying claudiosenas-projects/atlas-agentic-framework
+Uploading [--------------------] (0.0B/2.7MB)
+Uploading [=====---------------] (703.0KB/2.7MB)
+Uploading [==========----------] (1.4MB/2.7MB)
+Uploading [===============-----] (2.0MB/2.7MB)
+Uploading [====================] (2.7MB/2.7MB)
+Inspect: https://vercel.com/claudiosenas-projects/atlas-agentic-framework/DwzPqkCbjZDBPj3zZ4ymNaRzBVCH [4s]
+Production: https://atlas-agentic-framework-ivwpuxmey-claudiosenas-projects.vercel.app [4s]
+Building...
+Building...
+Building: Running build in Washington, D.C., USA (East) – iad1
+Building: Build machine configuration: 4 cores, 8 GB
+Building: Retrieving list of deployment files...
+Building: Downloading 457 deployment files...
+Building: Restored build cache from previous deployment (9mZh6ikCvm6GkPwdwzMCJPJkqWXi)
+Building: Running "vercel build"
+Building: Vercel CLI 50.32.4
+Building: Installing dependencies...
+Building: up to date in 736ms
+Building: 39 packages are looking for funding
+Building: run `npm fund` for details
+Building: Detected Next.js version: 14.2.35
+Building: Running "npm run build"
+Building: > atlas-agentic-framework@1.0.0 build
+Building: > next build
+Building: ▲ Next.js 14.2.35
+Building: - Environments: .env
+Building: Creating an optimized production build ...
+Building: ✓ Compiled successfully
+Building: Linting and checking validity of types ...
+Building: Collecting page data ...
+Building: [Supabase] URL exists: true
+Building: [Supabase] Key exists: true
+Building: [Supabase] URL length: 40
+Building: [Supabase] Client created successfully
+Building: [Supabase] URL exists: true
+Building: [Supabase] Key exists: true
+Building: [Supabase] URL length: 40
+Building: [Supabase] Client created successfully
+Building: [Supabase] URL exists: true
+Building: [Supabase] Key exists: true
+Building: [Supabase] URL length: 40
+Building: [Supabase] Client created successfully
+Building: [ExecutionRunner] Auto-starting in production mode...
+Building: [ExecutionRunner] Auto-starting in production mode...
+Building: [UTC: 2026-03-16T06:52:53.386Z | NY: 2026-03-16 02:52:53 ET] [INFO] [ExecutionRunner] Starting execution runner loop
+Building: [UTC: 2026-03-16T06:52:53.424Z | NY: 2026-03-16 02:52:53 ET] [INFO] [ExecutionRunner] Poll interval: 5000ms
+Building: [ExecutionRunner] Polling for executable tasks...
+Building: [SupabaseAdmin] URL: set Key: set
+Building: [UTC: 2026-03-16T06:52:53.386Z | NY: 2026-03-16 02:52:53 ET] [INFO] [ExecutionRunner] Starting execution runner loop
+Building: [UTC: 2026-03-16T06:52:53.424Z | NY: 2026-03-16 02:52:53 ET] [INFO] [ExecutionRunner] Poll interval: 5000ms
+Building: [ExecutionRunner] Polling for executable tasks...
+Building: [SupabaseAdmin] URL: set Key: set
+Building: [ExecutionRunner] [CRITERIA] Querying for tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [ExecutionRunner] [CRITERIA] Querying for tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [SupabaseAdmin] URL: set Key: set
+Building: [ExecutionRunner] [CRITERIA] Found 3 tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [ExecutionRunner] [ELIGIBLE] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4abde7fb-126a-4b92-9675-7c9839b57cf5
+Building: [ExecutionRunner] [ELIGIBLE] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4d1329a8-3ded-4705-8c31-7cd297760782
+Building: [ExecutionRunner] [ELIGIBLE] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67, status=in_progress, agentId=0850d04d-b663-4a19-a777-73ac701a57ed, executionId=38d284ae-8fd8-4976-8e82-1e537a0ea981
+Building: [ExecutionRunner] [CRITERIA] Found 3 tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [ExecutionRunner] [ELIGIBLE] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4abde7fb-126a-4b92-9675-7c9839b57cf5
+Building: [ExecutionRunner] [ELIGIBLE] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4d1329a8-3ded-4705-8c31-7cd297760782
+Building: [ExecutionRunner] [ELIGIBLE] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67, status=in_progress, agentId=0850d04d-b663-4a19-a777-73ac701a57ed, executionId=38d284ae-8fd8-4976-8e82-1e537a0ea981
+Building: [ExecutionRunner] [SKIP] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [SKIP] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [SKIP] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [SKIP] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [SKIP] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [CRITERIA] Total eligible tasks: 0
+Building: [ExecutionRunner] No tasks to execute
+Building: [ExecutionRunner] [SKIP] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [CRITERIA] Total eligible tasks: 0
+Building: [ExecutionRunner] No tasks to execute
+Building: Generating static pages (0/99) ...
+Building: [OpenClawClient] Request failed for /sessions?kinds=subagent,acp: TypeError: fetch failed
+Building: at node:internal/deps/undici/undici:16416:13
+Building: at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+Building: at async n.fetch (/vercel/path0/.next/server/app/api/control/integrations/status/route.js:1:5824)
+Building: at async n.getSessions (/vercel/path0/.next/server/app/api/control/integrations/status/route.js:1:6404)
+Building: at async n.getActiveAgents (/vercel/path0/.next/server/app/api/control/integrations/status/route.js:1:6495)
+Building: at async Promise.all (index 0)
+Building: at async h (/vercel/path0/.next/server/app/api/agents/live/route.js:1:2291)
+Building: at async /vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411
+Building: at async e_.execute (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)
+Building: at async e_.handle (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943) {
+Building: [cause]: Error: connect ECONNREFUSED 127.0.0.1:18789
+Building: at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+Building: errno: -111,
+Building: code: 'ECONNREFUSED',
+Building: syscall: 'connect',
+Building: address: '127.0.0.1',
+Building: port: 18789
+Building: }
+Building: }
+Building: [OpenClawClient] Request failed for /cron: TypeError: fetch failed
+Building: at node:internal/deps/undici/undici:16416:13
+Building: at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+Building: at async n.fetch (/vercel/path0/.next/server/app/api/control/integrations/status/route.js:1:5824)
+Building: at async n.getCronJobs (/vercel/path0/.next/server/app/api/control/integrations/status/route.js:1:6975)
+Building: at async Promise.all (index 1)
+Building: at async h (/vercel/path0/.next/server/app/api/agents/live/route.js:1:2291)
+Building: at async /vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411
+Building: at async e_.execute (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)
+Building: at async e_.handle (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)
+Building: at async exportAppRoute (/vercel/path0/node_modules/next/dist/export/routes/app-route.js:77:26) {
+Building: [cause]: Error: connect ECONNREFUSED 127.0.0.1:18789
+Building: at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+Building: errno: -111,
+Building: code: 'ECONNREFUSED',
+Building: syscall: 'connect',
+Building: address: '127.0.0.1',
+Building: port: 18789
+Building: }
+Building: }
+Building: [OpenClawClient] No active sessions found
+Building: [Events API] Error: B [Error]: Dynamic server usage: Route /api/events couldn't be rendered statically because it used `request.url`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+Building: at V (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:21778)
+Building: at Object.get (/vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:29465)
+Building: at d (/vercel/path0/.next/server/app/api/events/route.js:1:557)
+Building: at /vercel/path0/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38417
+Building: at /vercel/path0/node_modules/next/dist/server/lib/trace/tracer.js:140:36
+Building: at NoopContextManager.with (/vercel/path0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:7062)
+Building: at ContextAPI.with (/vercel/path0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:518)
+Building: at NoopTracer.startActiveSpan (/vercel/path0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18093)
+Building: at ProxyTracer.startActiveSpan (/vercel/path0/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18854)
+Building: at /vercel/path0/node_modules/next/dist/server/lib/trace/tracer.js:122:103 {
+Building: description: "Route /api/events couldn't be rendered statically because it used `request.url`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+Building: digest: 'DYNAMIC_SERVER_USAGE'
+Building: }
+Building: Generating static pages (24/99)
+Building: [Test] Starting env check
+Building: [Test] URL exists: true
+Building: [Test] Key exists: true
+Building: [Test] Getting admin client...
+Building: [Test] Admin client created
+Building: [Test] Querying tasks...
+Building: [Test] Query success, count: 5
+Building: [ExecutionRunner] Auto-starting in production mode...
+Building: [UTC: 2026-03-16T06:52:56.506Z | NY: 2026-03-16 02:52:56 ET] [INFO] [ExecutionRunner] Starting execution runner loop
+Building: [UTC: 2026-03-16T06:52:56.538Z | NY: 2026-03-16 02:52:56 ET] [INFO] [ExecutionRunner] Poll interval: 5000ms
+Building: [ExecutionRunner] Polling for executable tasks...
+Building: [ExecutionRunner] [CRITERIA] Querying for tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [ExecutionRunner] [CRITERIA] Found 3 tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL
+Building: [ExecutionRunner] [ELIGIBLE] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4abde7fb-126a-4b92-9675-7c9839b57cf5
+Building: [ExecutionRunner] [ELIGIBLE] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a, status=in_progress, agentId=5e19d798-1791-4b46-ba37-f10e2744c15a, executionId=4d1329a8-3ded-4705-8c31-7cd297760782
+Building: [ExecutionRunner] [ELIGIBLE] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67, status=in_progress, agentId=0850d04d-b663-4a19-a777-73ac701a57ed, executionId=38d284ae-8fd8-4976-8e82-1e537a0ea981
+Building: [ExecutionRunner] [SKIP] taskId=c772017c-f6f7-4646-b7f5-678cd0eec2d0 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [SKIP] taskId=39fe52c7-6539-4c28-b36a-3b3c0b60790a - Execution status="completed" (expected "in_progress")
+Building: Generating static pages (49/99)
+Building: [ExecutionRunner] [SKIP] taskId=97731b60-cebe-4faa-8072-4d6e3406ff67 - Execution status="completed" (expected "in_progress")
+Building: [ExecutionRunner] [CRITERIA] Total eligible tasks: 0
+Building: [ExecutionRunner] No tasks to execute
+Building: Generating static pages (74/99)
+Building: ✓ Generating static pages (99/99)
+Building: Finalizing page optimization ...
+Building: Collecting build traces ...
+Building: Route (app)                              Size     First Load JS
+Building: ┌ ƒ /                                    190 B          96.6 kB
+Building: ├ ○ /_not-found                          880 B          88.6 kB
+Building: ├ ƒ /acl                                 148 B          87.8 kB
+Building: ├ ○ /agents                              3.06 kB        99.5 kB
+Building: ├ ƒ /api/agent-runs                      0 B                0 B
+Building: ├ ƒ /api/agents/[id]/boost-restart       0 B                0 B
+Building: ├ ƒ /api/agents/[id]/snapshot            0 B                0 B
+Building: ├ ƒ /api/agents/ab-test                  0 B                0 B
+Building: ├ ƒ /api/agents/autonomy                 0 B                0 B
+Building: ├ ƒ /api/agents/chat                     0 B                0 B
+Building: ├ ƒ /api/agents/evolve                   0 B                0 B
+Building: ├ ƒ /api/agents/insights                 0 B                0 B
+Building: ├ ƒ /api/agents/kill                     0 B                0 B
+Building: ├ ○ /api/agents/live                     0 B                0 B
+Building: ├ ƒ /api/agents/meta                     0 B                0 B
+Building: ├ ƒ /api/agents/scale                    0 B                0 B
+Building: ├ ƒ /api/agents/self-heal                0 B                0 B
+Building: ├ ƒ /api/agents/sessions                 0 B                0 B
+Building: ├ ○ /api/agents/skills                   0 B                0 B
+Building: ├ ƒ /api/agents/spawn                    0 B                0 B
+Building: ├ ƒ /api/analytics/execution-patterns    0 B                0 B
+Building: ├ ○ /api/analytics/predict               0 B                0 B
+Building: ├ ƒ /api/approvals                       0 B                0 B
+Building: ├ ƒ /api/calendar/events                 0 B                0 B
+Building: ├ ƒ /api/calendar/sync                   0 B                0 B
+Building: ├ ○ /api/campaigns                       0 B                0 B
+Building: ├ ƒ /api/campaigns/import                0 B                0 B
+Building: ├ ○ /api/campaigns/kpis                  0 B                0 B
+Building: ├ ○ /api/campaigns/trend                 0 B                0 B
+Building: ├ ƒ /api/commands/execute                0 B                0 B
+Building: ├ ƒ /api/commands/ingest                 0 B                0 B
+Building: ├ ƒ /api/control/audit/run               0 B                0 B
+Building: ├ ƒ /api/control/fleet/actions           0 B                0 B
+Building: ├ ƒ /api/control/incidents               0 B                0 B
+Building: ├ ƒ /api/control/integrations/status     0 B                0 B
+Building: ├ ƒ /api/control/status                  0 B                0 B
+Building: ├ ƒ /api/costs                           0 B                0 B
+Building: ├ ƒ /api/costs/agents                    0 B                0 B
+Building: ├ ƒ /api/costs/summary                   0 B                0 B
+Building: ├ ƒ /api/costs/workflows/[id]            0 B                0 B
+Building: ├ ƒ /api/events                          0 B                0 B
+Building: ├ ƒ /api/events/create                   0 B                0 B
+Building: ├ ƒ /api/events/lead-scored-hot          0 B                0 B
+Building: ├ ƒ /api/executions                      0 B                0 B
+Building: ├ ƒ /api/executions/[id]                 0 B                0 B
+Building: ├ ƒ /api/executions/[id]/fail            0 B                0 B
+Building: ├ ƒ /api/executions/[id]/heartbeat       0 B                0 B
+Building: ├ ƒ /api/executions/[id]/retry           0 B                0 B
+Building: ├ ƒ /api/executions/agent/[agentId]      0 B                0 B
+Building: ├ ƒ /api/fleet/boost-restart-all-stuck   0 B                0 B
+Building: ├ ƒ /api/fleet/boost-restart-wave        0 B                0 B
+Building: ├ ƒ /api/fleet/commands                  0 B                0 B
+Building: ├ ƒ /api/followups                       0 B                0 B
+Building: ├ ƒ /api/health                          0 B                0 B
+Building: ├ ○ /api/infrastructure/status           0 B                0 B
+Building: ├ ƒ /api/integrations                    0 B                0 B
+Building: ├ ƒ /api/integrations/status             0 B                0 B
+Building: ├ ƒ /api/knowledge                       0 B                0 B
+Building: ├ ƒ /api/knowledge/[id]                  0 B                0 B
+Building: ├ ƒ /api/knowledge/search                0 B                0 B
+Building: ├ ƒ /api/knowledge/search/semantic       0 B                0 B
+Building: ├ ƒ /api/leads                           0 B                0 B
+Building: ├ ƒ /api/leads/[id]                      0 B                0 B
+Building: ├ ƒ /api/leads/activities                0 B                0 B
+Building: ├ ƒ /api/leads/claim                     0 B                0 B
+Building: ├ ƒ /api/leads/score                     0 B                0 B
+Building: ├ ƒ /api/meetings/ingest                 0 B                0 B
+Building: ├ ƒ /api/notifications/send              0 B                0 B
+Building: ├ ƒ /api/operator/recommendations        0 B                0 B
+Building: ├ ƒ /api/orchestrations                  0 B                0 B
+Building: ├ ƒ /api/orchestrations/[id]             0 B                0 B
+Building: ├ ƒ /api/orchestrations/[id]/status      0 B                0 B
+Building: ├ ƒ /api/owner-recommendations           0 B                0 B
+Building: ├ ƒ /api/runner                          0 B                0 B
+Building: �� ƒ /api/stream/events                   0 B                0 B
+Building: ├ ƒ /api/tasks                           0 B                0 B
+Building: ├ ƒ /api/tasks/[id]                      0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/accept               0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/aggregate            0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/claim                0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/defer                0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/delegate             0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/hierarchy            0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/result               0 B                0 B
+Building: ├ ƒ /api/tasks/[id]/status               0 B                0 B
+Building: ├ ƒ /api/tasks/claim                     0 B                0 B
+Building: ├ ƒ /api/tasks/delegate                  0 B                0 B
+Building: ├ ƒ /api/tasks/dependencies              0 B                0 B
+Building: ├ ƒ /api/tasks/orchestrate/parent        0 B                0 B
+Building: ├ ƒ /api/tasks/orchestrate/spawn         0 B                0 B
+Building: ├ ƒ /api/tasks/pending-acceptance        0 B                0 B
+Building: ├ ƒ /api/tasks/tree                      0 B                0 B
+Building: ├ ○ /api/test-db                         0 B                0 B
+Building: ├ ƒ /api/test/canonical-events           0 B                0 B
+Building: ├ ○ /api/test/debug-events               0 B                0 B
+Building: ├ ○ /api/validation/model-routing        0 B                0 B
+Building: ├ ○ /api/validation/timezone             0 B                0 B
+Building: ├ ƒ /api/watchlist                       0 B                0 B
+Building: ├ ƒ /api/webhooks/lead-scored            0 B                0 B
+Building: ├ ƒ /api/webhooks/openclaw               0 B                0 B
+Building: ├ ƒ /api/workers/heartbeat               0 B                0 B
+Building: ├ ƒ /api/workflows/retry                 0 B                0 B
+Building: ├ ƒ /approvals                           1.22 kB        92.3 kB
+Building: ├ ○ /campaigns                           5.17 kB         202 kB
+Building: ├ ○ /campaigns/realtime-example          49.8 kB         246 kB
+Building: ├ ○ /communications                      3.1 kB         90.8 kB
+Building: ├ ƒ /companies                           190 B          96.6 kB
+Building: ├ ƒ /companies/[id]                      190 B          96.6 kB
+Building: ├ ○ /control                             5.91 kB         102 kB
+Building: ├ ○ /control/agents/skills               3.82 kB         100 kB
+Building: ├ ○ /control/audit                       3.92 kB         100 kB
+Building: ├ ○ /control/costs                       4.05 kB         100 kB
+Building: ├ ○ /control/fleet                       5.45 kB         102 kB
+Building: ├ ○ /control/incidents                   3.67 kB         100 kB
+Building: ├ ○ /control/integrations                4.49 kB         101 kB
+Building: ├ ƒ /cost                                190 B          96.6 kB
+Building: ├ ○ /events                              4.98 kB         101 kB
+Building: ├ ○ /evolution                           6.2 kB         93.9 kB
+Building: ├ ƒ /executions                          148 B          87.8 kB
+Building: ├ ○ /executive-ops                       4.32 kB         101 kB
+Building: ├ ○ /executive-ops/approvals             3.4 kB         91.1 kB
+Building: ├ ○ /executive-ops/calendar              4.11 kB        91.8 kB
+Building: ├ ○ /executive-ops/commands              4.25 kB        91.9 kB
+Building: ├ ○ /executive-ops/decisions             4.31 kB          92 kB
+Building: ├ ○ /executive-ops/watchlist             3.55 kB        91.2 kB
+Building: ├ ○ /finance                             2.82 kB        90.5 kB
+Building: ├ ○ /finance/approvals                   2.42 kB        90.1 kB
+Building: ├ ○ /finance/budgets                     2.72 kB        90.4 kB
+Building: ├ ○ /finance/contracts                   2.56 kB        90.2 kB
+Building: ├ ○ /finance/invoices                    2.58 kB        90.3 kB
+Building: ├ ○ /finance/legal-privilege             2.16 kB        89.8 kB
+Building: ├ ○ /health                              4.41 kB        92.1 kB
+Building: ├ ○ /health/processes                    2.63 kB        90.3 kB
+Building: ├ ○ /hot-leads                           4.13 kB        98.5 kB
+Building: ├ ƒ /incidents                           1.2 kB         92.3 kB
+Building: ├ ○ /integrations                        4.82 kB        92.5 kB
+Building: ├ ○ /knowledge                           3.38 kB        99.8 kB
+Building: ├ ○ /knowledge/memory                    2.68 kB        90.4 kB
+Building: ├ ○ /knowledge/skills                    2.94 kB        90.6 kB
+Building: ├ ○ /operations                          2.89 kB        99.3 kB
+Building: ├ ○ /operations/delegation               3.02 kB        99.4 kB
+Building: ├ ○ /operations/milestones               3.12 kB        99.5 kB
+Building: ├ ○ /operations/productivity             3.61 kB         100 kB
+Building: ├ ○ /operations/tasks                    3.64 kB         100 kB
+Building: ├ ○ /presence                            3.18 kB        99.6 kB
+Building: ├ ○ /queue                               3.21 kB        99.6 kB
+Building: ├ ○ /recommendations                     3.47 kB        91.2 kB
+Building: ├ ○ /sales-marketing                     2.62 kB        90.3 kB
+Building: ├ ○ /tactical                            3.96 kB         100 kB
+Building: ├ ○ /tactical/companies                  3.71 kB         100 kB
+Building: ├ ○ /tactical/delegation                 3.67 kB         100 kB
+Building: ├ ○ /tactical/milestones                 3.7 kB          100 kB
+Building: ├ ○ /tactical/productivity               3.77 kB         100 kB
+Building: ├ ○ /tactical/tasks                      3.74 kB         100 kB
+Building: ├ ƒ /tasks                               2.56 kB          99 kB
+Building: └ ƒ /tasks/[id]                          3.25 kB         106 kB
+Building: + First Load JS shared by all            87.7 kB
+Building: ├ chunks/2117-4a48b4ce3d101f39.js      32.1 kB
+Building: ├ chunks/fd9d1056-61817ca2f8b7317b.js  53.6 kB
+Building: └ other shared chunks (total)          1.96 kB
+Building: ○  (Static)   prerendered as static content
+Building: ƒ  (Dynamic)  server-rendered on demand
+Building: Traced Next.js server files in: 28.696ms
+Building: Created all serverless functions in: 241.29ms
+Building: Collected static files (public/, static/, .next/static): 10.819ms
+Building: Build Completed in /vercel/output [41s]
+Building: Deploying outputs...
+[2K[1A[2K[GProduction: https://atlas-agentic-framework-ivwpuxmey-claudiosenas-projects.vercel.app [57s]
+Completing...
+Aliased: https://atlas-agentic-framework.vercel.app [57s]

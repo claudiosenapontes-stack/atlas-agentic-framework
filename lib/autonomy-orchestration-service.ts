@@ -458,6 +458,158 @@ export class AutonomyOrchestrationService {
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Create a checkpoint for rollback
+   */
+  async createCheckpoint(taskId: string): Promise<{ success: boolean; checkpointNumber?: number; error?: string }> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('create_task_checkpoint', { p_task_id: taskId });
+
+      if (error) throw error;
+
+      return {
+        success: data.success,
+        checkpointNumber: data.checkpoint_number,
+        error: data.error
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Rollback task to previous checkpoint
+   */
+  async rollbackTask(
+    taskId: string,
+    checkpointNumber?: number,
+    reason?: string
+  ): Promise<{ success: boolean; restoredToCheckpoint?: number; error?: string }> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('rollback_task', {
+          p_task_id: taskId,
+          p_checkpoint_number: checkpointNumber || null,
+          p_reason: reason || null
+        });
+
+      if (error) throw error;
+
+      return {
+        success: data.success,
+        restoredToCheckpoint: data.restored_to_checkpoint,
+        error: data.error
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Add dependency between tasks
+   */
+  async addDependency(
+    taskId: string,
+    dependsOnTaskId: string,
+    dependencyType: string = 'finish_to_start',
+    isBlocking: boolean = true
+  ): Promise<{ success: boolean; dependencyId?: string; error?: string }> {
+    try {
+      const { data, error } = await this.supabase
+        .from('task_dependencies')
+        .insert({
+          task_id: taskId,
+          depends_on_task_id: dependsOnTaskId,
+          dependency_type: dependencyType,
+          is_blocking: isBlocking
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { success: true, dependencyId: data.id };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get tasks with unmet dependencies
+   */
+  async getBlockedTasks(parentTaskId: string): Promise<{ success: boolean; blockedTasks?: any[]; error?: string }> {
+    try {
+      const { data, error } = await this.supabase
+        .rpc('get_tasks_with_unmet_dependencies', { p_parent_id: parentTaskId });
+
+      if (error) throw error;
+
+      return { success: true, blockedTasks: data || [] };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * List child tasks with ordering
+   */
+  async listChildren(
+    parentTaskId: string,
+    orderBy: 'created_at' | 'task_order' | 'status' = 'task_order'
+  ): Promise<{ success: boolean; children?: any[]; error?: string }> {
+    try {
+      const { data: children, error } = await this.supabase
+        .from('tasks')
+        .select(`
+          *,
+          task_dependencies!task_dependencies_task_id_fkey(*),
+          dependencies:task_dependencies!task_dependencies_depends_on_task_id_fkey(*)
+        `)
+        .eq('parent_task_id', parentTaskId)
+        .order(orderBy, { ascending: true });
+
+      if (error) throw error;
+
+      return { success: true, children: children || [] };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Mark child task complete and trigger parent rollup
+   */
+  async markChildComplete(
+    taskId: string,
+    agentId: string,
+    result: TaskResultSubmission
+  ): Promise<{ success: boolean; parentUpdated?: boolean; error?: string }> {
+    try {
+      // Submit result first
+      const resultResponse = await this.submitTaskResult(taskId, agentId, result);
+      if (!resultResponse.success) {
+        return { success: false, error: resultResponse.error };
+      }
+
+      // Get task to find parent
+      const { data: task, error: taskError } = await this.supabase
+        .from('tasks')
+        .select('parent_task_id')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError) throw taskError;
+
+      return {
+        success: true,
+        parentUpdated: !!task.parent_task_id
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 // Export singleton

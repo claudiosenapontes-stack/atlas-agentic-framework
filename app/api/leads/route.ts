@@ -123,15 +123,18 @@ export async function GET(request: NextRequest) {
       total_estimated_value: 0
     };
     
-    // Get aggregate stats
-    const { data: statusCounts } = await (supabase as any)
-      .from('leads')
-      .select('status', { count: 'exact' })
-      .group('status');
-    
-    if (statusCounts) {
-      statusCounts.forEach((row: any) => {
-        stats.by_status[row.status] = parseInt(row.count);
+    // Calculate stats from fetched leads (avoid .group() which isn't supported)
+    if (leads) {
+      leads.forEach((lead: any) => {
+        if (lead.status) {
+          stats.by_status[lead.status] = (stats.by_status[lead.status] || 0) + 1;
+        }
+        if (lead.priority) {
+          stats.by_priority[lead.priority] = (stats.by_priority[lead.priority] || 0) + 1;
+        }
+        if (lead.estimated_value) {
+          stats.total_estimated_value += parseFloat(lead.estimated_value) || 0;
+        }
       });
     }
     

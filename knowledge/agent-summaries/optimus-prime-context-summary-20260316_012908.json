@@ -1,0 +1,1 @@
+{"agent": "optimus-prime", "timestamp": "2026-03-16T05:29:08Z", "context_summary": {"pre_compaction_size_bytes": 6395053, "pre_compaction_lines": 2219, "archived_entries": 2169, "preserved_entries": 50, "backup_location": "/root/.openclaw/agents/optimus-prime/archive/context_20260316_012908.jsonl"}}

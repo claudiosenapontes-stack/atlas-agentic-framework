@@ -12,7 +12,7 @@ process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://ukuicfswabcaiosz
 console.log('[HeartbeatCron] Starting ATLAS-FLEET-HEARTBEAT-CRON-502 collection at', new Date().toISOString());
 
 // Import and run the heartbeat collection
-import('./services/heartbeat/agent-heartbeat.ts')
+import('./services/heartbeat/agent-heartbeat.js')
   .then(async (module) => {
     try {
       const result = await module.collectHeartbeats();

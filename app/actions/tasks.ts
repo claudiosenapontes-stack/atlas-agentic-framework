@@ -123,3 +123,14 @@ export async function createExecution(taskId: string, agentId?: string) {
   if (error) throw error
   return data
 }
+
+export async function getTaskChildren(parentId: string) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority')
+    .eq('parent_task_id', parentId)
+    .order('created_at', { ascending: true })
+  
+  if (error) return []
+  return data || []
+}

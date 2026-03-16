@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const DEMO_TREND = [
   { date: "2025-03-07", spend: 1800, leads: 48 },
@@ -12,16 +12,9 @@ const DEMO_TREND = [
 ];
 
 export async function GET() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ data: DEMO_TREND, source: "demo" });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
   try {
+    const supabase = getSupabaseAdmin();
+
     // Get last 7 days of metrics
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);

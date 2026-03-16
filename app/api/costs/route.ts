@@ -1,144 +1,151 @@
 /**
- * Cost Reporting API Routes
- * ATLAS-COST-MVP-357
+ * ATLAS-COSTS API (Production-Schema-Aligned)
+ * Uses executions table (tokens_used, actual_cost_usd)
  * 
- * GET /api/costs/summary - Overall cost summary
- * GET /api/costs/agents - Cost by agent
- * GET /api/costs/workflows/:id - Cost for specific workflow
+ * GET /api/costs
+ * Returns: Real cost data from executions table
  */
-
-export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-/**
- * GET /api/costs/summary
- * Overall cost summary with optional filters
- */
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  
-  // Parse filters
-  const companyId = searchParams.get("company_id");
-  const agentId = searchParams.get("agent_id");
-  const startDate = searchParams.get("start_date");
-  const endDate = searchParams.get("end_date");
-  const days = parseInt(searchParams.get("days") ?? "30", 10);
-  
-  const supabaseAdmin = getSupabaseAdmin();
-  
   try {
-    // Build base query
-    let query = supabaseAdmin.from("execution_costs").select("*");
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get('period') || 'today'; // today, week, month
+    const agentId = searchParams.get('agentId');
     
-    if (companyId) {
-      query = query.eq("company_id", companyId);
+    const supabase = getSupabaseAdmin();
+    
+    // Calculate date range
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (period) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'today':
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
     }
+    
+    // Query executions table for cost data
+    let query = (supabase as any)
+      .from('executions')
+      .select('id, agent_id, task_id, tokens_used, actual_cost_usd, created_at, status')
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
     
     if (agentId) {
-      query = query.eq("agent_id", agentId);
+      query = query.eq('agent_id', agentId);
     }
     
-    if (startDate) {
-      query = query.gte("created_at", startDate);
-    } else {
-      // Default to last N days
-      const since = new Date();
-      since.setDate(since.getDate() - days);
-      query = query.gte("created_at", since.toISOString());
-    }
-    
-    if (endDate) {
-      query = query.lte("created_at", endDate);
-    }
-    
-    const { data: costs, error } = await query;
+    const { data: executions, error } = await query;
     
     if (error) {
-      console.error("[Costs API] Query error:", error);
-      return NextResponse.json(
-        { success: false, error: "Failed to query costs" },
-        { status: 500 }
-      );
+      console.error('[Costs] Executions query error:', error);
+      throw error;
     }
     
-    // Calculate summary
-    const summary = {
-      total_cost_usd: 0,
-      total_tokens: 0,
-      total_input_tokens: 0,
-      total_output_tokens: 0,
-      entry_count: costs?.length ?? 0,
-      by_model: {} as Record<string, { cost: number; tokens: number; count: number }>,
-      by_agent: {} as Record<string, { cost: number; tokens: number; count: number }>,
-      by_day: {} as Record<string, { cost: number; tokens: number; count: number }>,
+    // Filter to records with cost data
+    const withCost = (executions || []).filter((e: any) => (e.tokens_used || 0) > 0);
+    
+    // Calculate totals
+    const totals = {
+      executionCount: withCost.length,
+      totalTokens: withCost.reduce((sum: number, e: any) => sum + (e.tokens_used || 0), 0),
+      totalCostUsd: withCost.reduce((sum: number, e: any) => sum + (e.actual_cost_usd || 0), 0),
     };
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const entry of (costs as any[]) ?? []) {
-      const cost = Number(entry.total_cost_usd);
-      const tokens = entry.total_tokens ?? ((entry.tokens_input ?? 0) + (entry.tokens_output ?? 0));
-      
-      summary.total_cost_usd += cost;
-      summary.total_tokens += tokens;
-      summary.total_input_tokens += entry.tokens_input ?? 0;
-      summary.total_output_tokens += entry.tokens_output ?? 0;
-      
-      // By model
-      if (!summary.by_model[entry.model]) {
-        summary.by_model[entry.model] = { cost: 0, tokens: 0, count: 0 };
+    // Group by date
+    const byDate: Record<string, any> = {};
+    for (const e of withCost) {
+      const date = new Date(e.created_at).toISOString().split('T')[0];
+      if (!byDate[date]) {
+        byDate[date] = {
+          executionCount: 0,
+          totalTokens: 0,
+          totalCostUsd: 0,
+        };
       }
-      summary.by_model[entry.model].cost += cost;
-      summary.by_model[entry.model].tokens += tokens;
-      summary.by_model[entry.model].count += 1;
-      
-      // By agent
-      const agentKey = entry.agent_id ?? "unknown";
-      if (!summary.by_agent[agentKey]) {
-        summary.by_agent[agentKey] = { cost: 0, tokens: 0, count: 0 };
+      byDate[date].executionCount++;
+      byDate[date].totalTokens += e.tokens_used || 0;
+      byDate[date].totalCostUsd += e.actual_cost_usd || 0;
+    }
+    
+    // Group by agent (join with agents table for names)
+    const { data: agents } = await (supabase as any)
+      .from('agents')
+      .select('id, name, display_name');
+    
+    const agentMap: Record<string, string> = {};
+    (agents || []).forEach((a: any) => {
+      agentMap[a.id] = a.name || a.display_name || a.id;
+    });
+    
+    const byAgent: Record<string, any> = {};
+    for (const e of withCost) {
+      const id = e.agent_id || 'unknown';
+      if (!byAgent[id]) {
+        byAgent[id] = {
+          agentId: id,
+          agentName: agentMap[id] || id,
+          executionCount: 0,
+          totalTokens: 0,
+          totalCostUsd: 0,
+        };
       }
-      summary.by_agent[agentKey].cost += cost;
-      summary.by_agent[agentKey].tokens += tokens;
-      summary.by_agent[agentKey].count += 1;
-      
-      // By day
-      const day = entry.created_at.split("T")[0];
-      if (!summary.by_day[day]) {
-        summary.by_day[day] = { cost: 0, tokens: 0, count: 0 };
-      }
-      summary.by_day[day].cost += cost;
-      summary.by_day[day].tokens += tokens;
-      summary.by_day[day].count += 1;
+      byAgent[id].executionCount++;
+      byAgent[id].totalTokens += e.tokens_used || 0;
+      byAgent[id].totalCostUsd += e.actual_cost_usd || 0;
+    }
+    
+    // If no cost data, mark as PARTIAL
+    if (withCost.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          totals: { executionCount: 0, totalTokens: 0, totalCostUsd: 0 },
+          byDate: {},
+          byAgent: [],
+          executions: [],
+        },
+        status: 'PARTIAL',
+        message: 'No cost data recorded for this period',
+        timestamp: new Date().toISOString(),
+      });
     }
     
     return NextResponse.json({
       success: true,
-      summary: {
-        total_cost_usd: Number(summary.total_cost_usd.toFixed(8)),
-        total_tokens: summary.total_tokens,
-        total_input_tokens: summary.total_input_tokens,
-        total_output_tokens: summary.total_output_tokens,
-        entry_count: summary.entry_count,
-        period_days: days,
+      data: {
+        totals,
+        byDate,
+        byAgent: Object.values(byAgent),
+        executions: withCost.slice(0, 100), // Limit to last 100
       },
-      breakdown: {
-        by_model: summary.by_model,
-        by_agent: summary.by_agent,
-        by_day: summary.by_day,
-      },
-      filters: {
-        company_id: companyId,
-        agent_id: agentId,
-        start_date: startDate,
-        end_date: endDate,
-      },
+      status: 'COMPLETE',
+      source: 'executions_table',
+      timestamp: new Date().toISOString(),
     });
     
   } catch (error) {
-    console.error("[Costs API] Exception:", error);
+    console.error('[Costs] Error:', error);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch costs',
+        data: null,
+        status: 'ERROR',
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 }
     );
   }

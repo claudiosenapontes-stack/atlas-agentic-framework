@@ -1,14 +1,8 @@
-import {
-  Activity,
-  CheckCircle,
-  Clock,
-  Cpu,
-  Zap,
-  AlertCircle,
-  Users,
-} from "lucide-react";
+'use client';
 
-export const dynamic = "force-dynamic";
+import { useState, useEffect } from 'react';
+import { CheckCircle, AlertCircle, Users, Radio, RefreshCw, Zap, Cpu, MemoryStick } from 'lucide-react';
+import Link from 'next/link';
 
 interface AgentMetrics {
   pid: number;
@@ -24,252 +18,150 @@ interface AgentMetrics {
   lastSeen: string;
 }
 
-async function getLiveAgents(): Promise<AgentMetrics[]> {
-  try {
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    
-    const res = await fetch(`${baseUrl}/api/agents/live`, {
-      cache: 'no-store',
-    });
-    
-    if (!res.ok) throw new Error('Failed to fetch live agents');
-    const data = await res.json();
-    return data.agents || [];
-  } catch (err) {
-    console.error('[AgentsPage] Failed to fetch live agents:', err);
-    return [];
+export default function AgentsPage() {
+  const [agents, setAgents] = useState<AgentMetrics[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<'live' | 'unavailable'>('unavailable');
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  async function fetchAgents() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/agents/live', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setAgents(data.agents || []);
+        setDataSource('live');
+      } else {
+        setDataSource('unavailable');
+      }
+    } catch (err) {
+      console.error('[Agents] Error:', err);
+      setDataSource('unavailable');
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
-/**
- * AGENTS PAGE — Business Layer
- * 
- * Visual characteristics:
- * - Clean, structured, calmer
- * - Standard card backgrounds (#111214)
- * - Clear typography hierarchy
- * - Organized grid layout
- * - Status without visual noise
- */
-
-export default async function AgentsPage() {
-  const agents = await getLiveAgents();
-
-  const enrichedAgents = agents.map((agent: AgentMetrics) => ({
-    id: agent.name,
-    name: agent.name,
-    display_name: agent.displayName || agent.name,
-    role: agent.agentType,
-    status: agent.status,
-    currentTask: agent.currentTask || null,
-    loadPercent: Math.round(agent.cpu * 10) || Math.floor(Math.random() * 30),
-    lastSeen: agent.status === 'online' ? 'Active now' : formatLastSeen(agent.lastSeen),
-    delegation_level: agent.agentType,
-  }));
-
-  const onlineCount = enrichedAgents.filter((a: any) => a.status === "online").length;
-  const onlineAgents = enrichedAgents.filter((a: any) => a.status === "online");
-  const totalLoad = onlineAgents.reduce((acc: number, a: any) => acc + (a.loadPercent || 0), 0);
-  const avgLoad = onlineAgents.length > 0 ? Math.round(totalLoad / onlineAgents.length) : 0;
+  const onlineCount = agents.filter(a => a.status === 'online').length;
 
   return (
-    <div className="space-y-6">
-      {/* Header — Clean Business Style */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Agent Fleet</h1>
-          <p className="text-sm text-[#6B7280] mt-0.5">Monitor and manage AI agents</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-[#16C784]/10 border border-[#16C784]/30 rounded-lg">
-            <div className="w-1.5 h-1.5 bg-[#16C784] rounded-full animate-pulse" />
-            <span className="text-xs text-[#16C784] font-medium">
-              {onlineCount} Online
-            </span>
+    <div className="min-h-screen bg-[#0B0B0C] text-white">
+      <header className="border-b border-[#1F2226] bg-[#111214] px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#FF6A00] flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-white">Agents</h1>
+              <p className="text-[10px] text-[#6B7280]">Agent Directory & Skills</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg">
-            <Cpu className="w-4 h-4 text-[#9BA3AF]" />
-            <span className="text-xs text-[#9BA3AF] font-medium">
-              {avgLoad}% Load
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid — Clean Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <FleetStatCard
-          icon={<Users className="w-4 h-4 text-[#9BA3AF]" />}
-          label="Total Agents"
-          value={enrichedAgents.length}
-        />
-        <FleetStatCard
-          icon={<CheckCircle className="w-4 h-4 text-[#16C784]" />}
-          label="Active"
-          value={onlineCount}
-          suffix={`${Math.round((onlineCount / enrichedAgents.length) * 100)}%`}
-        />
-        <FleetStatCard
-          icon={<Activity className="w-4 h-4 text-[#FFB020]" />}
-          label="Avg Load"
-          value={`${avgLoad}%`}
-          status={avgLoad > 80 ? 'critical' : avgLoad > 50 ? 'warning' : 'normal'}
-        />
-        <FleetStatCard
-          icon={<Clock className="w-4 h-4 text-[#9BA3AF]" />}
-          label="Tasks Today"
-          value="24"
-          suffix="+3"
-        />
-      </div>
-
-      {/* Agent Cards Grid — Clean Business Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {enrichedAgents.map((agent: any) => (
-          <FleetAgentCard key={agent.id} agent={agent} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FleetStatCard({
-  icon,
-  label,
-  value,
-  suffix,
-  status = 'neutral',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  suffix?: string;
-  status?: 'normal' | 'warning' | 'critical' | 'neutral';
-}) {
-  const statusColors = {
-    normal: 'text-[#16C784]',
-    warning: 'text-[#FFB020]',
-    critical: 'text-[#FF3B30]',
-    neutral: 'text-[#6B7280]',
-  };
-
-  return (
-    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-[#6B7280] text-xs">{label}</span>
-      </div>
-      <div className="flex items-end justify-between">
-        <span className="text-xl font-semibold text-white">{value}</span>
-        {suffix && <span className={`text-xs ${statusColors[status]}`}>{suffix}</span>}
-      </div>
-    </div>
-  );
-}
-
-function FleetAgentCard({ agent }: { agent: any }) {
-  const isOnline = agent.status === "online";
-
-  return (
-    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4 hover:border-[#6B7280]/30 transition-colors">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-              isOnline ? "bg-[#16C784]/10" : "bg-[#1F2226]"
-            }`}
-          >
-            {isOnline ? (
-              <Zap className="w-4 h-4 text-[#16C784]" />
+          <div className="flex items-center gap-2">
+            {dataSource === 'live' ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#16C784]/10 border border-[#16C784]/30">
+                <Radio className="w-4 h-4 text-[#16C784] animate-pulse" />
+                <span className="text-xs text-[#16C784]">LIVE</span>
+              </div>
             ) : (
-              <AlertCircle className="w-4 h-4 text-[#6B7280]" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#6B7280]/10 border border-[#6B7280]/30">
+                <AlertCircle className="w-4 h-4 text-[#6B7280]" />
+                <span className="text-xs text-[#6B7280]">NOT CONNECTED</span>
+              </div>
             )}
           </div>
-          <div>
-            <h3 className="font-medium text-sm text-white">{agent.display_name || agent.name}</h3>
-            <p className="text-[10px] text-[#6B7280] capitalize">{agent.role}</p>
+        </div>
+        <nav className="flex items-center gap-1 border-t border-[#1F2226] pt-2">
+          {['Agents', 'Presence', 'Queue', 'ACL'].map((label) => {
+            const paths: Record<string, string> = { Agents: '/agents', Presence: '/presence', Queue: '/queue', ACL: '/acl' };
+            const isActive = label === 'Agents';
+            return (
+              <Link key={label} href={paths[label]} className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${isActive ? 'text-white bg-[#1F2226]' : 'text-[#6B7280] hover:text-white hover:bg-[#1F2226]'}`}>
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+      </header>
+
+      <main className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/20 flex items-center justify-center">
+              <Users className="w-5 h-5 text-[#8B5CF6]" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-white">Agent Directory</h1>
+              <p className="text-sm text-[#6B7280]">Browse and manage AI agents</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#16C784]/10 border border-[#16C784]/30 rounded-lg">
+              <div className="w-1.5 h-1.5 bg-[#16C784] rounded-full animate-pulse" />
+              <span className="text-xs text-[#16C784] font-medium">{onlineCount} Online</span>
+            </div>
+            <button onClick={fetchAgents} disabled={loading} className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white transition-colors">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              isOnline ? "bg-[#16C784] animate-pulse" : "bg-[#6B7280]"
-            }`}
-          />
-          <span className={`text-[10px] ${isOnline ? "text-[#16C784]" : "text-[#6B7280]"}`}>
-            {isOnline ? "Online" : "Offline"}
-          </span>
-        </div>
-      </div>
 
-      {/* Current Task */}
-      <div className="mb-3">
-        <p className="text-[10px] text-[#6B7280] uppercase tracking-wider mb-1">Current Task</p>
-        <p className={`text-xs ${agent.currentTask ? "text-[#9BA3AF]" : "text-[#6B7280] italic"}`}>
-          {agent.currentTask || "No active task"}
-        </p>
-      </div>
-
-      {/* Load Bar */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="text-[#6B7280] uppercase tracking-wider">Load</span>
-          <span
-            className={`font-medium ${
-              agent.loadPercent > 80
-                ? "text-[#FF3B30]"
-                : agent.loadPercent > 50
-                ? "text-[#FFB020]"
-                : "text-[#16C784]"
-            }`}
-          >
-            {agent.loadPercent}%
-          </span>
-        </div>
-        <div className="h-1 bg-[#1F2226] rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              agent.loadPercent > 80
-                ? "bg-[#FF3B30]"
-                : agent.loadPercent > 50
-                ? "bg-[#FFB020]"
-                : "bg-[#16C784]"
-            }`}
-            style={{ width: `${agent.loadPercent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="mt-3 pt-3 border-t border-[#1F2226] flex items-center justify-between">
-        <span className="text-[10px] text-[#6B7280]">{agent.lastSeen}</span>
-        {agent.delegation_level && (
-          <span className="text-[10px] text-[#9BA3AF] capitalize bg-[#1F2226] px-2 py-0.5 rounded">
-            {agent.delegation_level}
-          </span>
+        {dataSource === 'unavailable' || agents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 bg-[#111214] rounded-[10px] border border-[#1F2226]">
+            <div className="w-16 h-16 rounded-full bg-[#1F2226] flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-[#6B7280]" />
+            </div>
+            <h2 className="text-lg font-medium text-white mb-2">No Agent Data Available</h2>
+            <p className="text-sm text-[#9BA3AF] max-w-md text-center mb-6">
+              The agent directory backend is not yet connected. Agent information will appear once the service is deployed.
+            </p>
+            <button onClick={fetchAgents} disabled={loading} className="px-4 py-2 bg-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white transition-colors">
+              {loading ? 'Checking...' : 'Check Connection'}
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {agents.map((agent) => (
+              <AgentCard key={agent.name} agent={agent} />
+            ))}
+          </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
 
-function formatLastSeen(lastSeen: string): string {
-  try {
-    const date = new Date(lastSeen);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  } catch {
-    return 'Unknown';
-  }
+function AgentCard({ agent }: { agent: AgentMetrics }) {
+  const isOnline = agent.status === 'online';
+  return (
+    <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px] hover:border-[#6B7280]/30 transition-colors">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isOnline ? 'bg-[#16C784]/10' : 'bg-[#1F2226]'}`}>
+            {isOnline ? <CheckCircle className="w-4 h-4 text-[#16C784]" /> : <AlertCircle className="w-4 h-4 text-[#6B7280]" />}
+          </div>
+          <div>
+            <h3 className="font-medium text-sm text-white">{agent.displayName}</h3>
+            <p className="text-[10px] text-[#6B7280] capitalize">{agent.agentType}</p>
+          </div>
+        </div>
+        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-[#16C784] animate-pulse' : 'bg-[#6B7280]'}`} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3 text-[10px]">
+        <div className="p-2 bg-[#0B0B0C] rounded border border-[#1F2226]">
+          <span className="text-[#6B7280]">CPU</span>
+          <p className="text-[#9BA3AF] mt-0.5">{agent.cpu}%</p>
+        </div>
+        <div className="p-2 bg-[#0B0B0C] rounded border border-[#1F2226]">
+          <span className="text-[#6B7280]">Memory</span>
+          <p className="text-[#9BA3AF] mt-0.5">{agent.memory}MB</p>
+        </div>
+      </div>
+      <div className="text-[10px] text-[#6B7280] truncate">{agent.currentTask || 'No active task'}</div>
+    </div>
+  );
 }

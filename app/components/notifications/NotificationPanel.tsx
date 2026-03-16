@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, X, AlertCircle, Info } from "lucide-react";
+import { Bell, Check, X, AlertCircle, Info, Send, MessageSquare } from "lucide-react";
 
 interface Notification {
   id: string;
@@ -9,6 +9,9 @@ interface Notification {
   type: "info" | "success" | "warning" | "error";
   timestamp: Date;
   read: boolean;
+  delivery_status?: 'pending' | 'sent' | 'delivered' | 'failed';
+  channels?: string[];
+  channel_status?: Record<string, { sent: boolean; mocked?: boolean; error?: string }>;
 }
 
 interface NotificationPanelProps {
@@ -49,6 +52,31 @@ export function NotificationPanel({
         return "border-red-500/30 bg-red-500/5";
       default:
         return "border-blue-500/30 bg-blue-500/5";
+    }
+  };
+
+  const getDeliveryStatusColor = (status?: string) => {
+    switch (status) {
+      case 'delivered':
+      case 'sent':
+        return 'text-green-400 bg-green-500/10 border-green-500/30';
+      case 'failed':
+        return 'text-red-400 bg-red-500/10 border-red-500/30';
+      case 'pending':
+        return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+      default:
+        return 'text-gray-400 bg-gray-700 border-gray-600';
+    }
+  };
+
+  const getChannelIcon = (channel: string) => {
+    switch (channel) {
+      case 'telegram':
+        return <Send className="w-3 h-3" />;
+      case 'in_app':
+        return <MessageSquare className="w-3 h-3" />;
+      default:
+        return null;
     }
   };
 
@@ -117,6 +145,44 @@ export function NotificationPanel({
                   <p className="text-sm text-gray-400 mt-1">
                     {notification.message}
                   </p>
+                  
+                  {/* Delivery Status Badges */}
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    {/* Delivery Status */}
+                    {notification.delivery_status && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${getDeliveryStatusColor(notification.delivery_status)}`}>
+                        {notification.delivery_status === 'delivered' && <Check className="w-3 h-3" />}
+                        {notification.delivery_status === 'failed' && <X className="w-3 h-3" />}
+                        {notification.delivery_status === 'pending' && <AlertCircle className="w-3 h-3" />}
+                        <span className="capitalize">{notification.delivery_status}</span>
+                      </span>
+                    )}
+                    
+                    {/* Channel Status */}
+                    {notification.channels?.map((channel) => {
+                      const chStatus = notification.channel_status?.[channel];
+                      const isDelivered = chStatus?.sent;
+                      const hasError = chStatus?.error;
+                      
+                      return (
+                        <span
+                          key={channel}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                            isDelivered
+                              ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                              : hasError
+                              ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                              : 'bg-gray-700 text-gray-400 border-gray-600'
+                          }`}
+                        >
+                          {getChannelIcon(channel)}
+                          <span className="capitalize">{channel}</span>
+                          {chStatus?.mocked && <span className="opacity-50">(m)</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  
                   <div className="flex items-center gap-2 mt-2">
                     {!notification.read && onMarkAsRead && (
                       <button

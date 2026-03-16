@@ -60,7 +60,7 @@ export async function POST(
     // Step 1: Fetch execution
     const { data: execution, error: fetchError } = await supabaseAdmin
       .from("executions")
-      .select("id, status, task_id, agent_id, attempt_number")
+      .select("id, status, task_id, agent_id, attempt_number, retry_count, max_attempts, retry_policy_name, failure_class")
       .eq("id", executionId)
       .single();
 

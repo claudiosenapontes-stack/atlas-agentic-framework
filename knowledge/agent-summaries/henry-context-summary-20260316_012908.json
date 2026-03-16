@@ -1,0 +1,1 @@
+{"agent": "henry", "timestamp": "2026-03-16T05:29:08Z", "context_summary": {"pre_compaction_size_bytes": 4305467, "pre_compaction_lines": 1378, "archived_entries": 1328, "preserved_entries": 50, "backup_location": "/root/.openclaw/agents/henry/archive/context_20260316_012908.jsonl"}}

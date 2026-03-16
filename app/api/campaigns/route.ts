@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // Demo data for when tables don't exist yet
 const DEMO_CAMPAIGNS = [
@@ -10,17 +10,9 @@ const DEMO_CAMPAIGNS = [
 ];
 
 export async function GET() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
-  // Return demo data if Supabase not configured
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ campaigns: DEMO_CAMPAIGNS, source: "demo" });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
   try {
+    const supabase = getSupabaseAdmin();
+
     // Fetch campaigns with aggregated metrics from daily metrics
     const { data: campaigns, error } = await supabase
       .from("campaigns")

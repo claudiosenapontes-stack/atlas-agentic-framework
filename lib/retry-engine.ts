@@ -18,7 +18,7 @@ export interface RetryPolicy {
 
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   name: "default",
-  max_attempts: 3,
+  max_attempts: 5,
   base_delay_ms: 5000,
   max_delay_ms: 60000,
   backoff_multiplier: 2.0,
@@ -77,24 +77,29 @@ export function calculateRetryDelay(
 
 /**
  * Determine if a failure should be retried based on its classification
+ * Accepts both FailureClass type and string (for DB values)
  */
 export function isRetryable(
-  failureClass: FailureClass,
+  failureClass: FailureClass | string,
   attemptNumber: number,
   policy: RetryPolicy = DEFAULT_RETRY_POLICY
 ): { retryable: boolean; reason?: string } {
-  // Check if failure class is retryable
-  if (policy.non_retryable_classes.includes(failureClass)) {
+  // Normalize to string for comparison
+  const fc = String(failureClass).toLowerCase() as FailureClass;
+  
+  // Check if failure class is explicitly non-retryable
+  if (policy.non_retryable_classes.includes(fc)) {
     return { 
       retryable: false, 
       reason: `Failure class '${failureClass}' is not retryable` 
     };
   }
   
-  if (!policy.retryable_classes.includes(failureClass)) {
+  // Check if failure class is in retryable list
+  if (!policy.retryable_classes.includes(fc)) {
     return { 
       retryable: false, 
-      reason: `Unknown failure class '${failureClass}'` 
+      reason: `Unknown or non-retryable failure class '${failureClass}'` 
     };
   }
   

@@ -108,16 +108,14 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseAdmin();
       const approvalId = randomUUID();
       
-      // Ultra-minimal insert - only id and timestamps (safest)
-      // Schema has unknown columns - approval_requests table structure unclear
+      // Minimal insert - try only id (safest possible)
+      // Schema discovery: approval_requests table exists but columns unknown
       const insertData: any = {
         id: approvalId,
-        created_at: timestamp,
-        updated_at: timestamp,
       };
       
-      // Store title in metadata if that column exists
-      insertData.metadata = { title: title.trim() };
+      // Try common columns one by one
+      // Uncomment to test: insertData.status = 'pending';
       
       const { error: insertError } = await (supabase as any)
         .from('approval_requests')

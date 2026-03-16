@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Build base query
+    console.log('[KB Search] Building query with filters:', filters);
     let query = (supabase as any)
       .from('knowledge_registry')
       .select('*', { count: 'exact' });

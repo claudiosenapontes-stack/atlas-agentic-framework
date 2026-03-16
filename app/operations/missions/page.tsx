@@ -37,7 +37,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [phaseFilter, setPhaseFilter] = useState('all');
+  const [ownerFilter, setOwnerFilter] = useState('all');
   const [search, setSearch] = useState('');
 
   async function fetchMissions() {
@@ -57,8 +59,14 @@ export default function MissionsPage() {
 
   useEffect(() => { fetchMissions(); }, []);
 
+  // Dynamic filter options from live data
+  const phases = Array.from(new Set(missions.map(m => m.phase).filter(Boolean)));
+  const owners = Array.from(new Set(missions.map(m => m.owner_agent || m.owner).filter(Boolean)));
+
   const filtered = missions.filter(m => {
-    if (filter !== 'all' && m.status !== filter) return false;
+    if (statusFilter !== 'all' && m.status !== statusFilter) return false;
+    if (phaseFilter !== 'all' && m.phase !== phaseFilter) return false;
+    if (ownerFilter !== 'all' && (m.owner_agent || m.owner) !== ownerFilter) return false;
     if (search && !m.title.toLowerCase().includes(search.toLowerCase()) && !m.id.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }).sort((a, b) => (a.status === 'blocked' ? -1 : b.status === 'blocked' ? 1 : 0));

@@ -69,16 +69,16 @@ export async function GET(request: NextRequest) {
     // Log diagnostic info
     console.log(`[${requestId}] Supabase returned ${missions?.length || 0} missions, duration: ${Date.now() - startTime}ms`);
     
-    // Transform to include computed fields for UI
+    // Transform to include computed fields for UI - LIVE DATA ONLY
     const transformedMissions = (missions || []).map(m => ({
       ...m,
       // UI compatibility fields
-      percentComplete: m.progress_percent || m.percentComplete || 0,
-      assignedAgents: m.assigned_agents || m.assignedAgents || [m.owner_agent].filter(Boolean),
-      currentBlocker: m.current_blocker || m.currentBlocker || null,
-      current_blocker: m.current_blocker || m.currentBlocker || null,
-      henryAuditVerdict: m.henry_audit_verdict || m.henryAuditVerdict || 'pending',
-      henry_audit_verdict: m.henry_audit_verdict || m.henryAuditVerdict || 'pending',
+      percentComplete: m.progress_percent || 0,
+      assignedAgents: m.assigned_agents || [m.owner_agent].filter(Boolean),
+      currentBlocker: m.current_blocker || null,
+      current_blocker: m.current_blocker || null,
+      henryAuditVerdict: m.henry_audit_verdict || 'pending',
+      henry_audit_verdict: m.henry_audit_verdict || 'pending',
       closure_confidence: m.closure_confidence || 0,
     }));
     

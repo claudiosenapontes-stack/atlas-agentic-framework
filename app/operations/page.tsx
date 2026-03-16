@@ -130,7 +130,6 @@ export default function UnifiedOperationsDashboard() {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Operations Center</h1>
@@ -145,7 +144,6 @@ export default function UnifiedOperationsDashboard() {
         </button>
       </div>
 
-      {/* Navigation Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -169,7 +167,6 @@ export default function UnifiedOperationsDashboard() {
         })}
       </div>
 
-      {/* Runtime Health Section */}
       <section>
         <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
           <Activity className="w-4 h-4" />
@@ -247,7 +244,6 @@ export default function UnifiedOperationsDashboard() {
         )}
       </section>
 
-      {/* Task Metrics */}
       <section>
         <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
           <GitBranch className="w-4 h-4" />
@@ -301,7 +297,6 @@ export default function UnifiedOperationsDashboard() {
         </div>
       </section>
 
-      {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-4">
@@ -316,7 +311,7 @@ export default function UnifiedOperationsDashboard() {
                   <Badge className={task.status === "completed" ? "bg-[#16C784]/20 text-[#16C784]" : task.status === "in_progress" ? "bg-[#FF6A00]/20 text-[#FF6A00]" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
                     {task.status}
                   </Badge>
-                </div
+                </div>
               ))}
               {tasks.length === 0 && <p className="text-[#9BA3AF] text-center py-4">No tasks found</p>}
             </div>
@@ -331,7 +326,8 @@ export default function UnifiedOperationsDashboard() {
                 <div key={exec.id} className="flex items-center justify-between py-2 border-b border-[#1F2226] last:border-0">
                   <div>
                     <p className="text-white text-sm">{exec.id.slice(0, 8)}</p>
-                    <p className="text-[#9BA3AF] text-xs">{exec.agent_name || "Unknown"}</p>
+                    <p className="text-[#
+9BA3AF] text-xs">{exec.agent_name || "Unknown"}</p>
                   </div>
                   <Badge className={exec.status === "completed" ? "bg-[#16C784]/20 text-[#16C784]" : exec.status === "failed" ? "bg-[#FF3B30]/20 text-[#FF3B30]" : "bg-[#9BA3AF]/20 text-[#9BA3AF]"}>
                     {exec.status}

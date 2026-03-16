@@ -181,12 +181,6 @@ export default function FleetPage() {
             )}
           </div>
         </div>
-        <nav className="flex items-center gap-1 border-t border-[#1F2226] pt-2">
-          {['Atlas Control','Fleet','Costs','Integrations','Audit','Incident Center'].map((label, i) => {
-            const paths = ['/control','/control/fleet','/control/costs','/control/integrations','/control/audit','/control/incidents'];
-            return <Link key={label} href={paths[i]} className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${label === 'Fleet' ? 'text-white bg-[#1F2226]' : 'text-[#6B7280] hover:text-white hover:bg-[#1F2226]'}`}>{label}</Link>;
-          })}
-        </nav>
       </header>
 
       <main className="p-4 space-y-6">

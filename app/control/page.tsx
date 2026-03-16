@@ -337,17 +337,24 @@ export default function ControlPage() {
           </div>
         </section>
 
-        {/* Audit Center */}
+        {/* Audit Center - Truthful States */}
         <section className="mb-6">
           <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
             <Play className="w-4 h-4" />Audit Center
           </h2>
+          {/* Truth Badge */}
+          <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
+            <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
+            <span className="text-[10px] text-[#3B82F6]">
+              Only Fleet Audit is wired to backend. Other audits are planned but not yet implemented.
+            </span>
+          </div>
           <div className="flex flex-wrap gap-3">
-            <AuditButton label="Fleet Audit" onClick={() => console.log('Fleet audit')} />
-            <AuditButton label="Systems Audit" onClick={() => console.log('Systems audit')} />
-            <AuditButton label="Connections Audit" onClick={() => console.log('Connections audit')} />
-            <AuditButton label="Services Audit" onClick={() => console.log('Services audit')} />
-            <AuditButton label="Database Audit" onClick={() => console.log('Database audit')} />
+            <AuditButton label="Fleet Audit" onClick={runFleetAudit} wired={true} state={fleetAuditState} />
+            <AuditButton label="Systems Audit" onClick={() => {}} wired={false} />
+            <AuditButton label="Connections Audit" onClick={() => {}} wired={false} />
+            <AuditButton label="Services Audit" onClick={() => {}} wired={false} />
+            <AuditButton label="Database Audit" onClick={() => {}} wired={false} />
           </div>
         </section>
 
@@ -383,11 +390,33 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
   );
 }
 
-function AuditButton({ label, onClick }: { label: string; onClick: () => void }) {
+function AuditButton({ label, onClick, wired = false, state }: { label: string; onClick: () => void; wired?: boolean; state?: ButtonState }) {
+  if (!wired) {
+    return (
+      <button disabled className="flex items-center gap-2 px-4 py-2 bg-[#1F2226] border border-[#1F2226] rounded-lg cursor-not-allowed opacity-60">
+        <Play className="w-4 h-4 text-[#6B7280]" />
+        <span className="text-sm text-[#6B7280]">{label}</span>
+        <span className="text-[10px] text-[#6B7280] ml-1">(not wired)</span>
+      </button>
+    );
+  }
+  
   return (
-    <button onClick={onClick} className="flex items-center gap-2 px-4 py-2 bg-[#111214] border border-[#1F2226] rounded-lg hover:bg-[#1F2226] hover:border-[#2a2d31] transition-colors">
-      <Play className="w-4 h-4 text-[#9BA3AF]" />
-      <span className="text-sm text-white">{label}</span>
+    <button 
+      onClick={onClick} 
+      disabled={state?.loading || state?.disabled}
+      className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+        state?.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : 
+        state?.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' :
+        state?.loading ? 'bg-[#3B82F6]/20 border-[#3B82F6]/50 text-[#3B82F6]' :
+        'bg-[#111214] border-[#1F2226] hover:bg-[#1F2226] hover:border-[#2a2d31] text-white'
+      }`}
+    >
+      {state?.loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 
+       state?.success ? <CheckCircle2 className="w-4 h-4" /> : 
+       state?.error ? <AlertCircle className="w-4 h-4" /> :
+       <Play className="w-4 h-4 text-[#9BA3AF]" />}
+      <span className="text-sm">{state?.loading ? 'Running...' : state?.success ? 'Complete' : state?.error ? 'Failed' : label}</span>
     </button>
   );
 }

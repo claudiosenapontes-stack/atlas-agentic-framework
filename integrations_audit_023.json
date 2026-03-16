@@ -1,0 +1,92 @@
+{
+  "timestamp": "2026-03-16T13:04:00Z",
+  "total": 16,
+  "by_classification": {
+    "connected": 7,
+    "auth_expired": 1,
+    "misconfigured": 1,
+    "not_implemented": 7
+  },
+  "integrations": {
+    "OpenClaw Runtime": {
+      "status": "connected",
+      "details": "Gateway responding on :18789/health",
+      "classification": "connected"
+    },
+    "Vercel": {
+      "status": "auth_expired",
+      "details": "CLI not authenticated - requires vercel login or --token",
+      "classification": "auth_expired"
+    },
+    "GitHub": {
+      "status": "connected",
+      "details": "gh auth status: logged in as claudiosenapontes-stack",
+      "classification": "connected"
+    },
+    "Supabase": {
+      "status": "connected",
+      "details": "URL configured, keys present in .env.local",
+      "classification": "connected"
+    },
+    "Brave Search": {
+      "status": "connected",
+      "details": "Available via web_search tool",
+      "classification": "connected"
+    },
+    "Perplexity": {
+      "status": "misconfigured",
+      "details": "Missing PERPLEXITY_API_KEY - web_search (perplexity) needs API key",
+      "classification": "misconfigured"
+    },
+    "Firecrawl/Fireclaw": {
+      "status": "not_implemented",
+      "details": "CLI not installed",
+      "classification": "not_implemented"
+    },
+    "Apify": {
+      "status": "not_implemented",
+      "details": "CLI not installed",
+      "classification": "not_implemented"
+    },
+    "ElevenLabs": {
+      "status": "not_implemented",
+      "details": "sag CLI not found",
+      "classification": "not_implemented"
+    },
+    "Blender": {
+      "status": "connected",
+      "details": "Installed at /usr/bin/blender",
+      "classification": "connected"
+    },
+    "SERP API": {
+      "status": "not_implemented",
+      "details": "No config found",
+      "classification": "not_implemented"
+    },
+    "Gamma": {
+      "status": "not_implemented",
+      "details": "CLI not installed",
+      "classification": "not_implemented"
+    },
+    "ManyChat": {
+      "status": "not_implemented",
+      "details": "CLI not installed",
+      "classification": "not_implemented"
+    },
+    "Meta Campaigns API": {
+      "status": "not_implemented",
+      "details": "No config found",
+      "classification": "not_implemented"
+    },
+    "WhatsApp": {
+      "status": "connected",
+      "details": "Integration available via message tool",
+      "classification": "connected"
+    },
+    "Redis": {
+      "status": "connected",
+      "details": "PONG response from redis-cli",
+      "classification": "connected"
+    }
+  }
+}

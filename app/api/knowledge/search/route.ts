@@ -32,7 +32,7 @@ const VALID_SEARCH_FIELDS = [
 // Valid sort options
 const VALID_SORT_OPTIONS = [
   'relevance',
-  'extracted_at',
+  'created_at',
   'last_ingested_at',
   'title',
   'classification_confidence'
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (filters.source) {
-      query = query.eq('source', filters.source);
+      query = query.eq('source_system', filters.source);
     }
     
     if (filters.status) {
@@ -159,15 +159,15 @@ export async function POST(request: NextRequest) {
     }
     
     if (filters.extracted_after) {
-      query = query.gte('extracted_at', filters.extracted_after);
+      query = query.gte('created_at', filters.extracted_after);
     }
-    
+
     if (filters.extracted_before) {
-      query = query.lte('extracted_at', filters.extracted_before);
+      query = query.lte('created_at', filters.extracted_before);
     }
-    
+
     // Apply sorting
-    const sortColumn = sortBy === 'relevance' ? 'extracted_at' : sortBy;
+    const sortColumn = sortBy === 'relevance' ? 'created_at' : sortBy;
     query = query.order(sortColumn, { ascending: sortOrder === 'asc' });
     
     // Apply pagination

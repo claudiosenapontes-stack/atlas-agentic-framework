@@ -5,10 +5,11 @@
  * POST /api/knowledge
  * Ingest/register a document record
  * 
- * REALIGNED to production schema:
- * - Uses knowledge_registry (not knowledge_documents)
- * - doc_id TEXT primary key (not UUID)
- * - doc_class (not doc_type)
+ * REALIGNED to ACTUAL production schema (from search endpoint verification):
+ * - Uses knowledge_registry 
+ * - id UUID primary key (not doc_id TEXT)
+ * - source_system (not source)
+ * - realm, visibility, owner_agent_id fields present
  * 
  * Requirements:
  * - explicit JSON responses
@@ -20,6 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
 
@@ -35,23 +37,29 @@ const VALID_DOC_CLASSES = [
   'MEET'
 ];
 
-// Valid sources
-const VALID_SOURCES = ['local', 'google_drive', 'github'];
+// Valid source systems
+const VALID_SOURCE_SYSTEMS = ['manual', 'google_drive', 'github', 'upload', 'api'];
+
+// Valid realms
+const VALID_REALMS = ['executive-ops', 'finance', 'sales-marketing', 'tech', 'strategy'];
+
+// Valid visibility
+const VALID_VISIBILITY = ['public', 'internal', 'restricted', 'private'];
 
 interface CreateKnowledgeRequest {
-  doc_id?: string; // Optional, will generate if not provided
   title: string;
   summary: string;
   doc_class: string;
-  source: string;
-  source_path: string;
-  source_url?: string;
+  source_system?: string;
+  source_external_id?: string;
+  canonical_url?: string;
+  realm?: string;
+  owner_agent_id?: string;
+  visibility?: string;
+  company_id?: string;
   keywords?: string[];
   entities?: Record<string, any>;
-  checksum?: string;
-  size_bytes?: number;
-  classification_confidence?: number;
-  extraction_confidence?: number;
+  metadata?: Record<string, any>;
 }
 
 // POST /api/knowledge
@@ -98,58 +106,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!body.source) {
-      return NextResponse.json(
-        { success: false, error: 'source is required', timestamp, source },
-        { status: 400 }
-      );
-    }
-    
-    if (!VALID_SOURCES.includes(body.source)) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `source must be one of: ${VALID_SOURCES.join(', ')}`,
-          timestamp, 
-          source 
-        },
-        { status: 400 }
-      );
-    }
-    
-    if (!body.source_path || body.source_path.trim() === '') {
-      return NextResponse.json(
-        { success: false, error: 'source_path is required', timestamp, source },
-        { status: 400 }
-      );
-    }
-    
     const supabase = getSupabaseAdmin();
-    const docId = body.doc_id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const docId = randomUUID();
     
-    // Build document record for knowledge_registry
+    // Build document record for knowledge_registry (ACTUAL production schema)
     const documentRecord = {
-      doc_id: docId,
+      id: docId,
       title: body.title.trim(),
       summary: body.summary.trim(),
       doc_class: body.doc_class,
-      source: body.source,
-      source_path: body.source_path.trim(),
-      source_url: body.source_url?.trim() || null,
+      source_system: body.source_system || 'manual',
+      source_external_id: body.source_external_id || null,
+      canonical_url: body.canonical_url || null,
+      realm: body.realm || 'executive-ops',
+      owner_agent_id: body.owner_agent_id || 'system',
+      visibility: body.visibility || 'internal',
+      company_id: body.company_id || null,
       keywords: body.keywords || [],
       entities: body.entities || {},
-      checksum: body.checksum || '',
-      size_bytes: body.size_bytes || 0,
-      extracted_at: timestamp,
-      extracted_by: 'api',
-      classification_confidence: body.classification_confidence || 0.5,
-      extraction_confidence: body.extraction_confidence || 0.5,
+      metadata: body.metadata || {},
       status: 'active',
-      last_ingested_at: timestamp,
-      ingest_version: 1
+      created_at: timestamp,
+      updated_at: timestamp,
     };
     
-    // Insert into knowledge_registry table (production schema)
+    // Insert into knowledge_registry table (ACTUAL production schema)
     const { data, error } = await (supabase as any)
       .from('knowledge_registry')
       .insert(documentRecord)
@@ -174,7 +155,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         success: true, 
-        doc_id: docId,
+        id: docId,
         document: data,
         timestamp,
         source 
@@ -208,15 +189,19 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     
-    // Parse query parameters (mapped to production schema)
+    // Parse query parameters (mapped to ACTUAL production schema)
     const doc_class = searchParams.get('doc_class');
-    const source_filter = searchParams.get('source');
+    const source_system = searchParams.get('source_system');
+    const realm = searchParams.get('realm');
     const status = searchParams.get('status') || 'active';
+    const owner_agent_id = searchParams.get('owner_agent_id');
+    const company_id = searchParams.get('company_id');
+    const visibility = searchParams.get('visibility');
     const keywords = searchParams.get('keywords')?.split(',').filter(Boolean);
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
-    const sort_by = searchParams.get('sort_by') || 'extracted_at';
+    const sort_by = searchParams.get('sort_by') || 'created_at';
     const sort_order = searchParams.get('sort_order') || 'desc';
     
     const supabase = getSupabaseAdmin();
@@ -231,12 +216,28 @@ export async function GET(request: NextRequest) {
       query = query.eq('doc_class', doc_class);
     }
     
-    if (source_filter) {
-      query = query.eq('source', source_filter);
+    if (source_system) {
+      query = query.eq('source_system', source_system);
+    }
+    
+    if (realm) {
+      query = query.eq('realm', realm);
     }
     
     if (status) {
       query = query.eq('status', status);
+    }
+    
+    if (owner_agent_id) {
+      query = query.eq('owner_agent_id', owner_agent_id);
+    }
+    
+    if (company_id) {
+      query = query.eq('company_id', company_id);
+    }
+    
+    if (visibility) {
+      query = query.eq('visibility', visibility);
     }
     
     if (keywords && keywords.length > 0) {
@@ -245,8 +246,8 @@ export async function GET(request: NextRequest) {
     }
     
     if (search) {
-      // Full-text search using PostgreSQL
-      query = query.textSearch('title', search);
+      // Use full-text search on search_vector or title/summary
+      query = query.or(`title.ilike.%${search}%,summary.ilike.%${search}%`);
     }
     
     // Apply sorting
@@ -286,8 +287,12 @@ export async function GET(request: NextRequest) {
         },
         filters: {
           doc_class,
-          source: source_filter,
+          source_system,
+          realm,
           status,
+          owner_agent_id,
+          company_id,
+          visibility,
           keywords,
           search
         },

@@ -200,28 +200,27 @@ export async function POST(request: NextRequest) {
       // Insert watchlist item
       let data;
       try {
-        // Build insert data dynamically to match actual schema
-        // Schema: id, rule_id, source, sender, subject, content_preview, ai_summary, 
-        //         priority, status, draft_reply, created_at, updated_at, category, 
-        //         company_id, description, entity_id, entity_type, entity_name, owner_id, reason
+        // Build insert data with ONLY confirmed columns from schema
+        // Confirmed: id, subject, priority, status, created_at, updated_at, category
+        // Optional: company_id, description, entity_id, entity_type, entity_name, owner_id, reason
         const insertData: any = {
           id: watchlistId,
-          subject: title.trim(),  // Table uses 'subject' not 'title'
-          description: description || null,
-          category: category || 'other',
-          entity_type: entity_type || null,
-          entity_id: entity_id || null,
-          entity_name: entity_name || null,
+          subject: title.trim(),
           priority: priority.toLowerCase(),
           status: status.toLowerCase(),
-          owner_id: owner_id || null,
-          company_id: company_id || null,
-          reason: reason || null,
           created_at: timestamp,
           updated_at: timestamp,
-          // Map description to content_preview if needed
-          content_preview: description || null,
+          category: category || 'other',
         };
+        
+        // Only add optional fields if provided
+        if (company_id) insertData.company_id = company_id;
+        if (description) insertData.description = description;
+        if (entity_id) insertData.entity_id = entity_id;
+        if (entity_type) insertData.entity_type = entity_type;
+        if (entity_name) insertData.entity_name = entity_name;
+        if (owner_id) insertData.owner_id = owner_id;
+        if (reason) insertData.reason = reason;
         
         // Only add metadata if provided and table likely supports it
         // Schema cache errors indicate column may not exist

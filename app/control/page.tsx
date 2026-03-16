@@ -3,8 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { Zap, Radio, Activity, AlertCircle, CheckCircle2, Server, Cpu, Database, Globe, Layers, GitBranch, Play, Shield, AlertTriangle, Clock, Users, RefreshCw, ClipboardCheck, ShieldAlert, Pause, Power, RotateCw, Wrench } from 'lucide-react';
-import Link from 'next/link';
+import { LayoutDashboard, Users, Activity, AlertTriangle, Clock, Power, Cpu, RefreshCw, AlertCircle, ClipboardCheck, Pause, Play, RotateCw, Wrench } from 'lucide-react';
 import { UI_SAFE_MODE } from '../config/safe-mode';
 
 interface Agent {
@@ -14,34 +13,7 @@ interface Agent {
   status: string;
   current_task?: string;
   responsiveness?: number;
-  context_window?: number;
-  last_heartbeat?: string;
   stalled?: boolean;
-}
-
-interface SeverinoRuntime {
-  status: 'running' | 'paused' | 'error';
-  scheduler: {
-    enabled: boolean;
-    last_cycle: string | null;
-    next_cycle: string | null;
-    cycle_count: number;
-  };
-  missions: {
-    active: number;
-    completed: number;
-    failed: number;
-    log: MissionEntry[];
-  };
-}
-
-interface MissionEntry {
-  id: string;
-  name: string;
-  status: 'active' | 'completed' | 'failed' | 'blocked';
-  started_at: string;
-  completed_at?: string;
-  blockers?: string[];
 }
 
 interface ButtonState {
@@ -51,170 +23,93 @@ interface ButtonState {
   disabled: boolean;
 }
 
+function StatCard({ icon: Icon, label, value, highlight = false }: { icon: any; label: string; value: string | number; highlight?: boolean }) {
+  return (
+    <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4 text-[#6B7280]" />
+        <span className="text-xs text-[#6B7280]">{label}</span>
+      </div>
+      <p className={`text-2xl font-semibold ${highlight ? 'text-[#FFB020]' : 'text-white'}`}>{value}</p>
+    </div>
+  );
+}
+
+function SectionCard({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
+  return (
+    <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Icon className="w-4 h-4 text-[#6B7280]" />
+        <span className="text-sm font-medium text-white">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, title, description }: { icon: any; title: string; description: string }) {
+  return (
+    <div className="text-center py-8">
+      <Icon className="w-6 h-6 mx-auto mb-2 text-[#6B7280]" />
+      <p className="text-sm text-[#9BA3AF]">{title}</p>
+      <p className="text-xs text-[#6B7280] mt-1">{description}</p>
+    </div>
+  );
+}
+
+function CommandButton({ label, icon: Icon, state, onClick, variant }: { label: string; icon: any; state: ButtonState; onClick: () => void; variant: 'primary' | 'warning' | 'success' | 'danger' }) {
+  const variants = {
+    primary: 'bg-[#3B82F6]/10 border-[#3B82F6]/30 text-[#3B82F6] hover:bg-[#3B82F6]/20',
+    warning: 'bg-[#FFB020]/10 border-[#FFB020]/30 text-[#FFB020] hover:bg-[#FFB020]/20',
+    success: 'bg-[#16C784]/10 border-[#16C784]/30 text-[#16C784] hover:bg-[#16C784]/20',
+    danger: 'bg-[#FF3B30]/10 border-[#FF3B30]/30 text-[#FF3B30] hover:bg-[#FF3B30]/20',
+  };
+  
+  return (
+    <button onClick={onClick} disabled={state.loading || state.disabled} 
+      className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors ${variants[variant]} disabled:opacity-50`}>
+      {state.loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+      {state.success ? 'Done' : state.error ? 'Failed' : state.loading ? '...' : label}
+    </button>
+  );
+}
+
 export default function ControlPage() {
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [dataSource, setDataSource] = useState<'live' | 'unavailable'>('unavailable');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Button states for fleet commands
   const [fleetAuditState, setFleetAuditState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: false });
-  const [pauseAllState, setPauseAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.pauseAll });
-  const [resumeAllState, setResumeAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.resumeAll });
-  const [boostRestartState, setBoostRestartState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: true || UI_SAFE_MODE.DISABLED_FEATURES.boostRestart });
-  
-  // Severino runtime state
-  const [severino, setSeverino] = useState<SeverinoRuntime | null>(null);
-  const [severinoLoading, setSeverinoLoading] = useState(true);
+  const [pauseAllState, setPauseAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: UI_SAFE_MODE.DISABLED_FEATURES.pauseAll });
+  const [resumeAllState, setResumeAllState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: UI_SAFE_MODE.DISABLED_FEATURES.resumeAll });
+  const [boostRestartState, setBoostRestartState] = useState<ButtonState>({ loading: false, success: false, error: false, disabled: UI_SAFE_MODE.DISABLED_FEATURES.boostRestart });
 
-  useEffect(() => {
-    fetchLiveData();
-    fetchSeverinoData();
-    const interval = setInterval(() => {
-      fetchLiveData();
-      fetchSeverinoData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchSeverinoData() {
-    setSeverinoLoading(true);
-    try {
-      const res = await fetch('/api/severino/status', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setSeverino(data);
-      } else {
-        setSeverino(null);
-      }
-    } catch (err) {
-      console.error('[ControlPage] Severino fetch error:', err);
-      setSeverino(null);
-    } finally {
-      setSeverinoLoading(false);
-    }
-  }
+  useEffect(() => { fetchLiveData(); const i = setInterval(fetchLiveData, 30000); return () => clearInterval(i); }, []);
 
   async function fetchLiveData() {
     setAgentsLoading(true);
     try {
-      const agentsRes = await fetch('/api/agents/live', { cache: 'no-store' });
-      if (agentsRes.ok) {
-        const agentsData = await agentsRes.json();
-        setAgents(agentsData.agents || []);
+      const res = await fetch('/api/agents/live', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setAgents(data.agents || []);
         setDataSource('live');
         setLastUpdated(new Date());
-        const hasAgents = (agentsData.agents || []).length > 0;
-        setPauseAllState(prev => ({ ...prev, disabled: !hasAgents || UI_SAFE_MODE.DISABLED_FEATURES.pauseAll }));
-        setResumeAllState(prev => ({ ...prev, disabled: !hasAgents || UI_SAFE_MODE.DISABLED_FEATURES.resumeAll }));
-        setBoostRestartState(prev => ({ ...prev, disabled: !hasAgents || UI_SAFE_MODE.DISABLED_FEATURES.boostRestart }));
       } else {
-        setAgents([]);
         setDataSource('unavailable');
       }
-    } catch (err) {
-      console.error('[ControlPage] Error:', err);
-      setDataSource('unavailable');
-    } finally {
-      setAgentsLoading(false);
-    }
+    } catch { setDataSource('unavailable'); }
+    finally { setAgentsLoading(false); }
   }
 
   async function runFleetAudit() {
-    setFleetAuditState({ loading: true, success: false, error: false, disabled: true });
+    setFleetAuditState({ ...fleetAuditState, loading: true, disabled: true });
     try {
       const res = await fetch('/api/audit/fleet', { method: 'POST' });
-      if (res.ok) {
-        setFleetAuditState({ loading: false, success: true, error: false, disabled: false });
-        setTimeout(() => setFleetAuditState(prev => ({ ...prev, success: false })), 3000);
-        fetchLiveData();
-      } else {
-        setFleetAuditState({ loading: false, success: false, error: true, disabled: false });
-        setTimeout(() => setFleetAuditState(prev => ({ ...prev, error: false })), 3000);
-      }
-    } catch {
-      setFleetAuditState({ loading: false, success: false, error: true, disabled: false });
-      setTimeout(() => setFleetAuditState(prev => ({ ...prev, error: false })), 3000);
-    }
-  }
-
-  async function pauseAllAgents() {
-    if (UI_SAFE_MODE.DISABLED_FEATURES.pauseAll) {
-      setPauseAllState({ loading: false, success: false, error: true, disabled: true });
-      setTimeout(() => setPauseAllState(prev => ({ ...prev, error: false })), 3000);
-      return;
-    }
-    setPauseAllState({ loading: true, success: false, error: false, disabled: true });
-    try {
-      const res = await fetch('/api/agents/pause-all', { method: 'POST' });
-      if (res.ok) {
-        setPauseAllState({ loading: false, success: true, error: false, disabled: false });
-        setTimeout(() => setPauseAllState(prev => ({ ...prev, success: false })), 3000);
-        fetchLiveData();
-      } else {
-        setPauseAllState({ loading: false, success: false, error: true, disabled: false });
-        setTimeout(() => setPauseAllState(prev => ({ ...prev, error: false })), 3000);
-      }
-    } catch {
-      setPauseAllState({ loading: false, success: false, error: true, disabled: false });
-      setTimeout(() => setPauseAllState(prev => ({ ...prev, error: false })), 3000);
-    }
-  }
-
-  async function resumeAllAgents() {
-    if (UI_SAFE_MODE.DISABLED_FEATURES.resumeAll) {
-      setResumeAllState({ loading: false, success: false, error: true, disabled: true });
-      setTimeout(() => setResumeAllState(prev => ({ ...prev, error: false })), 3000);
-      return;
-    }
-    setResumeAllState({ loading: true, success: false, error: false, disabled: true });
-    try {
-      const res = await fetch('/api/agents/resume-all', { method: 'POST' });
-      if (res.ok) {
-        setResumeAllState({ loading: false, success: true, error: false, disabled: false });
-        setTimeout(() => setResumeAllState(prev => ({ ...prev, success: false })), 3000);
-        fetchLiveData();
-      } else {
-        setResumeAllState({ loading: false, success: false, error: true, disabled: false });
-        setTimeout(() => setResumeAllState(prev => ({ ...prev, error: false })), 3000);
-      }
-    } catch {
-      setResumeAllState({ loading: false, success: false, error: true, disabled: false });
-      setTimeout(() => setResumeAllState(prev => ({ ...prev, error: false })), 3000);
-    }
-  }
-
-  async function boostRestartAllStuck() {
-    if (UI_SAFE_MODE.DISABLED_FEATURES.boostRestart) {
-      setBoostRestartState({ loading: false, success: false, error: true, disabled: true });
-      setTimeout(() => setBoostRestartState(prev => ({ ...prev, error: false })), 3000);
-      return;
-    }
-    setBoostRestartState({ loading: true, success: false, error: false, disabled: true });
-    try {
-      // ATLAS-PRIME-BOOST-RESTART-UI-TRUTH-FIX-001: Fixed endpoint
-      // Was: /api/agents/boost-restart-stuck (404 - does not exist)
-      // Now: /api/fleet/commands with action payload
-      const res = await fetch('/api/fleet/commands', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'boost-restart-stuck', initiated_by: 'operator' })
-      });
-      if (res.ok) {
-        setBoostRestartState({ loading: false, success: true, error: false, disabled: false });
-        setTimeout(() => setBoostRestartState(prev => ({ ...prev, success: false })), 3000);
-        fetchLiveData();
-      } else {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('[ControlPage] Boost restart failed:', errorData);
-        setBoostRestartState({ loading: false, success: false, error: true, disabled: false });
-        setTimeout(() => setBoostRestartState(prev => ({ ...prev, error: false })), 3000);
-      }
-    } catch (error) {
-      console.error('[ControlPage] Boost restart error:', error);
-      setBoostRestartState({ loading: false, success: false, error: true, disabled: false });
-      setTimeout(() => setBoostRestartState(prev => ({ ...prev, error: false })), 3000);
-    }
+      setFleetAuditState({ loading: false, success: res.ok, error: !res.ok, disabled: false });
+      if (res.ok) fetchLiveData();
+    } catch { setFleetAuditState({ loading: false, success: false, error: true, disabled: false }); }
   }
 
   const formatLastUpdated = () => {
@@ -225,360 +120,124 @@ export default function ControlPage() {
     return `${Math.floor(diff / 3600000)}h ago`;
   };
 
-  const isDataStale = lastUpdated ? (Date.now() - lastUpdated.getTime()) > 600000 : true;
   const onlineCount = agents.filter(a => a.status === 'online').length;
+  const stalledCount = agents.filter(a => a.stalled).length;
 
   return (
-    <div className="min-h-screen bg-[#0B0B0C] text-white">
-      <header className="border-b border-[#1F2226] bg-[#111214] px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
+    <div className="min-h-screen bg-[#0B0B0C]">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        {/* Header - Knowledge Pattern */}
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#FF6A00] flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-[#FF6A00]/20 to-[#FF3B30]/10 border border-[#FF6A00]/30 flex items-center justify-center">
+              <LayoutDashboard className="w-5 h-5 text-[#FF6A00]" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-white">Atlas OS Control</h1>
-              <p className="text-[10px] text-[#6B7280]">System Integrity Dashboard</p>
+              <h1 className="text-xl font-semibold text-white">Control Center</h1>
+              <p className="text-sm text-[#6B7280]">Fleet management & system integrity</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {dataSource === 'live' ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#16C784]/10 border border-[#16C784]/30">
-                <Radio className="w-4 h-4 text-[#16C784] animate-pulse" />
-                <span className="text-xs text-[#16C784]">SYSTEM OPERATIONAL</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#6B7280]/10 border border-[#6B7280]/30">
-                <AlertCircle className="w-4 h-4 text-[#6B7280]" />
-                <span className="text-xs text-[#6B7280]">NO LIVE DATA</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Safe Mode Banner */}
-      {UI_SAFE_MODE.ACTIVE && (
-        <div className="bg-[#FFB020]/10 border-y border-[#FFB020]/30 px-4 py-2">
-          <div className="flex items-center justify-center gap-2">
-            <Wrench className="w-4 h-4 text-[#FFB020]" />
-            <span className="text-sm font-medium text-[#FFB020]">{UI_SAFE_MODE.BANNER_TEXT}</span>
-          </div>
-        </div>
-      )}
-
-      <main className="p-4">
-        {/* Data Status Bar */}
-        <div className="flex items-center justify-between mb-4 p-2 bg-[#111214] rounded-lg border border-[#1F2226]">
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${dataSource === 'live' ? 'bg-[#16C784]' : 'bg-[#6B7280]'}`} />
-            <span className="text-xs text-[#9BA3AF]">{dataSource === 'live' ? 'Live data' : 'No live data connection'}</span>
-            {lastUpdated && <span className={`text-xs ${isDataStale ? 'text-[#FFB020]' : 'text-[#6B7280]'}`}>• Last updated: {formatLastUpdated()}</span>}
-          </div>
-          <button onClick={fetchLiveData} className="flex items-center gap-1 px-2 py-1 text-xs text-[#9BA3AF] hover:text-white transition-colors">
-            <RefreshCw className={`w-3 h-3 ${agentsLoading ? 'animate-spin' : ''}`} />Refresh
-          </button>
+          <span className={`px-2 py-1 border rounded text-xs ${dataSource === 'live' ? 'bg-[#16C784]/10 border-[#16C784]/30 text-[#16C784]' : 'bg-[#6B7280]/10 border-[#6B7280]/30 text-[#6B7280]'}`}>
+            {dataSource === 'live' ? 'Live' : 'Not Connected'}
+          </span>
         </div>
 
-        {/* Fleet Command Bar */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Power className="w-4 h-4" />Fleet Commands
-          </h2>
-          {/* TRUTH BADGE */}
-          <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
-            <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
-            <span className="text-[10px] text-[#3B82F6]">
-              Boost restart resets execution status only. No per-agent protocol implemented.
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <FleetCommandButton label="Run Fleet Audit" icon={<ClipboardCheck className="w-4 h-4" />} state={fleetAuditState} onClick={runFleetAudit} variant="primary" />
-            <FleetCommandButton label="Pause All Agents" icon={<Pause className="w-4 h-4" />} state={pauseAllState} onClick={pauseAllAgents} variant="warning" />
-            <FleetCommandButton label="Resume All Agents" icon={<Play className="w-4 h-4" />} state={resumeAllState} onClick={resumeAllAgents} variant="success" />
-            <FleetCommandButton label="Boost Restart All Stuck" icon={<RotateCw className="w-4 h-4" />} state={boostRestartState} onClick={boostRestartAllStuck} variant="danger" />
-          </div>
-        </section>
+        {/* Stats - Knowledge Pattern */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard icon={Users} label="Fleet Online" value={agentsLoading ? '-' : `${onlineCount}/${agents.length}`} />
+          <StatCard icon={Activity} label="Active Agents" value={agentsLoading ? '-' : onlineCount} />
+          <StatCard icon={AlertTriangle} label="Stalled" value={agentsLoading ? '-' : stalledCount} highlight={stalledCount > 0} />
+          <StatCard icon={Clock} label="Last Update" value={formatLastUpdated()} />
+        </div>
 
-        {/* Severino Runtime Status */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4" />Severino Runtime
-          </h2>
-          {severinoLoading ? (
-            <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4">
-              <div className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-[#6B7280] animate-spin" />
-                <span className="text-sm text-[#9BA3AF]">Loading runtime status...</span>
-              </div>
+        {UI_SAFE_MODE.ACTIVE && (
+          <div className="mb-6 p-3 bg-[#FFB020]/10 border border-[#FFB020]/30 rounded-[10px]">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-[#FFB020]" />
+              <span className="text-sm text-[#FFB020]">{UI_SAFE_MODE.BANNER_TEXT}</span>
             </div>
-          ) : severino ? (
-            <div className="space-y-3">
-              {/* Scheduler Status */}
-              <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${severino.status === 'running' ? 'bg-[#16C784] animate-pulse' : severino.status === 'paused' ? 'bg-[#FFB020]' : 'bg-[#FF3B30]'}`} />
-                    <span className="text-sm font-medium text-white">Scheduler {severino.status}</span>
-                  </div>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${severino.scheduler.enabled ? 'bg-[#16C784]/20 text-[#16C784]' : 'bg-[#6B7280]/20 text-[#6B7280]'}`}>
-                    {severino.scheduler.enabled ? 'ENABLED' : 'DISABLED'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <span className="text-[#6B7280]">Last Cycle:</span>
-                    <span className="text-[#9BA3AF] ml-2">{severino.scheduler.last_cycle ? new Date(severino.scheduler.last_cycle).toLocaleTimeString() : 'Never'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#6B7280]">Next Cycle:</span>
-                    <span className="text-[#9BA3AF] ml-2">{severino.scheduler.next_cycle ? new Date(severino.scheduler.next_cycle).toLocaleTimeString() : '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#6B7280]">Total Cycles:</span>
-                    <span className="text-white ml-2 font-mono">{severino.scheduler.cycle_count}</span>
-                  </div>
-                </div>
-              </div>
+          </div>
+        )}
 
-              {/* Mission Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
-                  <div className="text-lg font-bold text-[#3B82F6]">{severino.missions.active}</div>
-                  <div className="text-[10px] text-[#6B7280]">Active Missions</div>
-                </div>
-                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
-                  <div className="text-lg font-bold text-[#16C784]">{severino.missions.completed}</div>
-                  <div className="text-[10px] text-[#6B7280]">Completed</div>
-                </div>
-                <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-3 text-center">
-                  <div className="text-lg font-bold text-[#FF3B30]">{severino.missions.failed}</div>
-                  <div className="text-[10px] text-[#6B7280]">Failed</div>
-                </div>
+        {/* Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <SectionCard title="Fleet Commands" icon={Power}>
+              <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
+                <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
+                <span className="text-[10px] text-[#3B82F6]">Boost restart resets execution status only. No per-agent protocol implemented.</span>
               </div>
+              <div className="flex flex-wrap gap-3">
+                <CommandButton label="Run Fleet Audit" icon={ClipboardCheck} state={fleetAuditState} onClick={runFleetAudit} variant="primary" />
+                <CommandButton label="Pause All" icon={Pause} state={pauseAllState} onClick={() => {}} variant="warning" />
+                <CommandButton label="Resume All" icon={Play} state={resumeAllState} onClick={() => {}} variant="success" />
+                <CommandButton label="Boost Restart" icon={RotateCw} state={boostRestartState} onClick={() => {}} variant="danger" />
+              </div>
+            </SectionCard>
 
-              {/* Mission Log */}
-              {severino.missions.log.length > 0 && (
-                <div className="bg-[#111214] rounded-lg border border-[#1F2226] overflow-hidden">
-                  <div className="px-4 py-2 border-b border-[#1F2226]">
-                    <span className="text-xs font-medium text-[#9BA3AF]">Recent Mission Log</span>
-                  </div>
-                  <div className="divide-y divide-[#1F2226]">
-                    {severino.missions.log.slice(0, 5).map((mission) => (
-                      <div key={mission.id} className="px-4 py-2 flex items-center justify-between">
-                        <div>
-                          <span className="text-sm text-white">{mission.name}</span>
-                          {mission.blockers && mission.blockers.length > 0 && (
-                            <span className="text-xs text-[#FF3B30] ml-2">({mission.blockers.length} blockers)</span>
-                          )}
-                        </div>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          mission.status === 'completed' ? 'bg-[#16C784]/20 text-[#16C784]' :
-                          mission.status === 'failed' ? 'bg-[#FF3B30]/20 text-[#FF3B30]' :
-                          mission.status === 'blocked' ? 'bg-[#FFB020]/20 text-[#FFB020]' :
-                          'bg-[#3B82F6]/20 text-[#3B82F6]'
-                        }`}>
-                          {mission.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            <SectionCard title="Agent Runtime" icon={Cpu}>
+              {agentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-5 h-5 text-[#6B7280] animate-spin" />
+                </div>
+              ) : agents.length === 0 ? (
+                <EmptyState icon={AlertCircle} title="No agents connected" description="Agent telemetry not yet instrumented" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[#1F2226]">
+                        <th className="text-left py-2 text-xs text-[#6B7280] font-medium">Agent</th>
+                        <th className="text-left py-2 text-xs text-[#6B7280] font-medium">Status</th>
+                        <th className="text-left py-2 text-xs text-[#6B7280] font-medium">Task</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1F2226]">
+                      {agents.slice(0, 5).map((agent) => (
+                        <tr key={agent.id}>
+                          <td className="py-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-[#16C784]' : 'bg-[#FF3B30]'}`} />
+                              <span className="text-sm text-white">{agent.display_name || agent.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 text-xs text-[#6B7280]">{agent.status}</td>
+                          <td className="py-2 text-xs text-[#6B7280] truncate max-w-[150px]">{agent.current_task || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-4 text-center">
-              <AlertCircle className="w-5 h-5 mx-auto mb-2 text-[#6B7280]" />
-              <p className="text-sm text-[#9BA3AF]">Severino runtime not connected</p>
-              <p className="text-xs text-[#6B7280] mt-1">Scheduler telemetry unavailable</p>
-            </div>
-          )}
-        </section>
-
-        {/* System Summary */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Server className="w-4 h-4" />System Summary
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Fleet Online" value={dataSource === 'live' ? `${onlineCount}/${agents.length}` : 'No data'} color={dataSource === 'live' ? 'green' : 'neutral'} />
-            <StatCard label="Active Agents" value={dataSource === 'live' ? onlineCount : '--'} color={dataSource === 'live' ? 'green' : 'neutral'} />
-            <StatCard label="Stalled Agents" value={dataSource === 'live' ? agents.filter(a => a.stalled).length : '--'} color={agents.filter(a => a.stalled).length > 0 ? 'amber' : 'green'} />
-            <StatCard label="Data Status" value={dataSource === 'live' ? 'LIVE' : 'UNAVAILABLE'} color={dataSource === 'live' ? 'green' : 'neutral'} />
+            </SectionCard>
           </div>
-        </section>
 
-        {/* Agent Runtime Overview */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Cpu className="w-4 h-4" />Agent Runtime Overview
-          </h2>
-          <div className="bg-[#111214] rounded-lg border border-[#1F2226] overflow-hidden">
-            {agentsLoading ? (
-              <div className="p-8 text-center">
-                <RefreshCw className="w-6 h-6 mx-auto mb-2 text-[#6B7280] animate-spin" />
-                <p className="text-sm text-[#6B7280]">Loading agent data...</p>
+          <div className="space-y-6">
+            <SectionCard title="System Health" icon={Activity}>
+              <EmptyState icon={AlertCircle} title="Health telemetry not yet instrumented" description="Awaiting integration with monitoring backend" />
+            </SectionCard>
+
+            <SectionCard title="Audit Center" icon={ClipboardCheck}>
+              <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
+                <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
+                <span className="text-[10px] text-[#3B82F6]">Only Fleet Audit is wired to backend.</span>
               </div>
-            ) : dataSource === 'unavailable' || agents.length === 0 ? (
-              <div className="p-8 text-center">
-                <AlertCircle className="w-6 h-6 mx-auto mb-2 text-[#6B7280]" />
-                <p className="text-sm text-[#9BA3AF]">No live agent data available</p>
-                <p className="text-xs text-[#6B7280] mt-1">Agent telemetry not yet instrumented</p>
+              <button onClick={runFleetAudit} disabled={fleetAuditState.loading} className="w-full py-2 bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-lg text-sm text-[#3B82F6] hover:bg-[#3B82F6]/20 transition-colors disabled:opacity-50">
+                {fleetAuditState.loading ? 'Running...' : 'Run Fleet Audit'}
+              </button>
+            </SectionCard>
+
+            <SectionCard title="Incident Center" icon={AlertTriangle}>
+              <div className="text-center py-4">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-full bg-[#16C784]/10 flex items-center justify-center">
+                  <span className="text-[#16C784]">✓</span>
+                </div>
+                <p className="text-sm text-[#9BA3AF]">No active incidents</p>
               </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-[#0B0B0C]">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Agent</th>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Status</th>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Current Task</th>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Resp</th>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Context</th>
-                    <th className="px-4 py-2 text-left text-[10px] font-medium text-[#6B7280] uppercase">Heartbeat</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1F2226]">
-                  {agents.map((agent) => (
-                    <tr key={agent.id} className={agent.stalled ? 'bg-red-500/5' : ''}>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${agent.status === 'online' ? 'bg-green-400' : agent.status === 'degraded' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                          <span className="text-sm text-white">{agent.display_name || agent.name
-}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className={`text-xs ${agent.status === 'online' ? 'text-green-400' : agent.status === 'degraded' ? 'text-amber-400' : 'text-red-400'}`}>{agent.status}</span>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-[#9BA3AF]">{agent.current_task || 'No active task'}</td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-12 h-1 bg-[#1F2226] rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-400" style={{ width: `${agent.responsiveness || 0}%` }} />
-                          </div>
-                          <span className="text-xs text-[#6B7280]">{agent.responsiveness || 0}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className={`text-xs ${(agent.context_window || 0) > 80 ? 'text-red-400' : (agent.context_window || 0) > 60 ? 'text-amber-400' : 'text-green-400'}`}>{agent.context_window || 0}%</span>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-[#6B7280]">{agent.last_heartbeat || 'Unknown'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            </SectionCard>
           </div>
-        </section>
-
-        {/* System Health - Truthful Empty State */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Shield className="w-4 h-4" />System Health
-          </h2>
-          <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-8 text-center">
-            <AlertCircle className="w-6 h-6 mx-auto mb-2 text-[#6B7280]" />
-            <p className="text-sm text-[#9BA3AF]">Health telemetry not yet instrumented</p>
-            <p className="text-xs text-[#6B7280] mt-1">Awaiting integration with monitoring backend</p>
-          </div>
-        </section>
-
-        {/* Audit Center - Truthful States */}
-        <section className="mb-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Play className="w-4 h-4" />Audit Center
-          </h2>
-          {/* Truth Badge */}
-          <div className="mb-3 p-2 bg-[#3B82F6]/5 rounded border border-[#3B82F6]/20 flex items-center gap-2">
-            <AlertCircle className="w-3 h-3 text-[#3B82F6]" />
-            <span className="text-[10px] text-[#3B82F6]">
-              Only Fleet Audit is wired to backend. Other audits are planned but not yet implemented.
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <AuditButton label="Fleet Audit" onClick={runFleetAudit} wired={true} state={fleetAuditState} />
-            <AuditButton label="Systems Audit" onClick={() => {}} wired={false} />
-            <AuditButton label="Connections Audit" onClick={() => {}} wired={false} />
-            <AuditButton label="Services Audit" onClick={() => {}} wired={false} />
-            <AuditButton label="Database Audit" onClick={() => {}} wired={false} />
-          </div>
-        </section>
-
-        {/* Incident Center */}
-        <section className="mt-6">
-          <h2 className="text-xs font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />Incident Center
-          </h2>
-          <div className="bg-[#111214] rounded-lg border border-[#1F2226] p-8 text-center">
-            <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-[#16C784]" />
-            <p className="text-sm text-[#9BA3AF]">No active incidents</p>
-            <p className="text-xs text-[#6B7280] mt-1">Incident tracking awaiting integration</p>
-          </div>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
-  const colors: Record<string, string> = {
-    green: 'bg-green-500/10 border-green-500/30 text-green-400',
-    amber: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-    red: 'bg-red-500/10 border-red-500/30 text-red-400',
-    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    neutral: 'bg-[#6B7280]/10 border-[#6B7280]/30 text-[#6B7280]'
-  };
-  return (
-    <div className={`px-3 py-2 rounded-lg border ${colors[color]}`}>
-      <div className="text-lg font-bold">{value}</div>
-      <div className="text-[10px] opacity-70">{label}</div>
-    </div>
-  );
-}
-
-function AuditButton({ label, onClick, wired = false, state }: { label: string; onClick: () => void; wired?: boolean; state?: ButtonState }) {
-  if (!wired) {
-    return (
-      <button disabled className="flex items-center gap-2 px-4 py-2 bg-[#1F2226] border border-[#1F2226] rounded-lg cursor-not-allowed opacity-60">
-        <Play className="w-4 h-4 text-[#6B7280]" />
-        <span className="text-sm text-[#6B7280]">{label}</span>
-        <span className="text-[10px] text-[#6B7280] ml-1">(not wired)</span>
-      </button>
-    );
-  }
-  
-  return (
-    <button 
-      onClick={onClick} 
-      disabled={state?.loading || state?.disabled}
-      className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
-        state?.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : 
-        state?.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' :
-        state?.loading ? 'bg-[#3B82F6]/20 border-[#3B82F6]/50 text-[#3B82F6]' :
-        'bg-[#111214] border-[#1F2226] hover:bg-[#1F2226] hover:border-[#2a2d31] text-white'
-      }`}
-    >
-      {state?.loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 
-       state?.success ? <CheckCircle2 className="w-4 h-4" /> : 
-       state?.error ? <AlertCircle className="w-4 h-4" /> :
-       <Play className="w-4 h-4 text-[#9BA3AF]" />}
-      <span className="text-sm">{state?.loading ? 'Running...' : state?.success ? 'Complete' : state?.error ? 'Failed' : label}</span>
-    </button>
-  );
-}
-
-function FleetCommandButton({ label, icon, variant, onClick, state }: { label: string; icon: React.ReactNode; variant: 'primary' | 'warning' | 'success' | 'danger'; onClick: () => void; state: ButtonState }) {
-  const variants = {
-    primary: state.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : state.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' : state.loading ? 'bg-[#3B82F6]/20 border-[#3B82F6]/50 text-[#3B82F6]' : state.disabled ? 'bg-[#1F2226] border-[#1F2226] text-[#6B7280] cursor-not-allowed' : 'bg-[#3B82F6]/10 border-[#3B82F6]/30 text-[#3B82F6] hover:bg-[#3B82F6]/20',
-    warning: state.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : state.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' : state.loading ? 'bg-[#FFB020]/20 border-[#FFB020]/50 text-[#FFB020]' : state.disabled ? 'bg-[#1F2226] border-[#1F2226] text-[#6B7280] cursor-not-allowed' : 'bg-[#FFB020]/10 border-[#FFB020]/30 text-[#FFB020] hover:bg-[#FFB020]/20',
-    success: state.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : state.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' : state.loading ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : state.disabled ? 'bg-[#1F2226] border-[#1F2226] text-[#6B7280] cursor-not-allowed' : 'bg-[#16C784]/10 border-[#16C784]/30 text-[#16C784] hover:bg-[#16C784]/20',
-    danger: state.success ? 'bg-[#16C784]/20 border-[#16C784]/50 text-[#16C784]' : state.error ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' : state.loading ? 'bg-[#FF3B30]/20 border-[#FF3B30]/50 text-[#FF3B30]' : state.disabled ? 'bg-[#1F2226] border-[#1F2226] text-[#6B7280] cursor-not-allowed' : 'bg-[#FF3B30]/10 border-[#FF3B30]/30 text-[#FF3B30] hover:bg-[#FF3B30]/20',
-  };
-
-  return (
-    <button onClick={onClick} disabled={state.loading || state.disabled} className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${variants[variant]}`}>
-      {state.loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : state.success ? <CheckCircle2 className="w-4 h-4" /> : state.error ? <AlertCircle className="w-4 h-4" /> : icon}
-      <span className="text-sm font-medium">{state.success ? 'Done' : state.error ? 'Failed' : state.loading ? 'Running...' : label}</span>
-    </button>
   );
 }

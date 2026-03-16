@@ -1,9 +1,9 @@
 /**
- * ATLAS-DECISIONS API
+ * ATLAS-NOTIFICATIONS API
  * ATLAS-PRIME-EO-APP-ROUTE-RECONCILIATION-134
  * 
- * GET /api/decisions
- * Returns pending decisions for executive review
+ * GET /api/notifications
+ * Returns notifications for the current user
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,7 +11,13 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // Return empty array - decisions table may not exist
+  const timestamp = new Date().toISOString();
+  
+  // Return empty notifications array
   // This prevents frontend blocking while maintaining API contract
-  return NextResponse.json([]);
+  return NextResponse.json({
+    notifications: [],
+    unreadCount: 0,
+    timestamp,
+  });
 }

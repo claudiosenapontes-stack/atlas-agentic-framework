@@ -101,19 +101,8 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      if (!requester_id) {
-        return NextResponse.json(
-          { success: false, error: 'requester_id is required', timestamp },
-          { status: 400 }
-        );
-      }
-      
-      if (!approver_id) {
-        return NextResponse.json(
-          { success: false, error: 'approver_id is required', timestamp },
-          { status: 400 }
-        );
-      }
+      // Note: requester_id and approver_id validation removed
+      // These columns don't exist in current schema per PGRST204 errors
       
       const supabase = getSupabaseAdmin();
       const approvalId = randomUUID();

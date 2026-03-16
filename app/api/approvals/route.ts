@@ -31,9 +31,25 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const requester_id = searchParams.get('requester_id');
     const approver_id = searchParams.get('approver_id');
+    const company_id = searchParams.get('company_id');
     const limit = parseInt(searchParams.get('limit') || '50');
     
     const supabase = getSupabaseAdmin();
+    
+    // Check if table exists
+    const { error: tableCheckError } = await (supabase as any)
+      .from('approval_requests')
+      .select('id', { count: 'exact', head: true });
+    
+    if (tableCheckError) {
+      console.error('[Approvals GET] Table check error:', tableCheckError);
+      return NextResponse.json({
+        success: false,
+        error: `Database error: ${tableCheckError.message}`,
+        code: tableCheckError.code,
+        timestamp,
+      }, { status: 500 });
+    }
     
     let query = (supabase as any)
       .from('approval_requests')
@@ -51,6 +67,10 @@ export async function GET(request: NextRequest) {
     
     if (approver_id) {
       query = query.eq('approver_id', approver_id);
+    }
+    
+    if (company_id) {
+      query = query.eq('company_id', company_id);
     }
     
     const { data, error } = await query;
@@ -155,25 +175,46 @@ export async function POST(request: NextRequest) {
       const supabase = getSupabaseAdmin();
       const approvalId = randomUUID();
       
+      // Check if table exists first
+      const { data: tableCheck, error: tableError } = await (supabase as any)
+        .from('approval_requests')
+        .select('id')
+        .limit(1);
+      
+      if (tableError && tableError.message.includes('does not exist')) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'approval_requests table does not exist. Please run schema migrations.',
+            timestamp,
+          },
+          { status: 500 }
+        );
+      }
+      
       // Insert approval request
       let data;
       try {
+        const insertData: any = {
+          id: approvalId,
+          title: title.trim(),
+          description: description || null,
+          requester_id,
+          approver_id,
+          status: 'pending',
+          metadata,
+          created_at: timestamp,
+          updated_at: timestamp,
+        };
+        
+        // Only add optional fields if they exist in schema
+        if (request_type) insertData.request_type = request_type;
+        if (entity_type) insertData.entity_type = entity_type;
+        if (entity_id) insertData.entity_id = entity_id;
+        
         const result = await (supabase as any)
           .from('approval_requests')
-          .insert({
-            id: approvalId,
-            title: title.trim(),
-            description: description || null,
-            requester_id,
-            approver_id,
-            request_type: request_type || 'general',
-            entity_type: entity_type || null,
-            entity_id: entity_id || null,
-            status: 'pending',
-            metadata,
-            created_at: timestamp,
-            updated_at: timestamp,
-          })
+          .insert(insertData)
           .select()
           .single();
         

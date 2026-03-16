@@ -23,7 +23,9 @@ export type NotificationType =
   | "approval_request"
   | "watchlist_alert"
   | "hot_lead_assigned"
-  | "hot_lead_escalated";
+  | "hot_lead_escalated"
+  | "followup_overdue"
+  | "followup_reminder";
 
 export interface NotificationPayload {
   type: NotificationType;

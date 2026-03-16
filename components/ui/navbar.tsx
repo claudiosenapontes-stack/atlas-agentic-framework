@@ -11,8 +11,9 @@ const navLinks = [
   { href: "/finance", label: "Finance", icon: DollarSign },
   { href: "/sales-marketing", label: "Sales & Marketing", icon: Target },
   { href: "/knowledge", label: "Knowledge", icon: Brain },
-  { href: "/events", label: "Events", icon: Users },
 ];
+
+// Note: Events merged into Executive Ops Calendar (2026-03-16)
 
 // Note: Tasks is a sub-surface within Operations realm at /operations/tasks
 // Legacy /tasks route preserved for direct access but not promoted in nav

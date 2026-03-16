@@ -92,7 +92,7 @@ export default function AgentSkillsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[#0B0B0C] p-6">
-        <div className="max-w-6xl mx-auto">
+        <div>
           <div className="bg-[#FF3B30]/10 border border-[#FF3B30]/30 rounded-lg p-4 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-[#FF3B30]" />
             <div>
@@ -148,7 +148,7 @@ export default function AgentSkillsPage() {
 
       {/* Content */}
       <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="space-y-6">
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">

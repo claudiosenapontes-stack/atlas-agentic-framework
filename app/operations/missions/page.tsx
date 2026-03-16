@@ -110,16 +110,24 @@ export default function MissionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)} className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white">
+      <div className="flex flex-wrap gap-4 mb-6">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white">
           <option value="all">All Status</option>
           {Object.entries(STATUS_CONFIG).map(([key, config]) => (
             <option key={key} value={key}>{config.label}</option>
           ))}
         </select>
+        <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)} className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white">
+          <option value="all">All Phases</option>
+          {phases.map(phase => <option key={phase} value={phase}>{phase}</option>)}
+        </select>
+        <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white">
+          <option value="all">All Owners</option>
+          {owners.map(owner => <option key={owner} value={owner}>{owner}</option>)}
+        </select>
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#6B7280]" />
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white" />
+          <input type="text" placeholder="Search by ID, title..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white" />
         </div>
       </div>
 
@@ -127,6 +135,12 @@ export default function MissionsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {loading ? (
           <div className="col-span-full text-center py-12"><RefreshCw className="w-6 h-6 text-[#6B7280] animate-spin mx-auto" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="col-span-full text-center py-16">
+            <Rocket className="w-12 h-12 mx-auto mb-4 text-[#6B7280]" />
+            <h3 className="text-lg font-medium text-white mb-2">No missions found</h3>
+            <p className="text-sm text-[#9BA3AF]">{missions.length === 0 ? "No live mission data available. Create a mission to see it here." : "No missions match your filters."}</p>
+          </div>
         ) : filtered.map((mission) => {
           const config = STATUS_CONFIG[mission.status] || STATUS_CONFIG.requested;
           const blocked = mission.status === 'blocked' || mission.current_blocker || mission.currentBlocker;
@@ -197,7 +211,7 @@ export default function MissionsPage() {
                     henry === 'needs_work' ? 'bg-[#FF3B30]/10 text-[#FF3B30]' : 
                     'bg-[#FFB020]/10 text-[#FFB020]'
                   }`}>
-                    Henry: {henry}
+                    Henry: {henry === 'pending' ? 'reviewing' : henry}
                   </span>
                 </div>
               </div>

@@ -233,7 +233,7 @@ export default function MissionDetailPage() {
                   henryVerdict === 'needs_work' ? 'text-[#FF3B30]' :
                   'text-[#FFB020]'
                 }`}>
-                  {henryVerdict.toUpperCase()}
+                  {henryVerdict === 'pending' ? 'REVIEWING' : henryVerdict.toUpperCase()}
                 </span>
               </div>
             </div>

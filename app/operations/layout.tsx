@@ -7,7 +7,7 @@ export const metadata = {
 
 const operationsNavItems = [
   { href: "/operations", label: "Dashboard" },
-  { href: "/operations/tasks", label: "Task Graph" },
+  { href: "/operations/tasks", label: "Tasks" },
   { href: "/operations/milestones", label: "Milestones" },
   { href: "/operations/delegation", label: "Delegation" },
   { href: "/operations/productivity", label: "Productivity" },

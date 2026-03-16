@@ -50,7 +50,7 @@ function Badge({ children, className = "" }: { children: React.ReactNode; classN
 }
 
 const navItems = [
-  { href: "/operations/tasks", icon: GitBranch, title: "Task Graph", desc: "Parent-child hierarchy", color: "text-blue-400" },
+  { href: "/operations/tasks", icon: GitBranch, title: "Tasks", desc: "Task graph and work management", color: "text-blue-400", primary: true },
   { href: "/operations/milestones", icon: Flag, title: "Milestones", desc: "Project phases", color: "text-green-400" },
   { href: "/operations/delegation", icon: Users, title: "Delegation", desc: "Agent workloads", color: "text-purple-400" },
   { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "Performance metrics", color: "text-[#FF6A00]" },
@@ -102,19 +102,20 @@ export default function OperationsDashboard() {
         <p className="text-[#9BA3AF]">Command center for task orchestration and agent productivity</p>
       </div>
 
-      {/* Navigation Grid */}
+      {/* Navigation Grid — Tasks is primary sub-surface */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
-              <Card className="hover:border-[#FF6A00]/50 transition-colors cursor-pointer group">
+              <Card className={`hover:border-[#FF6A00]/50 transition-colors cursor-pointer group ${item.primary ? 'border-[#FF6A00]/30 bg-[#FF6A00]/5' : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <div className={`p-2 rounded-lg bg-[#1F2226] ${item.color}`}>
+                    <div className={`p-2 rounded-lg ${item.primary ? 'bg-[#FF6A00]/20' : 'bg-[#1F2226]'} ${item.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <ArrowRight className="w-4 h-4 text-[#9BA3AF] group-hover:text-[#FF6A00] transition-colors" />
+                    {item.primary && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF6A00]/20 text-[#FF6A00] rounded">PRIMARY</span>}
+                    <ArrowRight className={`w-4 h-4 ${item.primary ? 'text-[#FF6A00]' : 'text-[#9BA3AF]'} group-hover:text-[#FF6A00] transition-colors ${item.primary ? '' : 'ml-auto'}`} />
                   </div>
                   <h3 className="text-white font-medium mt-3">{item.title}</h3>
                   <p className="text-[#9BA3AF] text-sm">{item.desc}</p>

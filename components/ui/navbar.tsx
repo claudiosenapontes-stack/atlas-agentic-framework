@@ -12,8 +12,10 @@ const navLinks = [
   { href: "/sales-marketing", label: "Sales & Marketing", icon: Target },
   { href: "/knowledge", label: "Knowledge", icon: Brain },
   { href: "/events", label: "Events", icon: Users },
-  { href: "/tasks", label: "Tasks", icon: Lightbulb },
 ];
+
+// Note: Tasks is a sub-surface within Operations realm at /operations/tasks
+// Legacy /tasks route preserved for direct access but not promoted in nav
 
 // Realm entries only - no dropdowns per ATLAS-HENRY-REALM-NAV-STANDARD-001
 

@@ -2,14 +2,15 @@ import { RealmSubnav } from "../components/RealmSubnav";
 
 export const metadata = {
   title: "Knowledge | Atlas",
-  description: "Knowledge Brain & Agent Skills",
+  description: "Knowledge Brain - Agent memory, skills, and documents",
 };
 
 const knowledgeNavItems = [
   { href: "/knowledge", label: "Overview" },
-  { href: "/knowledge/skills", label: "Agent Skills" },
+  { href: "/knowledge/search", label: "Search" },
+  { href: "/knowledge/documents", label: "Documents" },
+  { href: "/knowledge/skills", label: "Skills" },
   { href: "/knowledge/memory", label: "Memory" },
-  { href: "/knowledge/soul", label: "SOUL.md" },
 ];
 
 export default function KnowledgeLayout({

@@ -122,6 +122,9 @@ export async function POST(request: NextRequest) {
       searchConditions.push(`summary.ilike.%${searchQuery}%`);
     }
     
+    // Apply filters
+    const filters = body.filters || {};
+    
     // Build base query
     console.log('[KB Search] Building query with filters:', filters);
     let query = (supabase as any)
@@ -132,9 +135,6 @@ export async function POST(request: NextRequest) {
     if (searchConditions.length > 0) {
       query = query.or(searchConditions.join(','));
     }
-    
-    // Apply filters
-    const filters = body.filters || {};
     
     if (filters.doc_class) {
       if (Array.isArray(filters.doc_class)) {

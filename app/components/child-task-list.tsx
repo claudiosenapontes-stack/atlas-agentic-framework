@@ -115,7 +115,7 @@ export function ChildTaskList({ parentTaskId, maxItems = 5, refreshInterval = 50
                 return (
                   <Link
                     key={child.id}
-                    href={`/tasks/${child.id}`}
+                    href={`/operations/tasks/${child.id}`}
                     className="flex items-center gap-2 px-4 py-2.5 hover:bg-violet-100/50 transition-colors"
                   >
                     <div className={`p-1 rounded ${statusConfig.color}`}>

@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Circle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  List,
+  BarChart3
 } from "lucide-react";
 import { TaskGraphVisualization } from "../components/TaskGraphVisualization";
 
@@ -25,59 +27,7 @@ interface Task {
   created_at: string;
   updated_at: string;
   priority?: string;
-  description?: string;
-}
-
-// Simple UI Components
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-[#111214] border border-[#1F2226] rounded-lg ${className}`}>{children}</div>;
-}
-
-function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`p-4 border-b border-[#1F2226] ${className}`}>{children}</div>;
-}
-
-function CardContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`p-4 ${className}`}>{children}</div>;
-}
-
-function Button({ children, onClick, className = "", variant = "primary" }: { 
-  children: React.ReactNode; 
-  onClick?: () => void;
-  className?: string;
-  variant?: "primary" | "ghost" | "outline";
-}) {
-  const variants = {
-    primary: "bg-[#FF6A00] hover:bg-[#FF6A00]/90 text-white",
-    ghost: "hover:bg-[#1F2226] text-[#9BA3AF] hover:text-white",
-    outline: "border border-[#1F2226] text-[#9BA3AF] hover:bg-[#1F2226]"
-  };
-  return (
-    <button onClick={onClick} className={`px-4 py-2 rounded-lg transition-colors ${variants[variant]} ${className}`}>
-      {children}
-    </button>
-  );
-}
-
-function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <span className={`px-2 py-0.5 text-xs rounded-full ${className}`}>{children}</span>;
-}
-
-function Input({ value, onChange, placeholder, className = "" }: { 
-  value: string; 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  className?: string;
-}) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`bg-[#1F2226] border border-[#2A2D32] text-white placeholder:text-[#9BA3AF] px-3 py-2 rounded-lg outline-none focus:border-[#FF6A00] ${className}`}
-    />
-  );
+  assigned_agent?: { display_name: string };
 }
 
 export default function TasksPage() {
@@ -85,145 +35,153 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"list" | "graph" | "stats">("list");
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  useEffect(() => { fetchTasks(); }, []);
 
   const fetchTasks = async () => {
     try {
       const res = await fetch("/api/tasks?limit=200");
       const data = await res.json();
       setTasks(data.tasks || []);
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error("Failed:", error); }
+    finally { setLoading(false); }
   };
 
-  const toggleExpand = (taskId: string) => {
-    const newExpanded = new Set(expandedTasks);
-    if (newExpanded.has(taskId)) {
-      newExpanded.delete(taskId);
-    } else {
-      newExpanded.add(taskId);
-    }
-    setExpandedTasks(newExpanded);
-  };
-
-  const getChildTasks = (parentId: string | null) => {
-    return tasks.filter(t => t.parent_id === parentId);
-  };
-
-  const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         task.id.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
-  const rootTasks = filteredTasks.filter(t => t.parent_id === null);
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case "in_progress":
-        return <Clock className="w-4 h-4 text-[#FF6A00]" />;
-      case "failed":
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Circle className="w-4 h-4 text-[#9BA3AF]" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: "bg-[#9BA3AF]/20 text-[#9BA3AF]",
-      in_progress: "bg-[#FF6A00]/20 text-[#FF6A00]",
-      completed: "bg-green-500/20 text-green-500",
-      failed: "bg-red-500/20 text-red-500",
-    };
-    return <Badge className={variants[status] || variants.pending}>{status.replace("_", " ")}</Badge>;
-  };
-
-  const renderTaskTree = (parentId: string | null, depth = 0) => {
-    const children = getChildTasks(parentId);
-    
-    return children.map(task => {
-      const hasChildren = tasks.some(t => t.parent_id === task.id);
-      const isExpanded = expandedTasks.has(task.id);
-      
-      return (
-        <div key={task.id}>
-          <div 
-            className="flex items-center gap-3 py-2 px-3 hover:bg-[#1F2226] rounded-lg group cursor-pointer"
-            style={{ paddingLeft: `${depth * 24 + 12}px` }}
-            onClick={() => hasChildren && toggleExpand(task.id)}
-          >
-            {hasChildren ? (
-              isExpanded ? <ChevronDown className="w-4 h-4 text-[#9BA3AF]" /> : <ChevronRight className="w-4 h-4 text-[#9BA3AF]" />
-            ) : <div className="w-4" />}
-            
-            {getStatusIcon(task.status)}
-            
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">{task.title}</p>
-              <p className="text-[#9BA3AF] text-xs">{task.id.slice(0, 8)} • {new Date(task.created_at).toLocaleDateString()}</p>
-            </div>
-            
-            {task.agent_id && <Badge className="border border-[#1F2226] text-[#9BA3AF]">{task.agent_id}</Badge>}
-            {getStatusBadge(task.status)}
-          </div>
-          
-          {hasChildren && isExpanded && renderTaskTree(task.id, depth + 1)}
-        </div>
-      );
-    });
-  };
+  const getChildTasks = (parentId: string | null) => tasks.filter(t => t.parent_id === parentId);
+  const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  
+  const tasksByStatus = tasks.reduce((acc: any, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/operations">
-            <Button variant="ghost" className="!p-2"><ArrowLeft className="w-5 h-5" /></Button>
-          </Link>
+          <Link href="/operations"><button className="hover:bg-[#1F2226] p-2 rounded"><ArrowLeft className="w-5 h-5" /></button></Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Task Graph</h1>
-            <p className="text-[#9BA3AF] text-sm">Parent-child task hierarchy and dependencies</p>
+            <h1 className="text-2xl font-bold text-white">Task Operations</h1>
+            <p className="text-[#9BA3AF] text-sm">Unified task management within Operations</p>
           </div>
         </div>
-        <Button><Plus className="w-4 h-4 mr-2" /> New Task</Button>
+        <button className="bg-[#FF6A00] px-4 py-2 rounded-lg text-white"><Plus className="w-4 h-4 inline mr-2" />New Task</button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-[#9BA3AF] text-sm">Total Tasks</p><p className="text-2xl font-bold text-white">{tasks.length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-[#9BA3AF] text-sm">Root Tasks</p><p className="text-2xl font-bold text-white">{tasks.filter(t => !t.parent_id).length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-[#9BA3AF] text-sm">Sub-tasks</p><p className="text-2xl font-bold text-white">{tasks.filter(t => t.parent_id).length}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-[#9BA3AF] text-sm">In Progress</p><p className="text-2xl font-bold text-white">{tasks.filter(t => t.status === "in_progress").length}</p></CardContent></Card>
+      <div className="grid grid-cols-6 gap-3">
+        {[
+          { label: "Total", value: tasks.length },
+          { label: "Inbox", value: tasksByStatus.inbox || 0 },
+          { label: "Active", value: tasksByStatus.in_progress || 0, color: "text-[#FFB020]" },
+          { label: "Blocked", value: tasksByStatus.blocked || 0, color: "text-red-500" },
+          { label: "Completed", value: tasksByStatus.completed || 0, color: "text-green-500" },
+          { label: "Root", value: tasks.filter(t => !t.parent_id).length },
+        ].map(stat => (
+          <div key={stat.label} className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
+            <p className="text-[#9BA3AF] text-sm">{stat.label}</p>
+            <p className={`text-2xl font-bold ${stat.color || "text-white"}`}>{stat.value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-[#9BA3AF]" />
-              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search tasks..." className="flex-1" />
+      <div className="flex items-center gap-2 border-b border-[#1F2226]">
+        {[
+          { id: "list", icon: List, label: "Task Queue" },
+          { id: "graph", icon: GitBranch, label: "Hierarchy Graph" },
+          { id: "stats", icon: BarChart3, label: "Analytics" },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setViewMode(tab.id as any)} 
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              viewMode === tab.id ? "border-[#FF6A00] text-white" : "border-transparent text-[#9BA3AF] hover:text-white"
+            }`}>
+            <tab.icon className="w-4 h-4" /> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === "list" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-[#9BA3AF]" />
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..." className="bg-[#1F2226] border border-[#2A2D32] text-white px-3 py-2 rounded-lg max-w-md" />
+          </div>
+          <div className="bg-[#111214] border border-[#1F2226] rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-[#0B0B0C]">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase">Task</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Status</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1F2226]">
+                {filteredTasks.slice(0, 50).map(task => (
+                  <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
+                    <td className="px-4 py-2.5">
+                      <Link href={`/operations/tasks/${task.id}`} className="text-xs text-white hover:text-[#9BA3AF]">{task.title}</Link>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded text-[10px] ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
+                        {task.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[10px] text-[#9BA3AF]">{task.priority || 'medium'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {viewMode === "graph" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-[#111214] border border-[#1F2226] rounded-lg">
+            <div className="p-4 border-b border-[#1F2226]">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-[#9BA3AF]" />
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..." className="bg-[#1F2226] border border-[#2A2D32] text-white px-3 py-2 rounded-lg flex-1 text-sm" />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="max-h-[600px] overflow-y-auto">
-              {loading ? <div className="p-4 text-[#9BA3AF] text-center">Loading...</div> : rootTasks.length === 0 ? <div className="p-4 text-[#9BA3AF] text-center">No tasks</div> : renderTaskTree(null)}
+            <div className="max-h-[600px] overflow-y-auto p-2">
+              {loading ? <div className="p-4 text-center text-[#9BA3AF]">Loading...</div> : 
+               tasks.filter(t => !t.parent_id).length === 0 ? <div className="p-4 text-center text-[#9BA3AF]">No tasks</div> :
+               tasks.filter(t => !t.parent_id).map(task => (
+                 <div key={task.id} className="flex items-center gap-2 py-2 px-3 hover:bg-[#1F2226] rounded">
+                   <Circle className="w-4 h-4 text-[#9BA3AF]" />
+                   <span className="text-sm text-white truncate">{task.title}</span>
+                 </div>
+               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="lg:col-span-2 bg-[#111214] border border-[#1F2226] rounded-lg p-4">
+            <h3 className="text-white font-medium mb-4">Visual Task Graph</h3>
+            <TaskGraphVisualization tasks={tasks} />
+          </div>
+        </div>
+      )}
 
-        <Card className="lg:col-span-2">
-          <CardHeader><h3 className="text-white font-medium">Visual Task Graph</h3></CardHeader>
-          <CardContent><TaskGraphVisualization tasks={tasks} /></CardContent>
-        </Card>
-      </div>
+      {viewMode === "stats" && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
+            <h3 className="text-white font-medium mb-4">Status Distribution</h3>
+            <div className="space-y-2">
+              {Object.entries(tasksByStatus).map(([status, count]: [string, any]) => (
+                <div key={status} className="flex items-center justify-between">
+                  <span className="text-sm text-[#9BA3AF]">{status}</span>
+                  <span className="text-sm text-white">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
+            <h3 className="text-white font-medium mb-4">Task Overview</h3>
+            <p className="text-[#9BA3AF] text-sm">Total tasks: {tasks.length}</p>
+            <p className="text-[#9BA3AF] text-sm">With parent: {tasks.filter(t => t.parent_id).length}</p>
+            <p className="text-[#9BA3AF] text-sm">Root level: {tasks.filter(t => !t.parent_id).length}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

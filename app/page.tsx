@@ -55,7 +55,7 @@ export default async function DashboardPage() {
             <span className="text-[#1F2226]">/</span>
             <Link href="/control" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Control</Link>
             <span className="text-[#1F2226]">/</span>
-            <Link href="/tasks" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Tasks</Link>
+            <Link href="/operations" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Operations</Link>
             <span className="text-[#1F2226]">/</span>
             <Link href="/cost" className="px-2 py-1 rounded text-[10px] text-[#6B7280] hover:text-white hover:bg-[#1F2226] transition-colors">Cost</Link>
           </div>
@@ -131,7 +131,7 @@ export default async function DashboardPage() {
         <div className="col-span-12">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <SystemLink href="/control" label="Control" status="operational" layer="Operations" />
-            <SystemLink href="/tasks" label="Tasks" status="neutral" layer="Business" />
+            <SystemLink href="/operations" label="Operations" status="neutral" layer="Unified" />
             <SystemLink href="/agents" label="Fleet" status="neutral" layer="System" />
             <SystemLink href="/cost" label="Cost" status="neutral" layer="Business" />
             <SystemLink href="/approvals" label="Approvals" count={pendingApprovals} alert={pendingApprovals > 0} layer="Business" />

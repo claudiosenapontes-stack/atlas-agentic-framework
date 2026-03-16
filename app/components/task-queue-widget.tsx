@@ -125,7 +125,7 @@ export function TaskQueueWidget({ maxItems = 10, refreshInterval = 5000 }: TaskQ
           </div>
           
           <Link
-            href="/tasks"
+            href="/operations/tasks"
             className="text-sm text-blue-600 hover:text-blue-700"
           >
             All →
@@ -164,7 +164,7 @@ export function TaskQueueWidget({ maxItems = 10, refreshInterval = 5000 }: TaskQ
               return (
                 <Link
                   key={task.id}
-                  href={`/tasks/${task.id}`}
+                  href={`/operations/tasks/${task.id}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
                 >
                   <div className={`p-1.5 rounded ${statusConfig.color}`}>

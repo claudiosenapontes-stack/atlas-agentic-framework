@@ -168,7 +168,7 @@ export function ExecutionChainPanel({ taskId, refreshInterval = 5000 }: Executio
               
               {/* Node */}
               <Link
-                href={`/tasks/${node.id}`}
+                href={`/operations/tasks/${node.id}`}
                 className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border ${
                   node.id === taskId 
                     ? 'bg-violet-50 border-violet-200' 

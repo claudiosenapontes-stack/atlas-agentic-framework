@@ -33,13 +33,31 @@ export async function POST(
     
     const supabase = getSupabaseAdmin();
     
-    // Get mission with tasks
+    // Get mission first (without complex join that may fail)
     const { data: mission, error: missionError } = await (supabase as any)
       .from('missions')
-      .select('*, mission_tasks(*, tasks(*))')
+      .select('*')
       .eq('id', missionId)
       .is('deleted_at', null)
       .single();
+    
+    // Get tasks separately if mission exists
+    let missionTasks: any[] = [];
+    if (mission) {
+      const { data: taskLinks } = await (supabase as any)
+        .from('mission_tasks')
+        .select('task_id')
+        .eq('mission_id', missionId);
+      
+      if (taskLinks && taskLinks.length > 0) {
+        const taskIds = taskLinks.map((t: any) => t.task_id);
+        const { data: tasks } = await (supabase as any)
+          .from('tasks')
+          .select('*')
+          .in('id', taskIds);
+        missionTasks = tasks || [];
+      }
+    }
     
     if (missionError || !mission) {
       return NextResponse.json({
@@ -51,9 +69,9 @@ export async function POST(
     }
     
     // Check if all tasks are completed
-    const incompleteTasks = mission.mission_tasks?.filter(
-      (mt: any) => mt.tasks?.status !== 'completed'
-    ) || [];
+    const incompleteTasks = missionTasks.filter(
+      (t: any) => t.status !== 'completed'
+    );
     
     // Build verification result
     const verificationResult = {
@@ -107,10 +125,10 @@ export async function POST(
       mission: updatedMission,
       verification: verificationResult,
       can_complete: incompleteTasks.length === 0,
-      incomplete_tasks: incompleteTasks.map((mt: any) => ({
-        id: mt.tasks?.id,
-        title: mt.tasks?.title,
-        status: mt.tasks?.status,
+      incomplete_tasks: incompleteTasks.map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
       })),
       timestamp,
       requestId,

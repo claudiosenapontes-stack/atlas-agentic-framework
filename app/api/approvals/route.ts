@@ -1,9 +1,10 @@
 /**
  * ATLAS-APPROVALS API (EO Backend Closeout)
- * ATLAS-OPTIMUS-EO-BACKEND-CLOSEOUT-104
+ * ATLAS-OPTIMUS-EO-BACKEND-FINAL-203
  * 
  * GET/POST /api/approvals
  * Minimal implementation for EO closeout
+ * Updated: 2026-03-16T19:49:00Z
  */
 
 import { NextRequest, NextResponse } from 'next/server';

@@ -100,7 +100,7 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C] text-white p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
+      <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

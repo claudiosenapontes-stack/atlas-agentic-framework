@@ -75,7 +75,7 @@ export default function KnowledgeSearchPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-indigo-500/20 to-purple-600/10 border border-indigo-500/30 flex items-center justify-center">

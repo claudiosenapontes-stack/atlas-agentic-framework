@@ -120,7 +120,7 @@ export default function ExecutiveOpsPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6">
         {/* Header - Knowledge Pattern */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">

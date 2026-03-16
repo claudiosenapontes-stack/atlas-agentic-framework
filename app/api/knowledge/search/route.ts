@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     const searchFields = body.fields || ['all'];
     const limit = Math.min(Math.max(body.limit || 20, 1), 100);
     const offset = Math.max(body.offset || 0, 0);
-    const sortBy = body.sort_by || 'extracted_at';
+    const sortBy = body.sort_by || 'created_at';
     const sortOrder = body.sort_order || 'desc';
     
     // Build search conditions for knowledge_registry

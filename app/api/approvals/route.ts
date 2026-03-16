@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
+// Cache-bust: 2026-03-16T19:59:00Z
 
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();

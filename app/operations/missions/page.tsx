@@ -3,23 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
-  Target, 
-  ArrowLeft, 
-  Plus, 
-  Search,
-  Filter,
-  CheckCircle2,
-  Circle,
-  Clock,
-  AlertCircle,
-  PauseCircle,
-  XCircle,
-  TrendingUp,
-  Users,
-  Calendar,
-  Flag,
-  ChevronRight,
-  MoreHorizontal
+  Target, ArrowLeft, Plus, Search, Filter, CheckCircle2, Circle,
+  Clock, AlertCircle, PauseCircle, XCircle, TrendingUp, Users,
+  Calendar, Flag, ChevronRight, MoreHorizontal
 } from 'lucide-react';
 
 interface Mission {
@@ -133,199 +119,160 @@ export default function MissionsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/operations">
-            <button className="hover:bg-[#1F2226] p-2 rounded transition-colors">
-              <ArrowLeft className="w-5 h-5 text-[#9BA3AF]" />
+    <div className="min-h-screen bg-[#0B0B0C]">
+      <div className="p-4 sm:p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-[10px] bg-gradient-to-br from-[#FF6A00]/20 to-[#FF3B30]/10 border border-[#FF6A00]/30 flex items-center justify-center">
+              <Target className="w-5 h-5 text-[#FF6A00]" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-white">Missions</h1>
+              <p className="text-sm text-[#6B7280]">Track Henry and Olivia across all active missions</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={fetchMissions}
+              className="flex items-center gap-2 px-3 py-2 bg-[#1F2226] hover:bg-[#2A2D32] text-white rounded-lg text-sm transition-colors"
+            >
+              <TrendingUp className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Mission Control</h1>
-            <p className="text-[#9BA3AF] text-sm">Strategic mission orchestration and progress tracking</p>
           </div>
         </div>
-        <button className="bg-[#FF6A00] hover:bg-[#FF6A00]/90 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-          <Plus className="w-4 h-4 inline mr-2" />
-          New Mission
-        </button>
-      </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {[
-          { label: 'Total', value: missions.length },
-          { label: 'Active', value: missionsByStatus.active || 0, color: 'text-[#16C784]' },
-          { label: 'In Progress', value: missionsByStatus.in_progress || 0, color: 'text-[#FFB020]' },
-          { label: 'Blocked', value: missions.filter(m => m.status === 'in_progress' && m.blocked_reason).length, color: 'text-red-500' },
-          { label: 'Completed', value: missionsByStatus.completed || 0, color: 'text-[#16C784]' },
-          { label: 'Draft', value: missionsByStatus.draft || 0, color: 'text-[#6B7280]' },
-          { label: 'Closed', value: (missionsByStatus.closed || 0) + (missionsByStatus.cancelled || 0), color: 'text-[#6B7280]' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
-            <p className="text-[#9BA3AF] text-xs uppercase tracking-wide">{stat.label}</p>
-            <p className={`text-2xl font-bold ${stat.color || 'text-white'}`}>{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 bg-[#111214] border border-[#1F2226] rounded-lg p-4">
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 text-[#6B7280]" />
-          <input
-            type="text"
-            placeholder="Search missions..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none text-white placeholder-[#6B7280] flex-1 text-sm"
-          />
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-[#6B7280]" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#1F2226] border border-[#2A2D32] rounded px-3 py-1.5 text-sm text-white outline-none"
-          >
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="closed">Closed</option>
-          </select>
-          
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-[#1F2226] border border-[#2A2D32] rounded px-3 py-1.5 text-sm text-white outline-none"
-          >
-            <option value="all">All Priority</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-          
-          <select
-            value={phaseFilter}
-            onChange={(e) => setPhaseFilter(e.target.value)}
-            className="bg-[#1F2226] border border-[#2A2D32] rounded px-3 py-1.5 text-sm text-white outline-none"
-          >
-            <option value="all">All Phase</option>
-            <option value="planning">Planning</option>
-            <option value="execution">Execution</option>
-            <option value="verification">Verification</option>
-            <option value="closure">Closure</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Missions Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin w-8 h-8 border-2 border-[#FF6A00] border-t-transparent rounded-full" />
-        </div>
-      ) : filteredMissions.length === 0 ? (
-        <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-12 text-center">
-          <Target className="w-12 h-12 text-[#6B7280] mx-auto mb-4" />
-          <h3 className="text-white font-medium mb-2">No missions found</h3>
-          <p className="text-[#9BA3AF] text-sm">
-            {missions.length === 0 
-              ? 'Create your first mission to get started' 
-              : 'No missions match your filters'}
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredMissions.map((mission) => {
-            const priority = priorityConfig[mission.priority];
-            const phase = phaseConfig[mission.phase];
-            const PhaseIcon = phase.icon;
-            
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {Object.entries(statusConfig).map(([status, config]) => {
+            const count = missionsByStatus[status] || 0;
+            const Icon = config.icon;
             return (
-              <div 
-                key={mission.id} 
-                className={`bg-[#111214] border ${mission.blocked_reason ? 'border-red-500/30' : 'border-[#1F2226]'} rounded-lg p-5 hover:border-[#FF6A00]/30 transition-colors group`}
-              >
-                {/* Header Row */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    {getStatusDisplay(mission)}
-                    <div className={`px-2 py-0.5 rounded text-xs font-medium border ${priority.bg} ${priority.color} ${priority.border}`}>
-                      {mission.priority.charAt(0).toUpperCase() + mission.priority.slice(1)}
-                    </div>
-                    <div className="flex items-center gap-1 text-[#9BA3AF] text-xs">
-                      <PhaseIcon className="w-3.5 h-3.5" />
-                      {phase.label}
-                    </div>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#1F2226] rounded transition-all">
-                    <MoreHorizontal className="w-4 h-4 text-[#9BA3AF]" />
-                  </button>
+              <div key={status} className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className={`w-4 h-4 ${config.color}`} />
+                  <span className="text-xs text-[#6B7280]">{config.label}</span>
                 </div>
-
-                {/* Title */}
-                <h3 className="text-white font-semibold text-lg mb-1">{mission.title}</h3>
-                {mission.objective && (
-                  <p className="text-[#9BA3AF] text-sm mb-3 line-clamp-2">{mission.objective}</p>
-                )}
-
-                {/* Blocked Warning */}
-                {mission.blocked_reason && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-400 mt-0.5" />
-                      <div>
-                        <p className="text-red-400 text-xs font-medium">Blocked</p>
-                        <p className="text-[#9BA3AF] text-sm">{mission.blocked_reason}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="text-[#9BA3AF]">Progress</span>
-                    <span className="text-white font-medium">{mission.progress_percent}%</span>
-                  </div>
-                  <div className="h-2 bg-[#1F2226] rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${getProgressBarColor(mission.progress_percent)} transition-all`}
-                      style={{ width: `${mission.progress_percent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Footer Stats */}
-                <div className="flex items-center justify-between pt-3 border-t border-[#1F2226]">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 text-[#9BA3AF] text-xs">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{mission.completed_task_count}/{mission.child_task_count} tasks</span>
-                    </div>
-                    {mission.target_end_date && (
-                      <div className="flex items-center gap-1.5 text-[#9BA3AF] text-xs">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{new Date(mission.target_end_date).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                  <button className="flex items-center gap-1 text-[#FF6A00] text-xs hover:text-[#FF6A00]/80 transition-colors">
-                    View Details
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <p className="text-2xl font-semibold text-white">{loading ? '-' : count}</p>
               </div>
             );
           })}
         </div>
-      )}
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-[#6B7280]" />
+            <input
+              type="text"
+              placeholder="Search missions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00]/50"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white"
+            >
+              <option value="all">All Status</option>
+              {Object.keys(statusConfig).map(s => (
+                <option key={s} value={s}>{statusConfig[s as keyof typeof statusConfig].label}</option>
+              ))}
+            </select>
+            <select 
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-3 py-2 bg-[#1F2226] border border-[#2A2D32] rounded-lg text-sm text-white"
+            >
+              <option value="all">All Priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Mission Board */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {loading ? (
+            <div className="col-span-full flex items-center justify-center py-12">
+              <Clock className="w-6 h-6 text-[#6B7280] animate-spin" />
+            </div>
+          ) : filteredMissions.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <Target className="w-8 h-8 mx-auto mb-3 text-[#6B7280]" />
+              <p className="text-sm text-[#9BA3AF]">No missions found</p>
+            </div>
+          ) : (
+            filteredMissions.map((mission) => {
+              const PhaseIcon = phaseConfig[mission.phase].icon;
+              const priorityCfg = priorityConfig[mission.priority];
+              return (
+                <Link key={mission.id} href={`/operations/missions/${mission.id}`}>
+                  <div className="group p-5 bg-[#111214] border border-[#1F2226] rounded-[10px] hover:border-[#FF6A00]/50 transition-all cursor-pointer h-full">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {getStatusDisplay(mission)}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${priorityCfg.bg} ${priorityCfg.color}`}>
+                          {mission.priority}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#FF6A00] transition-colors" />
+                    </div>
+
+                    <h3 className="text-lg font-medium text-white mb-1">{mission.title}</h3>
+                    {mission.objective && (
+                      <p className="text-sm text-[#9BA3AF] mb-3 line-clamp-2">{mission.objective}</p>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-3 text-xs text-[#6B7280]">
+                      <PhaseIcon className="w-3.5 h-3.5" />
+                      <span>{phaseConfig[mission.phase].label}</span>
+                      {mission.owner_agent && (
+                        <>
+                          <span className="mx-1">•</span>
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{mission.owner_agent}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-[#6B7280]">Progress</span>
+                        <span className="text-white font-medium">{mission.progress_percent}%</span>
+                      </div>
+                      <div className="h-1.5 bg-[#1F2226] rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all ${getProgressBarColor(mission.progress_percent)}`}
+                          style={{ width: `${mission.progress_percent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#6B7280]">
+                        {mission.completed_task_count}/{mission.child_task_count} tasks
+                      </span>
+                      {mission.blocked_reason && (
+                        <span className="flex items-center gap-1 text-[#FF3B30]">
+                          <AlertCircle className="w-3 h-3" />
+                          Blocked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }

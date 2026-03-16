@@ -15,10 +15,11 @@ function CardHeader({ children, className = "" }: { children: React.ReactNode; c
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <span className={`px-2 py-0.5 text-xs rounded-full ${className}`}>{children}</span>; }
 
 const navItems = [
-  { href: "/operations/tasks", icon: GitBranch, title: "Tasks", desc: "Task management", color: "text-blue-400", primary: true },
+  { href: "/operations/missions", icon: Target, title: "Missions", desc: "Track Henry & Olivia", color: "text-[#FF6A00]", primary: true },
+  { href: "/operations/tasks", icon: GitBranch, title: "Tasks", desc: "Task management", color: "text-blue-400" },
   { href: "/operations/milestones", icon: Flag, title: "Milestones", desc: "Project phases", color: "text-green-400" },
   { href: "/operations/delegation", icon: Users, title: "Delegation", desc: "Agent workloads", color: "text-purple-400" },
-  { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "Performance metrics", color: "text-[#FF6A00]" },
+  { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "Performance metrics", color: "text-pink-400" },
 ];
 
 export default function UnifiedOperationsDashboard() {

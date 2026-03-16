@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect } from 'react';
 import { Plug, CheckCircle, AlertCircle, RefreshCw, Mail, Calendar, Contact, Globe, MessageSquare, Database, Cloud, Bot, Zap, Radio, Loader2, XCircle, Wifi, Layers } from 'lucide-react';
 import Link from 'next/link';

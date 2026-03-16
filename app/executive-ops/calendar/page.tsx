@@ -3,24 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
-  Briefcase,
   Calendar, 
-  GitBranch,
-  Eye,
-  Terminal,
-  CheckCircle2,
-  Clock,
   Users,
   Video,
   MapPin,
-  XCircle,
   AlertCircle,
   Plus,
   Loader2,
-  ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Clock
 } from 'lucide-react';
-import { RealmSubnav } from '@/components/ui/realm-subnav';
 
 interface CalendarEvent {
   id: string;
@@ -58,17 +50,6 @@ async function getCalendarToday(): Promise<CalendarToday | null> {
     return null;
   }
 }
-
-// Subnav items for Executive Ops realm
-const executiveOpsNavItems = [
-  { href: '/executive-ops', label: 'Overview', icon: Briefcase },
-  { href: '/executive-ops/calendar', label: 'Calendar & Meetings', icon: Calendar },
-  { href: '/executive-ops/watchlist', label: 'Watchlist', icon: Eye },
-  { href: '/executive-ops/approvals', label: 'Approvals', icon: CheckCircle2 },
-  { href: '/executive-ops/followups', label: 'Follow-ups', icon: Clock },
-  { href: '/executive-ops/commands', label: 'Commands', icon: Terminal },
-  { href: '/executive-ops/decisions', label: 'Decisions', icon: GitBranch },
-];
 
 export default function CalendarPage() {
   const [calendar, setCalendar] = useState<CalendarToday | null>(null);
@@ -114,13 +95,6 @@ export default function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
-      {/* Realm Subnav */}
-      <RealmSubnav 
-        realm="Executive Ops" 
-        realmHref="/executive-ops"
-        items={executiveOpsNavItems}
-      />
-
       <div className="p-4 sm:p-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

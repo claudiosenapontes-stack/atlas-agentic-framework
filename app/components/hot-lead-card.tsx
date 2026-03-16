@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Flame, User, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Flame, User, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, UserPlus, Phone, Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface HotLeadCardProps {
@@ -22,6 +22,7 @@ interface HotLeadCardProps {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   recipientId: string;
   onNotificationSent?: (notificationId: string) => void;
+  onClaim?: () => Promise<any>;
 }
 
 export function HotLeadCard({
@@ -30,9 +31,12 @@ export function HotLeadCard({
   priority,
   recipientId,
   onNotificationSent,
+  onClaim,
 }: HotLeadCardProps) {
   const [sending, setSending] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [deliveryState, setDeliveryState] = useState<'idle' | 'sending' | 'delivered' | 'failed'>('idle');
+  const [claimState, setClaimState] = useState<'idle' | 'claiming' | 'claimed' | 'failed'>('idle');
   const [notificationId, setNotificationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +77,24 @@ export function HotLeadCard({
       setError(err.message);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleClaim = async () => {
+    if (!onClaim) return;
+    
+    setClaiming(true);
+    setClaimState('claiming');
+    setError(null);
+
+    try {
+      await onClaim();
+      setClaimState('claimed');
+    } catch (err: any) {
+      setClaimState('failed');
+      setError(err.message);
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -137,9 +159,12 @@ export function HotLeadCard({
             <User className="w-4 h-4 text-gray-500" />
             <span className="text-white font-medium">{lead.name}</span>
           </div>
-          <div className="text-sm text-gray-400 ml-6">
-            {lead.email}
-          </div>
+          {lead.email && (
+            <div className="flex items-center gap-2 text-sm text-gray-400 ml-6">
+              <Mail className="w-3 h-3" />
+              {lead.email}
+            </div>
+          )}
           <div className="text-sm text-gray-400 ml-6">
             {lead.company} • Source: {lead.source}
           </div>
@@ -157,6 +182,28 @@ export function HotLeadCard({
             </span>
           </div>
         </div>
+
+        {/* Claim Status */}
+        {claimState !== 'idle' && (
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+            claimState === 'claimed' ? 'bg-green-500/10 border-green-500/30' :
+            claimState === 'failed' ? 'bg-red-500/10 border-red-500/30' :
+            'bg-blue-500/10 border-blue-500/30'
+          }`}>
+            {claimState === 'claiming' && <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />}
+            {claimState === 'claimed' && <CheckCircle className="w-4 h-4 text-green-400" />}
+            {claimState === 'failed' && <XCircle className="w-4 h-4 text-red-400" />}
+            <span className={`text-sm ${
+              claimState === 'claimed' ? 'text-green-400' :
+              claimState === 'failed' ? 'text-red-400' :
+              'text-blue-400'
+            }`}>
+              {claimState === 'claiming' && 'Claiming lead...'}
+              {claimState === 'claimed' && 'Lead claimed successfully'}
+              {claimState === 'failed' && `Claim failed: ${error}`}
+            </span>
+          </div>
+        )}
 
         {/* Delivery State */}
         {deliveryState !== 'idle' && (
@@ -182,9 +229,23 @@ export function HotLeadCard({
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
+          {onClaim && claimState !== 'claimed' && (
+            <button
+              onClick={handleClaim}
+              disabled={claiming || sending}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-500 disabled:bg-green-800/50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              {claiming ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4" />
+              )}
+              Claim Lead
+            </button>
+          )}
           <button
             onClick={() => handleSendNotification('hot_lead_assigned')}
-            disabled={sending}
+            disabled={sending || claiming}
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
           >
             {sending ? (
@@ -192,11 +253,11 @@ export function HotLeadCard({
             ) : (
               <Send className="w-4 h-4" />
             )}
-            Send Assigned
+            Notify
           </button>
           <button
             onClick={() => handleSendNotification('hot_lead_escalated')}
-            disabled={sending}
+            disabled={sending || claiming}
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 rounded-lg text-sm font-medium transition-colors"
           >
             {sending ? (

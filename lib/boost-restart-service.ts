@@ -13,6 +13,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getOpenClawClient } from '@/lib/openclaw';
 import { buildAndCaptureSnapshot } from '@/lib/agent-session-snapshot';
+import { randomUUID } from 'crypto';
 
 // Types
 export interface BoostRestartResult {
@@ -423,7 +424,7 @@ export class BoostRestartService {
     initiatedBy: string,
     reason: string
   ): Promise<string> {
-    const logId = crypto.randomUUID();
+    const logId = randomUUID();
     
     await this.supabase.from('boost_restart_logs').insert({
       id: logId,

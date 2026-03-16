@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DollarSign, Zap, LayoutDashboard, PieChart, FileText, Scale, AlertCircle, RefreshCw, Radio } from 'lucide-react';
+import { DollarSign, LayoutDashboard, PieChart, FileText, Scale, AlertCircle, RefreshCw, Radio } from 'lucide-react';
 import Link from 'next/link';
 
 interface FinanceSnapshot {
@@ -40,26 +40,17 @@ export default function FinancePage() {
     }
   }
 
-  const navItems = [
-    { href: '/finance', label: 'Overview', icon: LayoutDashboard },
-    { href: '/finance/budgets', label: 'Budgets', icon: PieChart },
-    { href: '/finance/approvals', label: 'Approvals', icon: DollarSign },
-    { href: '/finance/invoices', label: 'Invoices', icon: FileText },
-    { href: '/finance/contracts', label: 'Contracts', icon: Scale },
-    { href: '/finance/legal-privilege', label: 'Legal Privilege', icon: Scale },
-  ];
-
   return (
     <div className="min-h-screen bg-[#0B0B0C] text-white">
-      <header className="border-b border-[#1F2226] bg-[#111214] px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
+      <main className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#FF6A00] flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-lg bg-[#16C784]/20 flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-[#16C784]" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-white">Finance & Legal</h1>
-              <p className="text-[10px] text-[#6B7280]">Budget & Contract Management</p>
+              <h1 className="text-xl font-semibold text-white">Finance Overview</h1>
+              <p className="text-sm text-[#6B7280]">Budget and legal operations</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -74,35 +65,15 @@ export default function FinancePage() {
                 <span className="text-xs text-[#6B7280]">NOT CONNECTED</span>
               </div>
             )}
+            <button 
+              onClick={fetchSnapshot} 
+              disabled={loading} 
+              className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
           </div>
-        </div>
-        <nav className="flex items-center gap-1 border-t border-[#1F2226] pt-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.href === '/finance';
-            return (
-              <Link key={item.href} href={item.href} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${isActive ? 'text-white bg-[#1F2226]' : 'text-[#6B7280] hover:text-white hover:bg-[#1F2226]'}`}>
-                <Icon className="w-3.5 h-3.5" />{item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </header>
-
-      <main className="p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#16C784]/20 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-[#16C784]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-white">Finance Overview</h1>
-              <p className="text-sm text-[#6B7280]">Budget and legal operations</p>
-            </div>
-          </div>
-          <button onClick={fetchSnapshot} disabled={loading} className="flex items-center gap-2 px-3 py-2 bg-[#111214] border border-[#1F2226] rounded-lg text-xs text-[#9BA3AF] hover:text-white transition-colors">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />Refresh
-          </button>
         </div>
 
         {dataSource === 'unavailable' ? (

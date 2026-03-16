@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, Zap, LayoutDashboard, Users, Target, Flame, CheckSquare, Play, Lightbulb, Moon, Sun, Briefcase, BarChart3, DollarSign } from "lucide-react";
+import { Menu, X, Zap, LayoutDashboard, Users, Target, Lightbulb, Moon, Sun, Briefcase, BarChart3, DollarSign, Brain } from "lucide-react";
 
 const navLinks = [
   { href: "/control", label: "Control", icon: LayoutDashboard },
   { href: "/executive-ops", label: "Executive", icon: Briefcase },
   { href: "/operations", label: "Operations", icon: BarChart3 },
   { href: "/finance", label: "Finance", icon: DollarSign },
+  { href: "/sales-marketing", label: "Sales & Marketing", icon: Target },
+  { href: "/knowledge", label: "Knowledge", icon: Brain },
   { href: "/events", label: "Events", icon: Users },
-  { href: "/campaigns", label: "Campaigns", icon: Target },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/tasks", label: "Tasks", icon: Lightbulb },
 ];
 
 // Realm entries only - no dropdowns per ATLAS-HENRY-REALM-NAV-STANDARD-001

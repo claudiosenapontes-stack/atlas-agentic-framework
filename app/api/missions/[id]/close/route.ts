@@ -51,20 +51,15 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // WRAPPED: Get mission with retry+timeout
-    const missionResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('id,status,evidence_bundle')
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .single(),
-        3000
-      )
-    );
+    // Get mission
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id,status,evidence_bundle')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
-    if (!missionResult.data) {
+    if (missionError || !mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -73,7 +68,7 @@ export async function POST(
       }, { status: 404 });
     }
     
-    if (missionResult.data.status === 'closed') {
+    if (mission.status === 'closed') {
       return NextResponse.json({
         success: false,
         error: 'Mission already closed',
@@ -82,30 +77,25 @@ export async function POST(
       }, { status: 400 });
     }
     
-    // WRAPPED: Update mission with retry+timeout
-    const updateResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update({
-            status: 'closed',
-            phase: 'closure',
-            actual_end_date: timestamp,
-            progress_percent: 100,
-            evidence_bundle: {
-              ...missionResult.data.evidence_bundle,
-              closure: { closed_at: timestamp, closed_by, notes: closure_notes }
-            },
-            updated_at: timestamp
-          })
-          .eq('id', missionId)
-          .select('id,status,phase,progress_percent')
-          .single(),
-        3000
-      )
-    );
+    // Update mission
+    const { data: updatedMission, error: updateError } = await supabase
+      .from('missions')
+      .update({
+        status: 'closed',
+        phase: 'closure',
+        actual_end_date: timestamp,
+        progress_percent: 100,
+        evidence_bundle: {
+          ...mission.evidence_bundle,
+          closure: { closed_at: timestamp, closed_by, notes: closure_notes }
+        },
+        updated_at: timestamp
+      })
+      .eq('id', missionId)
+      .select('id,status,phase,progress_percent')
+      .single();
     
-    if (updateResult.error) throw updateResult.error;
+    if (updateError) throw updateError;
     
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
@@ -119,7 +109,7 @@ export async function POST(
     
     return NextResponse.json({
       success: true,
-      mission: updateResult.data,
+      mission: updatedMission,
       requestId: rid,
       duration
     });

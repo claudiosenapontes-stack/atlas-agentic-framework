@@ -60,20 +60,15 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // WRAPPED: Get mission with retry+timeout
-    const missionResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('id,phase,priority,company_id')
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .single(),
-        3000
-      )
-    );
+    // Get mission
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id,phase,priority,company_id')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
-    if (!missionResult.data) {
+    if (missionError || !mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -81,8 +76,6 @@ export async function POST(
         duration: Date.now() - startTime
       }, { status: 404 });
     }
-    
-    const mission = missionResult.data;
     
     // Prepare task payloads
     const taskPayloads = taskDefs.map((taskDef: any) => ({

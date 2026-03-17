@@ -86,11 +86,12 @@ export async function POST(
       priority: taskDef.priority || mission.priority || 'medium',
       company_id: mission.company_id,
       task_type: taskDef.task_type || 'implementation',
-      assigned_agent_id: taskDef.owner_agent || request.headers.get('x-agent-id') || null,
+      assigned_agent_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned',
+      owner_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned',
       metadata: { 
         mission_id: missionId, 
         source: 'decompose',
-        owner_agent: taskDef.owner_agent || request.headers.get('x-agent-id') || null
+        assigned_agent_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || null
       },
       created_at: timestamp,
       updated_at: timestamp,

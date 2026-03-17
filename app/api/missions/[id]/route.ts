@@ -113,24 +113,19 @@ export async function PUT(
     if (body.metadata !== undefined) updateData.metadata = body.metadata;
     if (body.evidence_bundle !== undefined) updateData.evidence_bundle = body.evidence_bundle;
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update(updateData)
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .select()
-          .single(),
-        3000
-      )
-    );
+    const { data: updatedMission, error } = await supabase
+      .from('missions')
+      .update(updateData)
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .select()
+      .single();
     
-    if (result.error) {
+    if (error) {
       return NextResponse.json({
         success: false,
-        error: result.error.message,
-        code: result.error.code,
+        error: error.message,
+        code: error.code,
         requestId: rid,
         duration: Date.now() - startTime
       }, { status: 400 });
@@ -149,7 +144,7 @@ export async function PUT(
     
     return NextResponse.json({
       success: true,
-      mission: result.data,
+      mission: updatedMission,
       requestId: rid,
       duration
     });
@@ -190,18 +185,13 @@ export async function DELETE(
   try {
     const supabase = getSupabaseAdmin();
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update({ deleted_at: timestamp, updated_at: timestamp })
-          .eq('id', missionId)
-          .is('deleted_at', null),
-        3000
-      )
-    );
+    const { error } = await supabase
+      .from('missions')
+      .update({ deleted_at: timestamp, updated_at: timestamp })
+      .eq('id', missionId)
+      .is('deleted_at', null);
     
-    if (result.error) throw result.error;
+    if (error) throw error;
     
     const duration = Date.now() - startTime;
     return NextResponse.json({

@@ -20,9 +20,9 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
+const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
   return Promise.race([
-    promise,
+    Promise.resolve(promise),
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error("timeout")), ms)
     )
@@ -119,50 +119,38 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Insert task with retry+timeout (ALL ownership fields populated)
-    const insertResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('tasks')
-          .insert({
-            id: taskId,
-            title: title.trim(),
-            description: description || null,
-            task_type: task_type.toLowerCase(),
-            status: 'pending',
-            priority: priority.toLowerCase(),
-            assigned_agent_id: assigned_agent_id.toLowerCase(),
-            owner_id: owner_id,  // DETERMINISTIC: never null when assigned_agent_id provided
-            mission_id: mission_id || null,
-            claimed_at: null,
-            execution_result: null,
-            created_at: timestamp,
-            updated_at: timestamp,
-          })
-          .select(),
-        3000
-      )
-    );
+    // Insert task
+    const { error: insertError } = await supabase
+      .from('tasks')
+      .insert({
+        id: taskId,
+        title: title.trim(),
+        description: description || null,
+        task_type: task_type.toLowerCase(),
+        status: 'pending',
+        priority: priority.toLowerCase(),
+        assigned_agent_id: assigned_agent_id.toLowerCase(),
+        owner_id: owner_id,
+        mission_id: mission_id || null,
+        claimed_at: null,
+        execution_result: null,
+        created_at: timestamp,
+        updated_at: timestamp,
+      })
+      .select();
     
-    if (insertResult.error) throw insertResult.error;
+    if (insertError) throw insertError;
     
-    // VERIFY: Select back and validate ownership fields
-    const verifyResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('tasks')
-          .select('*')
-          .eq('id', taskId)
-          .single(),
-        3000
-      )
-    );
+    // Verify: Select back the created task
+    const { data: verifiedTask, error: verifyError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
     
-    if (verifyResult.error || !verifyResult.data) {
+    if (verifyError || !verifiedTask) {
       throw new Error('Task verification failed after insert');
     }
-    
-    const verifiedTask = verifyResult.data;
     
     // HARD VALIDATION: Verify owner_id is NOT NULL
     if (!verifiedTask.owner_id) {

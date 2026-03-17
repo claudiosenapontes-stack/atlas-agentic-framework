@@ -18,9 +18,9 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
+const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
   return Promise.race([
-    promise,
+    Promise.resolve(promise),
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error("timeout")), ms)
     )

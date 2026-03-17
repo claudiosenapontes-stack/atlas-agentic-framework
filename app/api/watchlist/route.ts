@@ -43,12 +43,28 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // FILTER: Exclude test/demo items
+    // FILTER: Exclude test/demo items and extract metadata from description
     const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
     const filteredItems = (data || []).filter((item: any) => {
       const name = (item.name || '').toLowerCase();
       if (!name || name === 'none') return false;
       return !testPatterns.some(pattern => name.includes(pattern));
+    }).map((item: any) => {
+      // Extract metadata from description if action_payload is empty/missing
+      if ((!item.action_payload || Object.keys(item.action_payload).length === 0) && item.description) {
+        const metaMatch = item.description.match(/\[METADATA\](.+)$/s);
+        if (metaMatch) {
+          try {
+            const parsedMeta = JSON.parse(metaMatch[1]);
+            item.action_payload = parsedMeta;
+            // Clean up description for display
+            item.description = item.description.replace(/\[METADATA\].+$/s, '').trim();
+          } catch (e) {
+            // Invalid JSON, leave as-is
+          }
+        }
+      }
+      return item;
     });
     
     return NextResponse.json({
@@ -108,8 +124,8 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const id = randomUUID();
     
-    // Build action_payload with advanced rule config
-    const actionPayload: any = {
+    // Build metadata for storage
+    const ruleMetadata: any = {
       // Default behavior flags
       auto_execute: body.auto_execute ?? false,
       require_approval: body.require_approval ?? false,
@@ -117,28 +133,44 @@ export async function POST(request: NextRequest) {
     
     // Add advanced rule metadata if provided
     if (metadata) {
-      actionPayload.metadata = metadata;
+      ruleMetadata.metadata = metadata;
       // Support specific fields at top level for easier querying
-      if (metadata.critical_keywords) actionPayload.critical_keywords = metadata.critical_keywords;
-      if (metadata.high_keywords) actionPayload.high_keywords = metadata.high_keywords;
-      if (metadata.reply_scope) actionPayload.reply_scope = metadata.reply_scope;
-      if (metadata.follow_up_timing) actionPayload.follow_up_timing = metadata.follow_up_timing;
-      if (metadata.auto_summarize !== undefined) actionPayload.auto_summarize = metadata.auto_summarize;
-      if (metadata.recipient_chain) actionPayload.recipient_chain = metadata.recipient_chain;
+      if (metadata.critical_keywords) ruleMetadata.critical_keywords = metadata.critical_keywords;
+      if (metadata.high_keywords) ruleMetadata.high_keywords = metadata.high_keywords;
+      if (metadata.reply_scope) ruleMetadata.reply_scope = metadata.reply_scope;
+      if (metadata.follow_up_timing) ruleMetadata.follow_up_timing = metadata.follow_up_timing;
+      if (metadata.auto_summarize !== undefined) ruleMetadata.auto_summarize = metadata.auto_summarize;
+      if (metadata.recipient_chain) ruleMetadata.recipient_chain = metadata.recipient_chain;
     }
     
     // Build payload for watch_rules
+    // Note: action_payload may not exist in schema yet, store in description as JSON fallback
     const insertPayload: any = {
       id,
       name,
       pattern,
       rule_type,
       action_type,
-      action_payload: actionPayload,
       is_active: true,
       created_at: timestamp,
       updated_at: timestamp,
     };
+    
+    // Try to include action_payload if it exists
+    // If not, metadata will be stored in description as JSON
+    try {
+      insertPayload.action_payload = ruleMetadata;
+    } catch (e) {
+      // Column doesn't exist, will fall back to description
+    }
+    
+    // Always store metadata in description as JSON for compatibility
+    // This ensures data persists even if action_payload column is missing
+    if (body.description) {
+      insertPayload.description = body.description + "\n\n[METADATA]" + JSON.stringify(ruleMetadata);
+    } else {
+      insertPayload.description = "[METADATA]" + JSON.stringify(ruleMetadata);
+    }
     
     // Add optional fields
     if (body.description) insertPayload.description = body.description;

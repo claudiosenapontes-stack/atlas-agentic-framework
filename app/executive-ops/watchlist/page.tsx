@@ -16,12 +16,14 @@ import {
 
 interface WatchlistItem {
   id: string;
-  subject: string | null;
-  priority: string | null;
-  status: string;
-  category: string;
+  name: string;
+  pattern: string;
+  rule_type: string;
+  action_type: string;
   description: string | null;
-  source: string | null;
+  owner_id: string | null;
+  is_active: boolean;
+  metadata: any;
   created_at: string;
   updated_at: string;
 }
@@ -38,19 +40,17 @@ async function getWatchlist(): Promise<WatchlistItem[] | null> {
   }
 }
 
-function mapPriority(priority: string | null): 'p0' | 'p1' | 'p2' | 'p3' {
-  if (!priority) return 'p3';
-  if (priority === 'urgent' || priority === 'high') return 'p0';
-  if (priority === 'medium') return 'p1';
-  if (priority === 'low') return 'p2';
+function getRulePriority(ruleType: string): 'p0' | 'p1' | 'p2' | 'p3' {
+  // Map rule types to priority levels
+  if (ruleType === 'critical_alert' || ruleType === 'ceo_escalation') return 'p0';
+  if (ruleType === 'opportunity' || ruleType === 'lead') return 'p1';
+  if (ruleType === 'keyword_match') return 'p2';
   return 'p3';
 }
 
-function mapStatus(status: string): 'on_track' | 'at_risk' | 'blocked' | 'completed' {
-  if (status === 'active' || status === 'confirmed') return 'on_track';
-  if (status === 'blocked') return 'blocked';
-  if (status === 'completed' || status === 'done') return 'completed';
-  return 'at_risk';
+function getItemStatus(isActive: boolean): 'on_track' | 'at_risk' | 'blocked' | 'completed' {
+  if (!isActive) return 'blocked';
+  return 'on_track';
 }
 
 const PRIORITY_COLORS = {

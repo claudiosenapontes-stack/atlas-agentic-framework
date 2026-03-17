@@ -51,19 +51,14 @@ export async function GET(
   try {
     const supabase = getSupabaseAdmin();
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('*')
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .single(),
-        3000
-      )
-    );
+    const { data: mission, error } = await supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
-    if (!result.data) {
+    if (error || !mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -75,7 +70,7 @@ export async function GET(
     const duration = Date.now() - startTime;
     return NextResponse.json({
       success: true,
-      mission: result.data,
+      mission: mission,
       requestId: rid,
       duration
     });

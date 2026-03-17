@@ -96,11 +96,7 @@ export async function GET(request: NextRequest) {
     if (phase && phase !== 'all') query = query.eq('phase', phase);
     if (ownerId && ownerId !== 'all') query = query.or(`owner_id.eq.${ownerId},owner_agent.eq.${ownerId}`);
     
-    const { data: missions, error, count } = await withTimeout(
-      query,
-      MAX_EXECUTION_MS,
-      'Supabase GET'
-    );
+    const { data: missions, error, count } = await query;
     
     if (error) {
       const duration = Date.now() - startTime;
@@ -207,18 +203,11 @@ export async function POST(request: NextRequest) {
     if (body.metadata) insertData.metadata = body.metadata;
     if (body.tags) insertData.tags = body.tags;
     
-    const { data: mission, error } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').insert(insertData).select().single(),
-        2,
-        'POST mission'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase POST'
-    );
+    const { data: mission, error } = await supabase
+      .from('missions')
+      .insert(insertData)
+      .select()
+      .single();
     
     if (error) {
       const duration = Date.now() - startTime;

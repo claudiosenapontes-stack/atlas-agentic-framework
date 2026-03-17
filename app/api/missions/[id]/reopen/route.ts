@@ -81,19 +81,13 @@ export async function POST(
     
     const supabase = getSupabaseAdmin();
     
-    // Get mission with retry
-    const { data: mission, error: missionError } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single(),
-        2,
-        'GET mission for reopen'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase GET mission'
-    );
+    // Get mission
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
     if (missionError || !mission) {
       const duration = Date.now() - startTime;
@@ -125,26 +119,20 @@ export async function POST(
       }
     };
     
-    // Update mission with retry
-    const { data: updatedMission, error: updateError } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').update({
-          status: 'active',
-          phase: new_phase,
-          actual_end_date: null,
-          evidence_bundle: reopenEvidence,
-          updated_at: timestamp,
-          metadata: { ...mission.metadata, changed_by: reopened_by, changed_by_agent: reopened_by_agent }
-        }).eq('id', missionId).select().single(),
-        2,
-        'UPDATE mission reopen'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase UPDATE reopen'
-    );
+    // Update mission
+    const { data: updatedMission, error: updateError } = await supabase
+      .from('missions')
+      .update({
+        status: 'active',
+        phase: new_phase,
+        actual_end_date: null,
+        evidence_bundle: reopenEvidence,
+        updated_at: timestamp,
+        metadata: { ...mission.metadata, changed_by: reopened_by, changed_by_agent: reopened_by_agent }
+      })
+      .eq('id', missionId)
+      .select()
+      .single();
     
     if (updateError) {
       const duration = Date.now() - startTime;

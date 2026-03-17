@@ -83,19 +83,13 @@ export async function POST(
     
     const supabase = getSupabaseAdmin();
     
-    // Get mission with retry
-    const { data: mission, error: missionError } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single(),
-        2,
-        'GET mission for decompose'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase GET mission'
-    );
+    // Get mission
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
     if (missionError || !mission) {
       const duration = Date.now() - startTime;
@@ -121,19 +115,11 @@ export async function POST(
       updated_at: timestamp,
     }));
     
-    // Insert tasks with retry
-    const { data: createdTasks, error: tasksError } = await withTimeout(
-      withRetry(() => 
-        supabase.from('tasks').insert(taskPayloads).select(),
-        2,
-        'INSERT tasks'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase INSERT tasks'
-    );
+    // Insert tasks
+    const { data: createdTasks, error: tasksError } = await supabase
+      .from('tasks')
+      .insert(taskPayloads)
+      .select();
     
     if (tasksError) {
       const duration = Date.now() - startTime;
@@ -150,21 +136,24 @@ export async function POST(
       is_blocking: taskDefs[i]?.is_blocking || false,
     }));
     
-    const { data: taskLinks } = await withTimeout(
-      supabase.from('mission_tasks').insert(linkPayloads).select(),
-      MAX_EXECUTION_MS,
-      'Supabase INSERT links'
-    );
+    const { data: taskLinks } = await supabase
+      .from('mission_tasks')
+      .insert(linkPayloads)
+      .select();
     
     // Fire-and-forget mission update (non-blocking)
     if (mission.phase === 'planning') {
-      supabase.from('missions').update({
-        phase: 'execution',
-        status: 'active',
-        actual_start_date: timestamp,
-        updated_at: timestamp,
-        metadata: { ...mission.metadata, changed_by: created_by, changed_by_agent: created_by_agent }
-      }).eq('id', missionId).then(() => {}).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('missions').update({
+            phase: 'execution',
+            status: 'active',
+            actual_start_date: timestamp,
+            updated_at: timestamp,
+            metadata: { ...mission.metadata, changed_by: created_by, changed_by_agent: created_by_agent }
+          }).eq('id', missionId);
+        } catch {}
+      })();
     }
     
     const duration = Date.now() - startTime;

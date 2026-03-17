@@ -89,12 +89,7 @@ export async function GET(
       ? supabase.from('missions').select(`*, mission_tasks(task_id, tasks(*))`).eq('id', missionId).is('deleted_at', null).single()
       : supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single();
     
-    const result = await withTimeout(
-      query,
-      MAX_EXECUTION_MS,
-      'Supabase GET single'
-    ) as { data: any; error: any };
-    const { data: mission, error } = result;
+    const { data: mission, error } = await query;
     
     if (error || !mission) {
       const duration = Date.now() - startTime;
@@ -204,18 +199,13 @@ export async function PUT(
     if (body.status === 'active' && !body.actual_start_date) updateData.actual_start_date = timestamp;
     if ((body.status === 'closed' || body.status === 'completed') && !body.actual_end_date) updateData.actual_end_date = timestamp;
     
-    const { data: mission, error } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').update(updateData).eq('id', missionId).is('deleted_at', null).select().single(),
-        2,
-        'PUT mission'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase PUT'
-    );
+    const { data: mission, error } = await supabase
+      .from('missions')
+      .update(updateData)
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .select()
+      .single();
     
     if (error) {
       const duration = Date.now() - startTime;
@@ -231,13 +221,17 @@ export async function PUT(
     
     // Fire-and-forget status history (non-blocking)
     if (body.status) {
-      supabase.from('mission_status_history').insert({
-        mission_id: missionId,
-        previous_status: mission.status,
-        new_status: body.status,
-        changed_by: body.changed_by || null,
-        reason: body.status_change_reason || null,
-      }).then(() => {}).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('mission_status_history').insert({
+            mission_id: missionId,
+            previous_status: mission.status,
+            new_status: body.status,
+            changed_by: body.changed_by || null,
+            reason: body.status_change_reason || null,
+          });
+        } catch {}
+      })();
     }
     
     const duration = Date.now() - startTime;
@@ -289,18 +283,11 @@ export async function DELETE(
   try {
     const supabase = getSupabaseAdmin();
     
-    const { error } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').update({ deleted_at: timestamp, updated_at: timestamp }).eq('id', missionId).is('deleted_at', null),
-        2,
-        'DELETE mission'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase DELETE'
-    );
+    const { error } = await supabase
+      .from('missions')
+      .update({ deleted_at: timestamp, updated_at: timestamp })
+      .eq('id', missionId)
+      .is('deleted_at', null);
     
     if (error) {
       const duration = Date.now() - startTime;

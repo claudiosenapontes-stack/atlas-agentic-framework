@@ -73,12 +73,12 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     
     // Get mission
-    const missionResult = await withTimeout(
-      supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single(),
-      MAX_EXECUTION_MS,
-      'Supabase GET mission'
-    ) as { data: any; error: any };
-    const { data: mission, error: missionError } = missionResult;
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
     if (missionError || !mission) {
       const duration = Date.now() - startTime;
@@ -105,27 +105,21 @@ export async function POST(
       ...(evidence_updates || {}),
     };
     
-    // Update mission with retry
-    const { data: updatedMission, error: updateError } = await withTimeout(
-      withRetry(() => 
-        supabase.from('missions').update({
-          status: 'closed',
-          phase: 'closure',
-          actual_end_date: timestamp,
-          progress_percent: 100,
-          evidence_bundle: closureEvidence,
-          updated_at: timestamp,
-          metadata: { ...mission.metadata, changed_by: closed_by, changed_by_agent: closed_by_agent }
-        }).eq('id', missionId).select().single(),
-        2,
-        'UPDATE mission close'
-      ).then(r => {
-        if (r.error) throw r.error;
-        return { data: r.data, error: null };
-      }),
-      MAX_EXECUTION_MS,
-      'Supabase UPDATE close'
-    );
+    // Update mission
+    const { data: updatedMission, error: updateError } = await supabase
+      .from('missions')
+      .update({
+        status: 'closed',
+        phase: 'closure',
+        actual_end_date: timestamp,
+        progress_percent: 100,
+        evidence_bundle: closureEvidence,
+        updated_at: timestamp,
+        metadata: { ...mission.metadata, changed_by: closed_by, changed_by_agent: closed_by_agent }
+      })
+      .eq('id', missionId)
+      .select()
+      .single();
     
     if (updateError) {
       const duration = Date.now() - startTime;

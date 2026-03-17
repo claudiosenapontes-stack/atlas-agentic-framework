@@ -90,7 +90,7 @@ export default function MilestonesPage() {
       setMilestones(milestoneList);
 
       // Fetch related missions for context
-      const missionIds = [...new Set(milestoneList.map((m: Milestone) => m.mission_id).filter(Boolean))];
+      const missionIds = Array.from(new Set(milestoneList.map((m: Milestone) => m.mission_id).filter(Boolean)));
       if (missionIds.length > 0) {
         const missionsRes = await fetch('/api/missions?limit=100', { cache: 'no-store' });
         if (missionsRes.ok) {

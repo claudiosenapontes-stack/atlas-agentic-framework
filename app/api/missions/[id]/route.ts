@@ -1,11 +1,11 @@
 /**
- * ATLAS-MISSION API v2 - RAIL-HARDENED
- * ATLAS-OPTIMUS-TASK-ENGINE-CLOSEOUT-5002
+ * ATLAS-MISSION API v3 - RAIL-HARDENED
+ * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
  * 
  * GET/PUT/DELETE /api/missions/:id
  * - FORCE NODEJS RUNTIME (NO EDGE)
- * - 3s global timeout guard
- * - 2 retries with 150ms backoff
+ * - 3s global timeout guard (ALL DB calls wrapped)
+ * - 2 retries with 150ms backoff (ALL DB calls)
  * - State transition guarantees
  * - NO 500 errors (graceful handling)
  */
@@ -17,9 +17,9 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
+const withTimeout = (promise: Promise<any>, ms = 3000) => {
   return Promise.race([
-    Promise.resolve(promise),
+    promise,
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error("timeout")), ms)
     )
@@ -39,7 +39,7 @@ async function withRetry(fn: () => Promise<any>, retries = 2) {
 
 const requestId = () => randomUUID().slice(0, 8);
 
-// GET /api/missions/:id
+// GET /api/missions/:id (RAIL-HARDENED)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -92,7 +92,7 @@ export async function GET(
   }
 }
 
-// PUT /api/missions/:id - State transitions guaranteed
+// PUT /api/missions/:id - State transitions (RAIL-HARDENED)
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -106,39 +106,36 @@ export async function PUT(
     const body = await withTimeout(request.json(), 1000);
     const supabase = getSupabaseAdmin();
     
-    // Build update data
     const updateData: any = { updated_at: timestamp };
     
-    // Always allow these fields
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.objective !== undefined) updateData.objective = body.objective;
     if (body.priority !== undefined) updateData.priority = body.priority;
-    
-    // State transitions (always allowed)
     if (body.status !== undefined) updateData.status = body.status;
     if (body.phase !== undefined) updateData.phase = body.phase;
     if (body.progress_percent !== undefined) updateData.progress_percent = body.progress_percent;
-    
-    // Metadata updates
     if (body.metadata !== undefined) updateData.metadata = body.metadata;
     if (body.evidence_bundle !== undefined) updateData.evidence_bundle = body.evidence_bundle;
     
-    // Update mission
-    const { data: updatedMission, error } = await supabase
-      .from('missions')
-      .update(updateData)
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .select()
-      .single();
+    const result = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .update(updateData)
+          .eq('id', missionId)
+          .is('deleted_at', null)
+          .select()
+          .single(),
+        3000
+      )
+    );
     
-    if (error) {
-      // Graceful error - never 500
+    if (result.error) {
       return NextResponse.json({
         success: false,
-        error: error.message,
-        code: error.code,
+        error: result.error.message,
+        code: result.error.code,
         requestId: rid,
         duration: Date.now() - startTime
       }, { status: 400 });
@@ -157,7 +154,7 @@ export async function PUT(
     
     return NextResponse.json({
       success: true,
-      mission: updatedMission,
+      mission: result.data,
       requestId: rid,
       duration
     });
@@ -185,7 +182,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/missions/:id
+// DELETE /api/missions/:id (RAIL-HARDENED)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -198,13 +195,18 @@ export async function DELETE(
   try {
     const supabase = getSupabaseAdmin();
     
-    const { error } = await supabase
-      .from('missions')
-      .update({ deleted_at: timestamp, updated_at: timestamp })
-      .eq('id', missionId)
-      .is('deleted_at', null);
+    const result = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .update({ deleted_at: timestamp, updated_at: timestamp })
+          .eq('id', missionId)
+          .is('deleted_at', null),
+        3000
+      )
+    );
     
-    if (error) throw error;
+    if (result.error) throw result.error;
     
     const duration = Date.now() - startTime;
     return NextResponse.json({

@@ -1,9 +1,9 @@
 /**
- * POST /api/missions/:id/decompose - RAIL-HARDENED
+ * POST /api/missions/:id/decompose - RAIL-HARDENED v2
  * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
  * - FORCE NODEJS RUNTIME (NO EDGE)
- * - 3s global timeout guard
- * - 2 retries with 150ms backoff
+ * - 3s global timeout guard (ALL DB calls wrapped)
+ * - 2 retries with 150ms backoff (ALL DB calls)
  * - Structured logging (requestId, duration, errorSource)
  */
 
@@ -14,7 +14,7 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
+const withTimeout = (promise: Promise<any>, ms = 3000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) => 
@@ -60,15 +60,20 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // Get mission
-    const { data: mission, error: missionError } = await supabase
-      .from('missions')
-      .select('id,phase,priority,company_id')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
+    // WRAPPED: Get mission with retry+timeout
+    const missionResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .select('id,phase,priority,company_id')
+          .eq('id', missionId)
+          .is('deleted_at', null)
+          .single(),
+        3000
+      )
+    );
     
-    if (missionError || !mission) {
+    if (!missionResult.data) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -77,7 +82,9 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // Prepare task payloads with ownership (schema-compliant fields only)
+    const mission = missionResult.data;
+    
+    // Prepare task payloads
     const taskPayloads = taskDefs.map((taskDef: any) => ({
       id: randomUUID(),
       title: taskDef.title,
@@ -96,16 +103,23 @@ export async function POST(
       updated_at: timestamp,
     }));
     
-    // Insert tasks
-    const { data: createdTasks, error: tasksError } = await supabase
-      .from('tasks')
-      .insert(taskPayloads)
-      .select('id,title,status');
+    // WRAPPED: Insert tasks with retry+timeout
+    const tasksResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('tasks')
+          .insert(taskPayloads)
+          .select('id,title,status'),
+        3000
+      )
+    );
     
-    if (tasksError) throw tasksError;
+    if (tasksResult.error) throw tasksResult.error;
     
-    // Create mission_task links
-    if (createdTasks && createdTasks.length > 0) {
+    const createdTasks = tasksResult.data || [];
+    
+    // Fire-and-forget: Create mission_task links
+    if (createdTasks.length > 0) {
       const linkPayloads = createdTasks.map((task: any, i: number) => ({
         mission_id: missionId,
         task_id: task.id,
@@ -114,7 +128,6 @@ export async function POST(
         is_blocking: taskDefs[i]?.is_blocking || false,
       }));
       
-      // Fire-and-forget links
       (async () => {
         try {
           await supabase.from('mission_tasks').insert(linkPayloads);
@@ -122,7 +135,7 @@ export async function POST(
       })();
     }
     
-    // Fire-and-forget mission update
+    // Fire-and-forget: Update mission phase
     if (mission.phase === 'planning') {
       (async () => {
         try {

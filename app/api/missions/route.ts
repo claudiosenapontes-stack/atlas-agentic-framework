@@ -1,13 +1,14 @@
 /**
- * ATLAS-MISSIONS API v1 - RAIL-HARDENED
+ * ATLAS-MISSIONS API - RAIL-HARDENED v2
  * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
  * 
  * GET/POST /api/missions
  * - FORCE NODEJS RUNTIME (NO EDGE)
- * - 3s global timeout guard
- * - 2 retries with 150ms backoff
- * - Structured logging (requestId, duration, errorSource)
+ * - 3s global timeout guard (ALL DB calls wrapped)
+ * - 2 retries with 150ms backoff (ALL DB calls)
+ * - Structured logging (requestId, duration)
  * - NO DEMO FALLBACK
+ * - FAST HEALTH CHECK FORMAT
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +18,7 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
+const withTimeout = (promise: Promise<any>, ms = 3000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) => 
@@ -39,7 +40,7 @@ async function withRetry(fn: () => Promise<any>, retries = 2) {
 
 const requestId = () => randomUUID().slice(0, 8);
 
-// GET /api/missions - List all missions
+// GET /api/missions - List all missions (RAIL-HARDENED)
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const rid = requestId();
@@ -51,14 +52,20 @@ export async function GET(request: NextRequest) {
     
     const supabase = getSupabaseAdmin();
     
-    const { data: missions, error } = await supabase
-      .from('missions')
-      .select('*', { count: 'exact' })
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    // WRAPPED: withRetry + withTimeout
+    const result = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .select('*', { count: 'exact' })
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1),
+        3000
+      )
+    );
     
-    if (error) throw error;
+    if (result.error) throw result.error;
     
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
@@ -66,13 +73,14 @@ export async function GET(request: NextRequest) {
       endpoint: 'GET /api/missions',
       requestId: rid,
       duration,
-      recordCount: missions?.length || 0,
+      recordCount: result.data?.length || 0,
       success: true
     }));
     
+    // FAST HEALTH CHECK FORMAT
     return NextResponse.json({
       success: true,
-      missions: missions || [],
+      missions: result.data || [],
       requestId: rid,
       duration
     });
@@ -98,7 +106,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/missions - Create new mission
+// POST /api/missions - Create new mission (RAIL-HARDENED)
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const rid = requestId();
@@ -117,6 +125,7 @@ export async function POST(request: NextRequest) {
     
     const supabase = getSupabaseAdmin();
     
+    // WRAPPED: withRetry + withTimeout
     const result = await withRetry(() =>
       withTimeout(
         supabase

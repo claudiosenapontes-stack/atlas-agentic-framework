@@ -94,11 +94,6 @@ export async function POST(request: NextRequest) {
             status: 'pending',
             priority: priority.toLowerCase(),
             assigned_agent_id: assigned_agent_id.toLowerCase(),
-            mission_id: mission_id || null,
-            claimed_at: null,
-            execution_result: null,
-            created_at: timestamp,
-            updated_at: timestamp,
           })
           .select(),
         3000

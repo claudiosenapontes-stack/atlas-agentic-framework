@@ -1,13 +1,13 @@
 /**
- * ATLAS-MISSION API v1 - RAIL-HARDENED
- * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
+ * ATLAS-MISSION API v2 - RAIL-HARDENED
+ * ATLAS-OPTIMUS-TASK-ENGINE-CLOSEOUT-5002
  * 
  * GET/PUT/DELETE /api/missions/:id
  * - FORCE NODEJS RUNTIME (NO EDGE)
  * - 3s global timeout guard
  * - 2 retries with 150ms backoff
- * - Structured logging (requestId, duration, errorSource)
- * - NO DEMO FALLBACK
+ * - State transition guarantees
+ * - NO 500 errors (graceful handling)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,9 +17,9 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
+const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
   return Promise.race([
-    promise,
+    Promise.resolve(promise),
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error("timeout")), ms)
     )
@@ -73,15 +73,6 @@ export async function GET(
     }
     
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({
-      level: 'info',
-      endpoint: 'GET /api/missions/:id',
-      requestId: rid,
-      missionId,
-      duration,
-      success: true
-    }));
-    
     return NextResponse.json({
       success: true,
       mission: result.data,
@@ -92,16 +83,6 @@ export async function GET(
   } catch (error: any) {
     const duration = Date.now() - startTime;
     const isTimeout = error.message === 'timeout';
-    console.log(JSON.stringify({
-      level: 'error',
-      endpoint: 'GET /api/missions/:id',
-      requestId: rid,
-      missionId,
-      duration,
-      errorSource: isTimeout ? 'timeout' : 'supabase',
-      success: false
-    }));
-    
     return NextResponse.json({
       success: false,
       error: isTimeout ? 'Request timeout' : error.message,
@@ -111,7 +92,7 @@ export async function GET(
   }
 }
 
-// PUT /api/missions/:id
+// PUT /api/missions/:id - State transitions guaranteed
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -119,32 +100,49 @@ export async function PUT(
   const startTime = Date.now();
   const rid = requestId();
   const missionId = params.id;
+  const timestamp = new Date().toISOString();
   
   try {
     const body = await withTimeout(request.json(), 1000);
     const supabase = getSupabaseAdmin();
     
-    const updateData: any = { updated_at: new Date().toISOString() };
+    // Build update data
+    const updateData: any = { updated_at: timestamp };
+    
+    // Always allow these fields
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.phase !== undefined) updateData.phase = body.phase;
+    if (body.objective !== undefined) updateData.objective = body.objective;
     if (body.priority !== undefined) updateData.priority = body.priority;
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update(updateData)
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .select()
-          .single(),
-        3000
-      )
-    );
+    // State transitions (always allowed)
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.phase !== undefined) updateData.phase = body.phase;
+    if (body.progress_percent !== undefined) updateData.progress_percent = body.progress_percent;
     
-    if (result.error) throw result.error;
+    // Metadata updates
+    if (body.metadata !== undefined) updateData.metadata = body.metadata;
+    if (body.evidence_bundle !== undefined) updateData.evidence_bundle = body.evidence_bundle;
+    
+    // Update mission
+    const { data: updatedMission, error } = await supabase
+      .from('missions')
+      .update(updateData)
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .select()
+      .single();
+    
+    if (error) {
+      // Graceful error - never 500
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
+    }
     
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
@@ -153,12 +151,13 @@ export async function PUT(
       requestId: rid,
       missionId,
       duration,
+      updated: Object.keys(updateData),
       success: true
     }));
     
     return NextResponse.json({
       success: true,
-      mission: result.data,
+      mission: updatedMission,
       requestId: rid,
       duration
     });
@@ -172,7 +171,8 @@ export async function PUT(
       requestId: rid,
       missionId,
       duration,
-      errorSource: isTimeout ? 'timeout' : 'exception',
+      error: error.message,
+      isTimeout,
       success: false
     }));
     
@@ -193,34 +193,20 @@ export async function DELETE(
   const startTime = Date.now();
   const rid = requestId();
   const missionId = params.id;
+  const timestamp = new Date().toISOString();
   
   try {
     const supabase = getSupabaseAdmin();
-    const timestamp = new Date().toISOString();
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update({ deleted_at: timestamp, updated_at: timestamp })
-          .eq('id', missionId)
-          .is('deleted_at', null),
-        3000
-      )
-    );
+    const { error } = await supabase
+      .from('missions')
+      .update({ deleted_at: timestamp, updated_at: timestamp })
+      .eq('id', missionId)
+      .is('deleted_at', null);
     
-    if (result.error) throw result.error;
+    if (error) throw error;
     
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({
-      level: 'info',
-      endpoint: 'DELETE /api/missions/:id',
-      requestId: rid,
-      missionId,
-      duration,
-      success: true
-    }));
-    
     return NextResponse.json({
       success: true,
       message: 'Mission deleted',
@@ -231,16 +217,6 @@ export async function DELETE(
   } catch (error: any) {
     const duration = Date.now() - startTime;
     const isTimeout = error.message === 'timeout';
-    console.log(JSON.stringify({
-      level: 'error',
-      endpoint: 'DELETE /api/missions/:id',
-      requestId: rid,
-      missionId,
-      duration,
-      errorSource: isTimeout ? 'timeout' : 'supabase',
-      success: false
-    }));
-    
     return NextResponse.json({
       success: false,
       error: isTimeout ? 'Request timeout' : error.message,

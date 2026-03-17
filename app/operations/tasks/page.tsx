@@ -30,10 +30,13 @@ interface Task {
   assigned_agent?: { display_name: string };
   blocked_since?: string;
   stuck_duration?: number;
+  mission_id?: string;
+  mission?: { id: string; title: string };
 }
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [missions, setMissions] = useState<Record<string, { id: string; title: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -43,9 +46,20 @@ export default function TasksPage() {
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch("/api/tasks?limit=200");
-      const data = await res.json();
-      const enrichedTasks = (data.tasks || []).map((task: Task) => {
+      const [tasksRes, missionsRes] = await Promise.all([
+        fetch("/api/tasks?limit=200"),
+        fetch("/api/missions?limit=100"),
+      ]);
+      const tasksData = await tasksRes.json();
+      const missionsData = await missionsRes.json();
+      
+      const missionMap: Record<string, { id: string; title: string }> = {};
+      (missionsData.missions || []).forEach((m: any) => {
+        missionMap[m.id] = { id: m.id, title: m.title };
+      });
+      setMissions(missionMap);
+      
+      const enrichedTasks = (tasksData.tasks || []).map((task: Task) => {
         const now = new Date();
         const updated = new Date(task.updated_at);
         const daysStuck = Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
@@ -120,6 +134,7 @@ export default function TasksPage() {
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Status</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Owner</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-32">Mission</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Stuck Time</th>
                 </tr>
               </thead>
@@ -141,6 +156,19 @@ export default function TasksPage() {
                       <span className="text-[10px] text-[#9BA3AF]">{task.assigned_agent?.display_name || task.agent_id || 'Unassigned'}</span>
                     </td>
                     <td className="px-4 py-2.5 text-[10px] text-[#9BA3AF]">{task.priority || 'medium'}</td>
+                    <td className="px-4 py-2.5">
+                      {task.mission_id && missions[task.mission_id] ? (
+                        <Link href={`/operations/missions/${task.mission_id}`} className="text-[10px] text-[#FF6A00] hover:underline truncate block max-w-[100px]">
+                          {missions[task.mission_id].title.slice(0, 20)}...
+                        </Link>
+                      ) : task.mission ? (
+                        <Link href={`/operations/missions/${task.mission.id}`} className="text-[10px] text-[#FF6A00] hover:underline truncate block max-w-[100px]">
+                          {task.mission.title.slice(0, 20)}...
+                        </Link>
+                      ) : (
+                        <span className="text-[10px] text-[#6B7280]">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5">
                       {task.status === 'blocked' && (
                         <span className="text-[10px] font-medium text-red-400">

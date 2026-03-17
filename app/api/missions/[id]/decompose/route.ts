@@ -14,7 +14,7 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
+const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
   return Promise.race([
     promise,
     new Promise((_, reject) => 
@@ -61,19 +61,14 @@ export async function POST(
     const timestamp = new Date().toISOString();
     
     // Get mission
-    const missionResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('id,phase,priority,company_id')
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .single(),
-        3000
-      )
-    );
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id,phase,priority,company_id')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
-    if (!missionResult.data) {
+    if (missionError || !mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -81,8 +76,6 @@ export async function POST(
         duration: Date.now() - startTime
       }, { status: 404 });
     }
-    
-    const mission = missionResult.data;
     
     // Prepare task payloads with ownership (schema-compliant fields only)
     const taskPayloads = taskDefs.map((taskDef: any) => ({
@@ -104,18 +97,15 @@ export async function POST(
     }));
     
     // Insert tasks
-    const tasksResult = await withRetry(() =>
-      withTimeout(
-        supabase.from('tasks').insert(taskPayloads).select('id,title,status'),
-        3000
-      )
-    );
+    const { data: createdTasks, error: tasksError } = await supabase
+      .from('tasks')
+      .insert(taskPayloads)
+      .select('id,title,status');
     
-    if (tasksResult.error) throw tasksResult.error;
+    if (tasksError) throw tasksError;
     
     // Create mission_task links
-    const createdTasks = tasksResult.data || [];
-    if (createdTasks.length > 0) {
+    if (createdTasks && createdTasks.length > 0) {
       const linkPayloads = createdTasks.map((task: any, i: number) => ({
         mission_id: missionId,
         task_id: task.id,
@@ -125,17 +115,25 @@ export async function POST(
       }));
       
       // Fire-and-forget links
-      supabase.from('mission_tasks').insert(linkPayloads).then(() => {}).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('mission_tasks').insert(linkPayloads);
+        } catch {}
+      })();
     }
     
     // Fire-and-forget mission update
     if (mission.phase === 'planning') {
-      supabase.from('missions').update({
-        phase: 'execution',
-        status: 'active',
-        actual_start_date: timestamp,
-        updated_at: timestamp
-      }).eq('id', missionId).then(() => {}).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('missions').update({
+            phase: 'execution',
+            status: 'active',
+            actual_start_date: timestamp,
+            updated_at: timestamp
+          }).eq('id', missionId);
+        } catch {}
+      })();
     }
     
     const duration = Date.now() - startTime;

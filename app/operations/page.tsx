@@ -105,7 +105,13 @@ export default function UnifiedOperationsDashboard() {
     return { completed, total, successRate: total > 0 ? (completed / total) * 100 : 0, totalCost: executions.reduce((acc, e) => acc + (e.cost_usd || 0), 0) };
   }, [executions]);
 
-  const agentMetrics = useMemo(() => ({ total: agents.length, online: agents.filter(a => a.status === "online").length }), [agents]);
+  const agentMetrics = useMemo(() => {
+    const total = agents.length;
+    const online = agents.filter(a => a.status === "online").length;
+    const failing = agents.filter(a => (a.successRate || 100) < 50).length;
+    const overloaded = agents.filter(a => (a.queueDepth || 0) > 5 || (a.currentTask && a.queueDepth && a.queueDepth > 3)).length;
+    return { total, online, failing, overloaded };
+  }, [agents]);
 
   const getMissionStatusColor = (status: string) => {
     switch (status) {
@@ -228,10 +234,10 @@ export default function UnifiedOperationsDashboard() {
         </section>
       )}
 
-      {taskMetrics.overloadedAgents > 0 && (
+      {(taskMetrics.overloadedAgents > 0 || agentMetrics.overloaded > 0) && (
         <section>
           <h2 className="text-sm font-medium text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> Overloaded Agents ({taskMetrics.overloadedAgents})
+            <AlertCircle className="w-4 h-4" /> Overloaded Agents ({taskMetrics.overloadedAgents + agentMetrics.overloaded})
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {Object.entries(taskMetrics.byAgent)
@@ -243,6 +249,38 @@ export default function UnifiedOperationsDashboard() {
                     <p className="text-red-400 text-xs font-medium truncate">{agentId}</p>
                     <p className="text-xl font-bold text-red-500">{count} tasks</p>
                     <p className="text-[#9BA3AF] text-[10px]">Threshold: {taskMetrics.overloadedThreshold}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            {agents
+              .filter(a => (a.queueDepth || 0) > 5)
+              .map(agent => (
+                <Card key={agent.name} className="border-red-500/30 bg-red-500/5">
+                  <CardContent className="p-3">
+                    <p className="text-red-400 text-xs font-medium truncate">{agent.displayName || agent.name}</p>
+                    <p className="text-xl font-bold text-red-500">{agent.queueDepth} queue</p>
+                    <p className="text-[#9BA3AF] text-[10px]">Load: {agent.currentTask || 'idle'}</p>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        </section>
+      )}
+
+      {agentMetrics.failing > 0 && (
+        <section>
+          <h2 className="text-sm font-medium text-red-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> Failing Agents ({agentMetrics.failing})
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {agents
+              .filter(a => (a.successRate || 100) < 50)
+              .map(agent => (
+                <Card key={agent.name} className="border-red-500/50 bg-red-500/10">
+                  <CardContent className="p-3">
+                    <p className="text-red-400 text-xs font-medium truncate">{agent.displayName || agent.name}</p>
+                    <p className="text-xl font-bold text-red-500">{agent.successRate}% success</p>
+                    <p className="text-[#9BA3AF] text-[10px]">Status: {agent.status}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -264,7 +302,8 @@ export default function UnifiedOperationsDashboard() {
             { label: "Overloaded Agents", value: taskMetrics.overloadedAgents, color: taskMetrics.overloadedAgents > 0 ? "text-red-500" : "text-green-500" },
             { label: "Success Rate", value: `${executionMetrics.successRate.toFixed(0)}%`, color: "text-green-500" },
             { label: "Executions", value: executionMetrics.total },
-            { label: "Agents Online", value: agentMetrics.online, color: "text-green-500" },
+            { label: "Agents Online", value: agentMetrics.online, color: agentMetrics.online === 0 ? "text-red-500" : "text-green-500" },
+            { label: "Failing Agents", value: agentMetrics.failing, color: agentMetrics.failing > 0 ? "text-red-500" : "text-green-500" },
             { label: "Cost", value: `$${executionMetrics.totalCost.toFixed(0)}` },
           ].map((kpi, i) => (
             <Card key={i}>

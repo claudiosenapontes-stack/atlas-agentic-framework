@@ -12,7 +12,8 @@ import {
   HeartPulse,
   Loader2,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Clock
 } from "lucide-react";
 
 interface Agent {
@@ -23,6 +24,10 @@ interface Agent {
   active_tasks: number;
   completed_tasks: number;
   current_load: number;
+  queue_depth?: number;
+  success_rate?: number;
+  is_overloaded?: boolean;
+  is_failing?: boolean;
 }
 
 interface Task {
@@ -87,24 +92,64 @@ export default function DelegationPage() {
 
   const fetchData = async () => {
     try {
-      const [agentsRes, tasksRes] = await Promise.all([
+      const [agentsRes, tasksRes, execsRes] = await Promise.all([
         fetch("/api/agents/live"),
-        fetch("/api/tasks?status=pending&limit=50"),
+        fetch("/api/tasks?limit=200"),
+        fetch("/api/executions?limit=100"),
       ]);
 
       const agentsData = await agentsRes.json();
       const tasksData = await tasksRes.json();
+      const execsData = await execsRes.json();
 
-      const enhancedAgents = (agentsData.agents || []).map((agent: any) => ({
-        ...agent,
-        capabilities: getAgentCapabilities(agent.name),
-        active_tasks: Math.floor(Math.random() * 5),
-        completed_tasks: Math.floor(Math.random() * 50) + 10,
-        current_load: Math.floor(Math.random() * 100),
-      }));
+      const allTasks = tasksData.tasks || [];
+      const executions = execsData.executions || [];
+
+      // Calculate real metrics per agent
+      const agentTaskCounts: Record<string, number> = {};
+      const agentQueueCounts: Record<string, number> = {};
+      
+      allTasks.forEach((task: Task) => {
+        if (task.agent_id) {
+          if (task.status === 'in_progress' || task.status === 'active') {
+            agentTaskCounts[task.agent_id] = (agentTaskCounts[task.agent_id] || 0) + 1;
+          } else if (task.status === 'pending' || task.status === 'inbox') {
+            agentQueueCounts[task.agent_id] = (agentQueueCounts[task.agent_id] || 0) + 1;
+          }
+        }
+      });
+
+      // Calculate success rates per agent
+      const agentExecs: Record<string, { total: number; success: number }> = {};
+      executions.forEach((exec: any) => {
+        const agentName = exec.agent_name || 'unknown';
+        if (!agentExecs[agentName]) agentExecs[agentName] = { total: 0, success: 0 };
+        agentExecs[agentName].total++;
+        if (exec.status === 'completed') agentExecs[agentName].success++;
+      });
+
+      const enhancedAgents = (agentsData.agents || []).map((agent: any) => {
+        const activeTasks = agentTaskCounts[agent.name] || 0;
+        const queueDepth = agentQueueCounts[agent.name] || 0;
+        const execStats = agentExecs[agent.name] || { total: 0, success: 0 };
+        const successRate = execStats.total > 0 ? Math.round((execStats.success / execStats.total) * 100) : 100;
+        const currentLoad = Math.min(100, (activeTasks * 20) + (queueDepth * 10));
+        
+        return {
+          ...agent,
+          capabilities: getAgentCapabilities(agent.name),
+          active_tasks: activeTasks,
+          queue_depth: queueDepth,
+          completed_tasks: execStats.success,
+          current_load: currentLoad,
+          success_rate: successRate,
+          is_overloaded: activeTasks > 5 || queueDepth > 3 || currentLoad > 80,
+          is_failing: successRate < 50,
+        };
+      });
 
       setAgents(enhancedAgents);
-      setUnassignedTasks((tasksData.tasks || []).filter((t: Task) => !t.agent_id));
+      setUnassignedTasks(allTasks.filter((t: Task) => !t.agent_id && (t.status === 'pending' || t.status === 'inbox')));
     } catch (error) {
       console.error("Failed to fetch delegation data:", error);
     } finally {
@@ -146,11 +191,19 @@ export default function DelegationPage() {
   const findBestAvailableAgent = (): Agent | null => {
     const availableAgents = agents.filter(a => 
       a.status === "online" && 
+      !a.is_overloaded &&
+      !a.is_failing &&
       a.current_load < 70 &&
-      a.active_tasks < 5
+      a.active_tasks < 5 &&
+      (a.queue_depth || 0) < 3
     );
     if (availableAgents.length === 0) return null;
-    return availableAgents.sort((a, b) => a.current_load - b.current_load)[0];
+    // Sort by lowest load, then by lowest queue depth
+    return availableAgents.sort((a, b) => {
+      const loadDiff = a.current_load - b.current_load;
+      if (loadDiff !== 0) return loadDiff;
+      return (a.queue_depth || 0) - (b.queue_depth || 0);
+    })[0];
   };
 
   const triggerHealthCheck = async () => {
@@ -223,6 +276,9 @@ export default function DelegationPage() {
 
   const onlineAgents = agents.filter(a => a.status === "online").length;
   const totalActiveTasks = agents.reduce((acc, a) => acc + a.active_tasks, 0);
+  const totalQueueDepth = agents.reduce((acc, a) => acc + (a.queue_depth || 0), 0);
+  const failingAgents = agents.filter(a => a.is_failing).length;
+  const overloadedAgents = agents.filter(a => a.is_overloaded).length;
 
   return (
     <div className="space-y-6 p-6">
@@ -266,11 +322,12 @@ export default function DelegationPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card><CardContent className="p-4"><div className="flex items-center gap-3"><Users className="w-5 h-5 text-[#9BA3AF]" /><div><p className="text-[#9BA3AF] text-sm">Online Agents</p><p className="text-2xl font-bold text-white">{onlineAgents}/{agents.length}</p></div></div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="flex items-center gap-3"><Circle className="w-5 h-5 text-[#9BA3AF]" /><div><p className="text-[#9BA3AF] text-sm">Unassigned</p><p className="text-2xl font-bold text-white">{unassignedTasks.length}</p></div></div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-green-500" /><div><p className="text-[#9BA3AF] text-sm">Active Tasks</p><p className="text-2xl font-bold text-white">{totalActiveTasks}</p></div></div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="flex items-center gap-3"><CheckCircle2 className="w-5 h-5 text-green-500" /><div><p className="text-[#9BA3AF] text-sm">Completed Today</p><p className="text-2xl font-bold text-white">{Math.floor(Math.random() * 20)}</p></div></div></CardContent></Card>
+        <Card className={totalQueueDepth > 10 ? 'border-yellow-500/30 bg-yellow-500/5' : ''}><CardContent className="p-4"><div className="flex items-center gap-3"><Clock className={`w-5 h-5 ${totalQueueDepth > 10 ? 'text-yellow-500' : 'text-[#9BA3AF]'}`} /><div><p className="text-[#9BA3AF] text-sm">Queue Depth</p><p className={`text-2xl font-bold ${totalQueueDepth > 10 ? 'text-yellow-500' : 'text-white'}`}>{totalQueueDepth}</p></div></div></CardContent></Card>
+        <Card className={failingAgents > 0 ? 'border-red-500/30 bg-red-500/5' : ''}><CardContent className="p-4"><div className="flex items-center gap-3"><AlertCircle className={`w-5 h-5 ${failingAgents > 0 ? 'text-red-500' : 'text-green-500'}`} /><div><p className="text-[#9BA3AF] text-sm">Failing Agents</p><p className={`text-2xl font-bold ${failingAgents > 0 ? 'text-red-500' : 'text-green-500'}`}>{failingAgents}</p></div></div></CardContent></Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -279,13 +336,28 @@ export default function DelegationPage() {
             <h3 className="text-white font-medium mb-4">Agent Status</h3>
             <div className="space-y-4">
               {agents.map(agent => (
-                <div key={agent.name} className="flex items-center gap-4 p-3 bg-[#1F2226] rounded-lg">
-                  <Avatar><span className="text-[#FF6A00] font-medium">{agent.name.slice(0, 2).toUpperCase()}</span></Avatar>
+                <div key={agent.name} className={`flex items-center gap-4 p-3 rounded-lg ${agent.is_failing ? 'bg-red-500/10 border border-red-500/30' : agent.is_overloaded ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-[#1F2226]'}`}>
+                  <Avatar className={agent.is_failing ? 'bg-red-500/20' : agent.is_overloaded ? 'bg-yellow-500/20' : ''}>
+                    <span className={`font-medium ${agent.is_failing ? 'text-red-500' : agent.is_overloaded ? 'text-yellow-500' : 'text-[#FF6A00]'}`}>{agent.name.slice(0, 2).toUpperCase()}</span>
+                  </Avatar>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2"><span className="text-white font-medium capitalize">{agent.name}</span>{getStatusIcon(agent.status)}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-medium capitalize">{agent.name}</span>
+                      {getStatusIcon(agent.status)}
+                      {agent.is_failing && <Badge className="bg-red-500/20 text-red-500 text-[10px]">{agent.success_rate}% FAILING</Badge>}
+                      {agent.is_overloaded && !agent.is_failing && <Badge className="bg-yellow-500/20 text-yellow-500 text-[10px]">OVERLOADED</Badge>}
+                    </div>
                     <div className="flex flex-wrap gap-1 mt-1">{agent.capabilities.slice(0, 3).map(cap => <Badge key={cap} className="border border-[#1F2226] text-[#9BA3AF]">{cap}</Badge>)}</div>
+                    <div className="flex gap-3 mt-2 text-[10px] text-[#9BA3AF]">
+                      <span>Active: {agent.active_tasks}</span>
+                      <span>Queue: {agent.queue_depth || 0}</span>
+                      <span>Completed: {agent.completed_tasks}</span>
+                    </div>
                   </div>
-                  <div className="text-right"><p className={`text-lg font-bold ${getLoadColor(agent.current_load)}`}>{agent.current_load}%</p><p className="text-[#9BA3AF] text-xs">Load</p></div>
+                  <div className="text-right">
+                    <p className={`text-lg font-bold ${agent.is_failing ? 'text-red-500' : getLoadColor(agent.current_load)}`}>{agent.current_load}%</p>
+                    <p className="text-[#9BA3AF] text-xs">Load</p>
+                  </div>
                 </div>
               ))}
             </div>

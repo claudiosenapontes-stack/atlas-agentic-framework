@@ -1,15 +1,14 @@
 /**
- * ATLAS-TASKS API - Executive Ops Write Path
- * ATLAS-SOPHIA-EO-WRITE-API-FIX-001
+ * ATLAS-TASKS API v2 - RAIL-HARDENED
+ * ATLAS-OPTIMUS-TASK-ENGINE-CLOSEOUT-5002
  * 
  * GET/POST /api/tasks
- * Manage tasks with Executive Ops integration
- * 
- * Requirements:
- * - Validate schema against Olivia contracts → 400 for invalid
- * - Ensure DB writes succeed
- * - Return explicit JSON: {success: true, id: uuid, status: "created"}
- * - Catch DB errors explicitly → 500 with error message
+ * - FORCE NODEJS RUNTIME
+ * - 3s timeout guard
+ * - 2 retries with 150ms backoff
+ * - VERIFY after insert
+ * - Structured logging
+ * - NO DEMO FALLBACK
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,339 +16,216 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-// Valid Atlas agents for task assignment
-const VALID_AGENTS = [
-  'henry', 'severino', 'olivia', 'sophia', 
-  'harvey', 'einstein', 'optimus', 'optimus-prime'
-];
-
-// Valid task types for Executive Ops (Olivia payload contract)
-const VALID_TASK_TYPES = [
-  'event_creation',
-  'task_creation', 
-  'generate_briefing',
-  'delegated_assignment',
-  'follow_up',
-  'implementation',
-  'review',
-  'approval',
-  'research',
-  'coordination',
-  'analysis'
-];
-
-// Map Olivia payload types to database-valid task types
-const TASK_TYPE_MAP: Record<string, string> = {
-  'event_creation': 'implementation',
-  'task_creation': 'implementation',
-  'generate_briefing': 'implementation',
-  'delegated_assignment': 'implementation',
-  'follow_up': 'implementation',
-  'review': 'review',
-  'approval': 'approval',
-  'research': 'research',
-  'coordination': 'coordination',
-  'analysis': 'analysis',
+const withTimeout = (promise: Promise<any> | any, ms = 3000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("timeout")), ms)
+    )
+  ]);
 };
 
-// Valid company codes that can be used instead of UUIDs
-const VALID_COMPANY_CODES = ['ARQIA', 'XGROUP', 'SENA'];
-
-// Company code to UUID mapping cache
-let companyIdCache: Record<string, string | null> = {};
-
-// Resolve company identifier (code or UUID) to UUID
-async function resolveCompanyId(supabase: any, companyId: string | null): Promise<string | null> {
-  if (!companyId) return null;
-  
-  // If it's already a UUID format, return as-is
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (uuidRegex.test(companyId)) {
-    return companyId;
-  }
-  
-  // Check cache first
-  if (companyIdCache[companyId.toUpperCase()] !== undefined) {
-    return companyIdCache[companyId.toUpperCase()];
-  }
-  
-  // Look up company by code
-  const code = companyId.toUpperCase();
-  if (!VALID_COMPANY_CODES.includes(code)) {
-    companyIdCache[code] = null;
-    return null;
-  }
-  
-  try {
-    const { data, error } = await supabase
-      .from('companies')
-      .select('id')
-      .ilike('code', code)
-      .maybeSingle();
-    
-    if (error || !data) {
-      // If company not found, return null (will use null in DB)
-      companyIdCache[code] = null;
-      return null;
+async function withRetry(fn: () => Promise<any>, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, 150 * (i + 1)));
     }
-    
-    companyIdCache[code] = data.id;
-    return data.id;
-  } catch {
-    companyIdCache[code] = null;
-    return null;
   }
 }
 
-// POST - Create new task (Executive Ops write path)
+const requestId = () => randomUUID().slice(0, 8);
+
+// POST /api/tasks - Create with verification
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const rid = requestId();
   const timestamp = new Date().toISOString();
   
   try {
-    let body;
-    try {
-      body = await request.json();
-    } catch (parseError) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid JSON in request body', timestamp },
-        { status: 400 }
-      );
-    }
+    const body = await withTimeout(request.json(), 1000);
+    const { title, description, task_type, assigned_agent_id, priority = 'medium', mission_id } = body;
     
-    // Extract fields from Olivia payload contract
-    const {
-      title,
-      description,
-      task_type,
-      assigned_agent_id,
-      priority = 'medium',
-      company_id,
-      parent_task_id,
-      command_id,
-      execution_id,
-      metadata = {},
-      realm,
-      source,
-      initiator,
-    } = body;
-    
-    // Validation 1: title required
+    // Validation
     if (!title || typeof title !== 'string' || title.trim() === '') {
-      return NextResponse.json(
-        { success: false, error: 'title is required and must be a non-empty string', timestamp },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'title is required',
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
     }
     
-    // Validation 2: task_type required and valid
-    if (!task_type) {
-      return NextResponse.json(
-        { success: false, error: 'task_type is required', timestamp },
-        { status: 400 }
-      );
-    }
-    
-    if (!VALID_TASK_TYPES.includes(task_type.toLowerCase())) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Invalid task_type. Must be one of: ${VALID_TASK_TYPES.join(', ')}`, 
-          timestamp 
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Validation 3: assigned_agent_id required and valid
     if (!assigned_agent_id) {
-      return NextResponse.json(
-        { success: false, error: 'assigned_agent_id is required', timestamp },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'assigned_agent_id is required',
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
     }
     
-    if (!VALID_AGENTS.includes(assigned_agent_id.toLowerCase())) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Invalid assigned_agent_id. Must be one of: ${VALID_AGENTS.join(', ')}`, 
-          timestamp 
-        },
-        { status: 400 }
-      );
+    if (!task_type) {
+      return NextResponse.json({
+        success: false,
+        error: 'task_type is required',
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
     }
     
     const supabase = getSupabaseAdmin();
-    
-    // Map task type to database-valid value
-    const dbTaskType = TASK_TYPE_MAP[task_type.toLowerCase()] || 'implementation';
-    
-    // Resolve company_id (handles both UUIDs and codes like "ARQIA")
-    const resolvedCompanyId = await resolveCompanyId(supabase, company_id);
-    
-    // Generate UUID
     const taskId = randomUUID();
     
-    // Build task record with Executive Ops realm
-    const taskRecord = {
-      id: taskId,
-      title: title.trim(),
-      description: description || null,
-      task_type: dbTaskType,
-      status: 'pending',
-      priority: priority.toLowerCase(),
-      assigned_agent_id: assigned_agent_id.toLowerCase(),
-      company_id: resolvedCompanyId,
-      parent_task_id: parent_task_id || null,
-      command_id: command_id || null,
-      execution_id: execution_id || null,
-      task_order: 9999,
-      metadata: {
-        ...metadata,
-        realm: realm || 'executive-ops',
-        source: source || 'api',
-        initiator: initiator || 'unknown',
-        original_task_type: task_type,
-        original_company_id: company_id,
-        resolved_company_id: resolvedCompanyId,
-        created_via: 'ATLAS-SOPHIA-EO-WRITE-API-FIX-001',
-        created_at: timestamp,
-      },
-      created_at: timestamp,
-      updated_at: timestamp,
-    };
+    // Insert task with retry+timeout
+    const insertResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('tasks')
+          .insert({
+            id: taskId,
+            title: title.trim(),
+            description: description || null,
+            task_type: task_type.toLowerCase(),
+            status: 'pending',
+            priority: priority.toLowerCase(),
+            assigned_agent_id: assigned_agent_id.toLowerCase(),
+            mission_id: mission_id || null,
+            claimed_at: null,
+            execution_result: null,
+            created_at: timestamp,
+            updated_at: timestamp,
+          })
+          .select(),
+        3000
+      )
+    );
     
-    // Insert task into database
-    let task;
-    try {
-      const { data, error: insertError } = await (supabase as any)
-        .from('tasks')
-        .insert(taskRecord)
-        .select()
-        .single();
-      
-      if (insertError) {
-        console.error('[Tasks POST] DB insert error:', insertError);
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: `Database error: ${insertError.message}`,
-            code: insertError.code,
-            timestamp,
-          },
-          { status: 500 }
-        );
-      }
-      
-      task = data;
-    } catch (dbError: any) {
-      console.error('[Tasks POST] DB exception:', dbError);
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: `Database exception: ${dbError.message}`,
-          timestamp,
-        },
-        { status: 500 }
-      );
+    if (insertResult.error) throw insertResult.error;
+    
+    // VERIFY: Immediately select the task back
+    const verifyResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('tasks')
+          .select('*')
+          .eq('id', taskId)
+          .single(),
+        3000
+      )
+    );
+    
+    if (verifyResult.error || !verifyResult.data) {
+      throw new Error('Task verification failed after insert');
     }
     
-    // Return explicit JSON response per requirements
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      level: 'info',
+      endpoint: 'POST /api/tasks',
+      requestId: rid,
+      taskId,
+      duration,
+      verified: true,
+      success: true
+    }));
+    
     return NextResponse.json({
       success: true,
-      id: task.id,
-      status: "created",
-      task: {
-        id: task.id,
-        title: task.title,
-        task_type: task_type,
-        db_task_type: task.task_type,
-        status: task.status,
-        priority: task.priority,
-        assigned_agent_id: task.assigned_agent_id,
-        company_id: resolvedCompanyId,
-        company_code: company_id,
-        created_at: task.created_at,
-      },
-      timestamp,
+      task: verifyResult.data,
+      verified: true,
+      requestId: rid,
+      duration
     }, { status: 201 });
     
   } catch (error: any) {
-    console.error('[Tasks POST] Unexpected error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: `Unexpected error: ${error.message}`,
-        timestamp,
-      },
-      { status: 500 }
-    );
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message === 'timeout';
+    console.log(JSON.stringify({
+      level: 'error',
+      endpoint: 'POST /api/tasks',
+      requestId: rid,
+      duration,
+      error: error.message,
+      isTimeout,
+      success: false
+    }));
+    
+    return NextResponse.json({
+      success: false,
+      error: isTimeout ? 'Request timeout' : error.message,
+      requestId: rid,
+      duration
+    }, { status: isTimeout ? 504 : 500 });
   }
 }
 
-// GET - List tasks
+// GET /api/tasks - List with hardening
 export async function GET(request: NextRequest) {
-  const timestamp = new Date().toISOString();
+  const startTime = Date.now();
+  const rid = requestId();
   
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const assigned_agent_id = searchParams.get('assigned_agent_id');
-    const company_id = searchParams.get('company_id');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     
     const supabase = getSupabaseAdmin();
     
-    let query = (supabase as any)
+    let query = supabase
       .from('tasks')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
     
-    if (status) {
-      query = query.eq('status', status);
-    }
+    if (status) query = query.eq('status', status);
+    if (assigned_agent_id) query = query.eq('assigned_agent_id', assigned_agent_id.toLowerCase());
     
-    if (assigned_agent_id) {
-      query = query.eq('assigned_agent_id', assigned_agent_id.toLowerCase());
-    }
+    const result = await withRetry(() => withTimeout(query, 3000));
     
-    if (company_id) {
-      query = query.eq('company_id', company_id);
-    }
+    if (result.error) throw result.error;
     
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('[Tasks GET] Query error:', error);
-      return NextResponse.json({
-        success: true,
-        tasks: [],
-        count: 0,
-        timestamp,
-        source: 'tasks',
-        error: `Query error: ${error.message}`,
-      });
-    }
+    const duration = Date.now() - startTime;
+    console.log(JSON.stringify({
+      level: 'info',
+      endpoint: 'GET /api/tasks',
+      requestId: rid,
+      duration,
+      count: result.data?.length || 0,
+      success: true
+    }));
     
     return NextResponse.json({
       success: true,
-      tasks: data || [],
-      count: data?.length || 0,
-      timestamp,
-      source: 'tasks',
+      tasks: result.data || [],
+      count: result.data?.length || 0,
+      requestId: rid,
+      duration
     });
     
   } catch (error: any) {
-    console.error('[Tasks GET] Error:', error);
-    return NextResponse.json({
-      success: true,
-      tasks: [],
-      count: 0,
-      timestamp,
-      source: 'tasks',
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message === 'timeout';
+    console.log(JSON.stringify({
+      level: 'error',
+      endpoint: 'GET /api/tasks',
+      requestId: rid,
+      duration,
       error: error.message,
-    });
+      isTimeout,
+      success: false
+    }));
+    
+    return NextResponse.json({
+      success: false,
+      error: isTimeout ? 'Request timeout' : error.message,
+      requestId: rid,
+      duration
+    }, { status: isTimeout ? 504 : 500 });
   }
 }

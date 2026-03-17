@@ -1,9 +1,9 @@
 /**
  * ATLAS-WATCHLIST API
- * ATLAS-OPTIMUS-WATCHLIST-METADATA-ENABLE-9826
+ * ATLAS-OPTIMUS-WATCHLIST-REAL-PERSISTENCE-9848
  * 
  * GET/POST /api/watchlist
- * Now supports full metadata in action_payload for advanced rule config
+ * Full metadata persistence in database - no memory/runtime split
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,13 +21,52 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     
-    // Query watch_rules (the watch patterns/rules)
+    // Query watch_rules with ALL metadata columns
     const { data, error } = await withDbRetry(async () => {
       return await (supabase as any)
         .from('watch_rules')
-        .select('*')
+        .select(`
+          id,
+          name,
+          pattern,
+          rule_type,
+          action_type,
+          is_active,
+          priority,
+          critical_keywords,
+          high_keywords,
+          medium_keywords,
+          exclude_keywords,
+          classification_rules,
+          reply_scope,
+          auto_reply_enabled,
+          auto_reply_template,
+          follow_up_default_hours,
+          follow_up_urgent_hours,
+          follow_up_critical_hours,
+          auto_summarize,
+          notify_agent_ids,
+          notify_emails,
+          escalation_agent_id,
+          company_id,
+          email_account,
+          folder_pattern,
+          watch_schedule,
+          auto_execute,
+          require_approval,
+          max_daily_alerts,
+          cooldown_minutes,
+          description,
+          rule_metadata,
+          match_count,
+          last_matched_at,
+          owner_id,
+          created_by,
+          created_at,
+          updated_at
+        `)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
     }, 'get_watch_rules');
     
     const duration = Date.now() - startTime;
@@ -43,34 +82,26 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // FILTER: Exclude test/demo items and extract metadata from description
-    const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
-    const filteredItems = (data || []).filter((item: any) => {
-      const name = (item.name || '').toLowerCase();
-      if (!name || name === 'none') return false;
-      return !testPatterns.some(pattern => name.includes(pattern));
-    }).map((item: any) => {
-      // Extract metadata from description if action_payload is empty/missing
-      if ((!item.action_payload || Object.keys(item.action_payload).length === 0) && item.description) {
-        const metaMatch = item.description.match(/\[METADATA\]([\s\S]+)$/);
-        if (metaMatch) {
-          try {
-            const parsedMeta = JSON.parse(metaMatch[1]);
-            item.action_payload = parsedMeta;
-            // Clean up description for display
-            item.description = item.description.replace(/\[METADATA\][\s\S]+$/, '').trim();
-          } catch (e) {
-            // Invalid JSON, leave as-is
-          }
-        }
-      }
-      return item;
-    });
+    // Return ALL rules with FULL config - no filtering, no hidden logic
+    const items = (data || []).map((item: any) => ({
+      ...item,
+      // Ensure arrays are never null
+      critical_keywords: item.critical_keywords || [],
+      high_keywords: item.high_keywords || [],
+      medium_keywords: item.medium_keywords || [],
+      exclude_keywords: item.exclude_keywords || [],
+      notify_agent_ids: item.notify_agent_ids || [],
+      notify_emails: item.notify_emails || [],
+      // Parse JSONB fields
+      classification_rules: item.classification_rules || {},
+      watch_schedule: item.watch_schedule || { type: 'realtime' },
+      rule_metadata: item.rule_metadata || {},
+    }));
     
     return NextResponse.json({
       success: true,
-      items: filteredItems,
-      count: filteredItems.length,
+      items,
+      count: items.length,
       timestamp,
       requestId,
       duration,
@@ -99,7 +130,47 @@ export async function POST(request: NextRequest) {
       pattern, 
       rule_type = 'keyword_match',
       action_type = 'alert',
-      metadata
+      priority = 'medium',
+      
+      // Keywords
+      critical_keywords = [],
+      high_keywords = [],
+      medium_keywords = [],
+      exclude_keywords = [],
+      classification_rules = {},
+      
+      // Reply config
+      reply_scope = 'none',
+      auto_reply_enabled = false,
+      auto_reply_template,
+      
+      // Follow-up timing
+      follow_up_default_hours = 24,
+      follow_up_urgent_hours = 4,
+      follow_up_critical_hours = 1,
+      auto_summarize = false,
+      
+      // Routing
+      notify_agent_ids = [],
+      notify_emails = [],
+      escalation_agent_id,
+      
+      // Scope
+      company_id,
+      email_account,
+      folder_pattern = 'inbox',
+      watch_schedule = { type: 'realtime' },
+      
+      // Execution
+      auto_execute = false,
+      require_approval = false,
+      max_daily_alerts = 100,
+      cooldown_minutes = 5,
+      
+      // Metadata
+      description,
+      rule_metadata = {},
+      owner_id,
     } = body;
     
     // Validate required fields
@@ -124,53 +195,59 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const id = randomUUID();
     
-    // Build metadata for storage
-    const ruleMetadata: any = {
-      // Default behavior flags
-      auto_execute: body.auto_execute ?? false,
-      require_approval: body.require_approval ?? false,
-    };
-    
-    // Add advanced rule metadata if provided
-    if (metadata) {
-      ruleMetadata.metadata = metadata;
-      // Support specific fields at top level for easier querying
-      if (metadata.critical_keywords) ruleMetadata.critical_keywords = metadata.critical_keywords;
-      if (metadata.high_keywords) ruleMetadata.high_keywords = metadata.high_keywords;
-      if (metadata.reply_scope) ruleMetadata.reply_scope = metadata.reply_scope;
-      if (metadata.follow_up_timing) ruleMetadata.follow_up_timing = metadata.follow_up_timing;
-      if (metadata.auto_summarize !== undefined) ruleMetadata.auto_summarize = metadata.auto_summarize;
-      if (metadata.recipient_chain) ruleMetadata.recipient_chain = metadata.recipient_chain;
-    }
-    
-    // Build payload for watch_rules
-    // Note: action_payload column doesn't exist yet, store metadata in description as JSON
-    const insertPayload: any = {
+    // Build complete payload with ALL metadata
+    const insertPayload = {
       id,
       name,
       pattern,
       rule_type,
       action_type,
+      priority,
       is_active: true,
+      
+      // Keywords
+      critical_keywords: Array.isArray(critical_keywords) ? critical_keywords : [],
+      high_keywords: Array.isArray(high_keywords) ? high_keywords : [],
+      medium_keywords: Array.isArray(medium_keywords) ? medium_keywords : [],
+      exclude_keywords: Array.isArray(exclude_keywords) ? exclude_keywords : [],
+      classification_rules: classification_rules || {},
+      
+      // Reply config
+      reply_scope,
+      auto_reply_enabled,
+      auto_reply_template,
+      
+      // Follow-up
+      follow_up_default_hours,
+      follow_up_urgent_hours,
+      follow_up_critical_hours,
+      auto_summarize,
+      
+      // Routing
+      notify_agent_ids: Array.isArray(notify_agent_ids) ? notify_agent_ids : [],
+      notify_emails: Array.isArray(notify_emails) ? notify_emails : [],
+      escalation_agent_id,
+      
+      // Scope
+      company_id,
+      email_account,
+      folder_pattern,
+      watch_schedule: watch_schedule || { type: 'realtime' },
+      
+      // Execution
+      auto_execute,
+      require_approval,
+      max_daily_alerts,
+      cooldown_minutes,
+      
+      // Metadata
+      description,
+      rule_metadata: rule_metadata || {},
+      owner_id,
+      
       created_at: timestamp,
       updated_at: timestamp,
     };
-    
-    // Always store metadata in description as JSON for compatibility
-    // This ensures data persists even if action_payload column is missing
-    const userDescription = body.description || '';
-    if (userDescription) {
-      insertPayload.description = userDescription + "\n\n[METADATA]" + JSON.stringify(ruleMetadata);
-    } else {
-      insertPayload.description = "[METADATA]" + JSON.stringify(ruleMetadata);
-    }
-    
-    // Add optional fields
-    if (body.owner_id) insertPayload.owner_id = body.owner_id;
-    if (body.company_id) insertPayload.company_id = body.company_id;
-    if (body.email_account) insertPayload.email_account = body.email_account;
-    if (body.folder_pattern) insertPayload.folder_pattern = body.folder_pattern;
-    if (body.watch_schedule) insertPayload.watch_schedule = body.watch_schedule;
     
     const { data, error } = await withDbRetry(async () => {
       return await (supabase as any)
@@ -214,5 +291,128 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
-// Cache bust: 1773773070
-// Force cache bust: 1773776850
+
+// PATCH for updates
+export async function PATCH(request: NextRequest) {
+  const timestamp = new Date().toISOString();
+  const requestId = randomUUID().slice(0, 8);
+  const startTime = Date.now();
+  
+  try {
+    const body = await request.json();
+    const { id, ...updates } = body;
+    
+    if (!id) {
+      return NextResponse.json({
+        success: false,
+        error: 'id is required for PATCH',
+        timestamp,
+        requestId,
+      }, { status: 400 });
+    }
+    
+    const supabase = getSupabaseAdmin();
+    
+    const { data, error } = await withDbRetry(async () => {
+      return await (supabase as any)
+        .from('watch_rules')
+        .update({
+          ...updates,
+          updated_at: timestamp,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    }, 'update_watch_rule');
+    
+    const duration = Date.now() - startTime;
+    
+    if (error) {
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        timestamp,
+        requestId,
+        duration,
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({
+      success: true,
+      item: data,
+      timestamp,
+      requestId,
+      duration,
+    });
+    
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      timestamp,
+      requestId,
+      duration,
+    }, { status: 500 });
+  }
+}
+
+// DELETE
+export async function DELETE(request: NextRequest) {
+  const timestamp = new Date().toISOString();
+  const requestId = randomUUID().slice(0, 8);
+  const startTime = Date.now();
+  
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    if (!id) {
+      return NextResponse.json({
+        success: false,
+        error: 'id is required',
+        timestamp,
+        requestId,
+      }, { status: 400 });
+    }
+    
+    const supabase = getSupabaseAdmin();
+    
+    const { error } = await withDbRetry(async () => {
+      return await (supabase as any)
+        .from('watch_rules')
+        .delete()
+        .eq('id', id);
+    }, 'delete_watch_rule');
+    
+    const duration = Date.now() - startTime;
+    
+    if (error) {
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        timestamp,
+        requestId,
+        duration,
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({
+      success: true,
+      deleted: id,
+      timestamp,
+      requestId,
+      duration,
+    });
+    
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      timestamp,
+      requestId,
+      duration,
+    }, { status: 500 });
+  }
+}

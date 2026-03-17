@@ -132,8 +132,6 @@ export async function POST(request: NextRequest) {
         assigned_agent_id: assigned_agent_id.toLowerCase(),
         owner_id: owner_id,
         mission_id: mission_id || null,
-        claimed_at: null,
-        execution_result: null,
         created_at: timestamp,
         updated_at: timestamp,
       })

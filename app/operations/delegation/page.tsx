@@ -279,6 +279,9 @@ export default function DelegationPage() {
   const totalQueueDepth = agents.reduce((acc, a) => acc + (a.queue_depth || 0), 0);
   const failingAgents = agents.filter(a => a.is_failing).length;
   const overloadedAgents = agents.filter(a => a.is_overloaded).length;
+  
+  // Integrity: Tasks with missing ownership
+  const integrityIssues = unassignedTasks.filter(t => !t.agent_id && t.status !== 'completed');
 
   return (
     <div className="space-y-6 p-6">
@@ -329,6 +332,27 @@ export default function DelegationPage() {
         <Card className={totalQueueDepth > 10 ? 'border-yellow-500/30 bg-yellow-500/5' : ''}><CardContent className="p-4"><div className="flex items-center gap-3"><Clock className={`w-5 h-5 ${totalQueueDepth > 10 ? 'text-yellow-500' : 'text-[#9BA3AF]'}`} /><div><p className="text-[#9BA3AF] text-sm">Queue Depth</p><p className={`text-2xl font-bold ${totalQueueDepth > 10 ? 'text-yellow-500' : 'text-white'}`}>{totalQueueDepth}</p></div></div></CardContent></Card>
         <Card className={failingAgents > 0 ? 'border-red-500/30 bg-red-500/5' : ''}><CardContent className="p-4"><div className="flex items-center gap-3"><AlertCircle className={`w-5 h-5 ${failingAgents > 0 ? 'text-red-500' : 'text-green-500'}`} /><div><p className="text-[#9BA3AF] text-sm">Failing Agents</p><p className={`text-2xl font-bold ${failingAgents > 0 ? 'text-red-500' : 'text-green-500'}`}>{failingAgents}</p></div></div></CardContent></Card>
       </div>
+
+      {integrityIssues.length > 0 && (
+        <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-orange-400">Ownership Integrity Warning</p>
+            <p className="text-[#9BA3AF] text-xs">{integrityIssues.length} task{integrityIssues.length > 1 ? 's' : ''} missing agent assignment</p>
+            <div className="mt-2 space-y-1">
+              {integrityIssues.slice(0, 3).map(task => (
+                <div key={task.id} className="flex items-center justify-between text-xs">
+                  <span className="text-white truncate max-w-[200px]">{task.title}</span>
+                  <span className="text-[#6B7280]">{task.id.slice(0, 8)}</span>
+                </div>
+              ))}
+              {integrityIssues.length > 3 && (
+                <p className="text-[#6B7280] text-xs">...and {integrityIssues.length - 3} more</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

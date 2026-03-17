@@ -1,38 +1,17 @@
 /**
- * POST /api/missions/:id/reopen - RAIL-HARDENED v2
- * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
+ * POST /api/missions/:id/reopen - RAIL-HARDENED v3
+ * ATLAS-OPTIMUS-MISSION-CLOSURE-FIX-9501
  * - FORCE NODEJS RUNTIME (NO EDGE)
- * - 3s global timeout guard (ALL DB calls wrapped)
- * - 2 retries with 150ms backoff (ALL DB calls)
- * - Structured logging (requestId, duration, errorSource)
+ * - Centralized retry from supabase-admin
+ * - Safe evidence_bundle handling
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, withDbRetry } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("timeout")), ms)
-    )
-  ]);
-};
-
-async function withRetry(fn: () => Promise<any>, retries = 2) {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (i === retries) throw e;
-      await new Promise(r => setTimeout(r, 150 * (i + 1)));
-    }
-  }
-}
 
 const requestId = () => randomUUID().slice(0, 8);
 
@@ -45,8 +24,13 @@ export async function POST(
   const missionId = params.id;
   
   try {
-    const body = await withTimeout(request.json(), 1000);
-    const { reopen_reason, reopened_by, new_phase = 'execution' } = body;
+    // Parse body with timeout
+    const body = await Promise.race([
+      request.json(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('body parse timeout')), 2000))
+    ]) as any;
+    
+    const { reopen_reason, reopened_by, new_phase = 'execution' } = body || {};
     
     if (!reopen_reason) {
       return NextResponse.json({
@@ -60,15 +44,20 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // Get mission
-    const { data: mission, error: missionError } = await supabase
-      .from('missions')
-      .select('id,status,phase,evidence_bundle')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
+    // Get mission with retry
+    const mission = await withDbRetry(async () => {
+      const { data, error } = await supabase
+        .from('missions')
+        .select('id,status,phase,evidence_bundle')
+        .eq('id', missionId)
+        .is('deleted_at', null)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }, 'get_mission_for_reopen');
     
-    if (missionError || !mission) {
+    if (!mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -86,37 +75,45 @@ export async function POST(
       }, { status: 400 });
     }
     
-    // Update mission
-    const { data: updatedMission, error: updateError } = await supabase
-      .from('missions')
-      .update({
-        status: 'active',
-        phase: new_phase,
-        actual_end_date: null,
-        evidence_bundle: {
-          ...mission.evidence_bundle,
-          reopen: {
-            reopened_at: timestamp,
-            reopened_by,
-            reason: reopen_reason,
-            previous_status: mission.status
-          }
-        },
-        updated_at: timestamp
-      })
-      .eq('id', missionId)
-      .select('id,status,phase')
-      .single();
+    // Safely handle evidence_bundle
+    const currentEvidence = mission.evidence_bundle || {};
     
-    if (updateError) throw updateError;
+    // Update mission with retry
+    const updatedMission = await withDbRetry(async () => {
+      const { data, error } = await supabase
+        .from('missions')
+        .update({
+          status: 'active',
+          phase: new_phase,
+          actual_end_date: null,
+          evidence_bundle: {
+            ...currentEvidence,
+            reopen: {
+              reopened_at: timestamp,
+              reopened_by: reopened_by || null,
+              reason: reopen_reason,
+              previous_status: mission.status
+            }
+          },
+          updated_at: timestamp
+        })
+        .eq('id', missionId)
+        .select('id,status,phase')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }, 'reopen_mission');
     
     const duration = Date.now() - startTime;
+    
     console.log(JSON.stringify({
       level: 'info',
       endpoint: 'POST /api/missions/:id/reopen',
       requestId: rid,
       missionId,
       duration,
+      errorSource: null,
       success: true
     }));
     
@@ -129,22 +126,27 @@ export async function POST(
     
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    const isTimeout = error.message === 'timeout';
+    const isTimeout = error.message?.includes('timeout');
+    const errorSource = isTimeout ? 'db_timeout' : 'db_connection';
+    
     console.log(JSON.stringify({
       level: 'error',
       endpoint: 'POST /api/missions/:id/reopen',
       requestId: rid,
       missionId,
       duration,
-      errorSource: isTimeout ? 'timeout' : 'exception',
+      error: error.message,
+      errorSource,
       success: false
     }));
     
     return NextResponse.json({
       success: false,
-      error: isTimeout ? 'Request timeout' : error.message,
+      error: isTimeout ? 'Database timeout - please retry' : error.message,
       requestId: rid,
-      duration
+      duration,
+      errorSource,
+      retryable: isTimeout
     }, { status: isTimeout ? 504 : 500 });
   }
 }

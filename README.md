@@ -390,3 +390,4 @@ Built by the Atlas AI team:
 // Deployment trigger: Mon Mar 16 14:23:36 EDT 2026
 // Force redeploy Mon Mar 16 21:58:40 EDT 2026
 // Force redeploy 1773715119
+// Schema refresh trigger 1773716645

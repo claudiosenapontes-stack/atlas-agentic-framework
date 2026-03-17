@@ -86,7 +86,8 @@ export async function GET(
       success: true,
       mission: missionWithCount,
       requestId: rid,
-      duration
+      duration,
+      build_marker: 'MISSION-COUNT-FIX-9502'
     });
     
   } catch (error: any) {

@@ -1,9 +1,9 @@
 /**
- * POST /api/missions/:id/reopen - HARDENED
- * ATLAS-OPTIMUS-MISSION-ENGINE-HARDENING-1204
- * - 3s timeout guard
- * - Retry logic
- * - Comprehensive logging
+ * POST /api/missions/:id/reopen - ULTRA-HARDENED
+ * ATLAS-OPTIMUS-MISSION-ACTION-ENDPOINTS-CLOSEOUT-1213
+ * - Aggressive 2s timeout on ALL DB operations
+ * - Minimal field selection
+ * - Streamlined logic
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,46 +13,31 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const MAX_EXECUTION_MS = 3000;
+const DB_TIMEOUT_MS = 2000;
+const MAX_RETRY = 2;
 
-interface LogEntry {
-  requestId: string;
-  endpoint: string;
-  missionId: string;
-  duration: number;
-  success: boolean;
-  errorSource?: string;
-}
-
-function logAccess(entry: LogEntry) {
-  console.log(JSON.stringify({
-    level: entry.success ? 'info' : 'error',
-    ...entry,
-    timestamp: new Date().toISOString(),
-  }));
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> {
+async function dbWithTimeout<T>(operation: () => Promise<T>, context: string): Promise<T> {
   return Promise.race([
-    promise,
+    operation(),
     new Promise<T>((_, reject) => 
-      setTimeout(() => reject(new Error(`${context} timeout after ${timeoutMs}ms`)), timeoutMs)
+      setTimeout(() => reject(new Error(`DB_TIMEOUT:${context}`)), DB_TIMEOUT_MS)
     )
   ]);
 }
 
-async function withRetry<T>(fn: () => Promise<T>, retries = 2, context: string): Promise<{ data: T | null; error: any; attempts: number }> {
+async function retryOperation<T>(operation: () => Promise<T>, context: string): Promise<T> {
   let lastError;
-  for (let i = 0; i < retries; i++) {
+  for (let i = 0; i < MAX_RETRY; i++) {
     try {
-      const data = await fn();
-      return { data, error: null, attempts: i + 1 };
+      return await dbWithTimeout(operation, context);
     } catch (error) {
       lastError = error;
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 100 * (i + 1)));
+      if (i < MAX_RETRY - 1 && !(error instanceof Error && error.message.includes('TIMEOUT'))) {
+        await new Promise(r => setTimeout(r, 50));
+      }
     }
   }
-  return { data: null, error: lastError, attempts: retries };
+  throw lastError;
 }
 
 export async function POST(
@@ -61,108 +46,89 @@ export async function POST(
 ) {
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
-  const { id: missionId } = params;
+  const missionId = params.id;
   const startTime = Date.now();
   
-  console.log(`[${requestId}] POST /api/missions/${missionId}/reopen started`);
-  
   try {
-    const body = await withTimeout(request.json(), 1000, 'body parsing');
+    const body = await Promise.race([
+      request.json(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('BODY_TIMEOUT')), 500))
+    ]) as any;
+    
     const { reopen_reason, reopened_by, reopened_by_agent, new_phase = 'execution' } = body;
     
     if (!reopen_reason) {
-      return NextResponse.json({
-        success: false,
-        error: 'reopen_reason is required',
-        timestamp,
-        requestId,
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'reopen_reason required', requestId },
+        { status: 400 }
+      );
     }
     
     const supabase = getSupabaseAdmin();
     
-    // Get mission
-    const { data: mission, error: missionError } = await supabase
-      .from('missions')
-      .select('*')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
+    // GET mission - minimal fields
+    const mission = await retryOperation(async () => {
+      const { data, error } = await supabase
+        .from('missions')
+        .select('id,status,phase,evidence_bundle,metadata')
+        .eq('id', missionId)
+        .is('deleted_at', null)
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'get_mission');
     
-    if (missionError || !mission) {
-      const duration = Date.now() - startTime;
-      logAccess({ requestId, endpoint: '/reopen', missionId, duration, success: false, errorSource: 'not_found' });
-      return NextResponse.json({ success: false, error: 'Mission not found', timestamp, requestId, duration }, { status: 404 });
+    if (!mission) {
+      return NextResponse.json(
+        { success: false, error: 'Mission not found', requestId, duration: Date.now() - startTime },
+        { status: 404 }
+      );
     }
     
     if (mission.status !== 'closed' && mission.status !== 'cancelled') {
-      const duration = Date.now() - startTime;
-      logAccess({ requestId, endpoint: '/reopen', missionId, duration, success: false, errorSource: 'invalid_status' });
-      return NextResponse.json({
-        success: false,
-        error: `Cannot reopen mission with status: ${mission.status}`,
-        timestamp,
-        requestId,
-        duration,
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: `Cannot reopen ${mission.status} mission`, requestId, duration: Date.now() - startTime },
+        { status: 400 }
+      );
     }
     
     const reopenEvidence = {
       ...mission.evidence_bundle,
-      reopen: {
-        reopened_at: timestamp,
-        reopened_by,
-        reopened_by_agent,
-        reason: reopen_reason,
-        previous_status: mission.status,
-        previous_phase: mission.phase,
-      }
+      reopen: { reopened_at: timestamp, reopened_by, reopened_by_agent, reason: reopen_reason, previous_status: mission.status, previous_phase: mission.phase }
     };
     
-    // Update mission
-    const { data: updatedMission, error: updateError } = await supabase
-      .from('missions')
-      .update({
-        status: 'active',
-        phase: new_phase,
-        actual_end_date: null,
-        evidence_bundle: reopenEvidence,
-        updated_at: timestamp,
-        metadata: { ...mission.metadata, changed_by: reopened_by, changed_by_agent: reopened_by_agent }
-      })
-      .eq('id', missionId)
-      .select()
-      .single();
-    
-    if (updateError) {
-      const duration = Date.now() - startTime;
-      logAccess({ requestId, endpoint: '/reopen', missionId, duration, success: false, errorSource: 'supabase' });
-      return NextResponse.json({ success: false, error: updateError.message, timestamp, requestId, duration }, { status: 500 });
-    }
+    // UPDATE mission
+    const updatedMission = await retryOperation(async () => {
+      const { data, error } = await supabase
+        .from('missions')
+        .update({
+          status: 'active',
+          phase: new_phase,
+          actual_end_date: null,
+          evidence_bundle: reopenEvidence,
+          updated_at: timestamp,
+          metadata: { ...mission.metadata, changed_by: reopened_by, changed_by_agent: reopened_by_agent }
+        })
+        .eq('id', missionId)
+        .select('id,status,phase,updated_at')
+        .single();
+      if (error) throw error;
+      return data;
+    }, 'update_mission');
     
     const duration = Date.now() - startTime;
-    logAccess({ requestId, endpoint: '/reopen', missionId, duration, success: true });
+    console.log(JSON.stringify({ level: 'info', endpoint: 'reopen', requestId, missionId, duration, success: true }));
     
-    return NextResponse.json({
-      success: true,
-      mission: updatedMission,
-      reopen: reopenEvidence.reopen,
-      timestamp,
-      requestId,
-      duration,
-    });
+    return NextResponse.json({ success: true, mission: updatedMission, requestId, duration });
     
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    const isTimeout = error.message?.includes('timeout');
-    logAccess({ requestId, endpoint: '/reopen', missionId, duration, success: false, errorSource: isTimeout ? 'timeout' : 'exception' });
+    const isTimeout = error.message?.includes('TIMEOUT');
+    console.log(JSON.stringify({ level: 'error', endpoint: 'reopen', requestId, missionId, duration, error: error.message, isTimeout }));
     
-    return NextResponse.json({
-      success: false,
-      error: isTimeout ? 'Request timeout' : error.message,
-      timestamp,
-      requestId,
-      duration,
-    }, { status: isTimeout ? 504 : 500 });
+    return NextResponse.json(
+      { success: false, error: isTimeout ? 'Database timeout' : error.message, requestId, duration },
+      { status: isTimeout ? 504 : 500 }
+    );
   }
 }

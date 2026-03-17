@@ -41,6 +41,8 @@ async function withRetry(fn: () => Promise<any>, retries = 2) {
 
 const requestId = () => randomUUID().slice(0, 8);
 
+// BUILD_TIMESTAMP: 2026-03-17-0047-9002-FORCE-REBUILD
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

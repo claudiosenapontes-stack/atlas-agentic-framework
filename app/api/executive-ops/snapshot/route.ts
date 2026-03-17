@@ -1,6 +1,6 @@
 /**
  * ATLAS-EXECUTIVE-OPS-SNAPSHOT API
- * ATLAS-PRIME-EXEC-OPS-CLEAN-UI-9802
+ * ATLAS-PRIME-WHATSAPP-UI-9814
  * 
  * GET /api/executive-ops/snapshot
  * Returns REAL executive dashboard snapshot data from live sources
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       activeMissionCount: activeMissions,
       timestamp,
       source: 'live',
-      build_marker: 'EXEC-OPS-CLEAN-9802'
+      build_marker: 'WHATSAPP-UI-9814'
     });
     
   } catch (error: any) {
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
       timestamp,
       source: 'error',
       error: error.message,
-      build_marker: 'EXEC-OPS-CLEAN-9802'
+      build_marker: 'WHATSAPP-UI-9814'
     });
   }
 }

@@ -51,19 +51,14 @@ export async function GET(request: NextRequest) {
     
     const supabase = getSupabaseAdmin();
     
-    const result = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('*', { count: 'exact' })
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false })
-          .range(offset, offset + limit - 1),
-        3000
-      )
-    );
+    const { data: missions, error } = await supabase
+      .from('missions')
+      .select('*', { count: 'exact' })
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
     
-    if (result.error) throw result.error;
+    if (error) throw error;
     
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
@@ -71,13 +66,13 @@ export async function GET(request: NextRequest) {
       endpoint: 'GET /api/missions',
       requestId: rid,
       duration,
-      recordCount: result.data?.length || 0,
+      recordCount: missions?.length || 0,
       success: true
     }));
     
     return NextResponse.json({
       success: true,
-      missions: result.data || [],
+      missions: missions || [],
       requestId: rid,
       duration
     });

@@ -144,44 +144,52 @@ export default function TasksPage() {
               <tbody className="divide-y divide-[#1F2226]">
                 {filteredTasks.slice(0, 50).map(task => (
                   <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {task.status === 'blocked' && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
-                        <Link href={`/operations/tasks/${task.id}`} className="text-xs text-white hover:text-[#9BA3AF]">{task.title}</Link>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          {task.status === 'blocked' && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                          <Link href={`/operations/tasks/${task.id}`} className="text-sm font-medium text-white hover:text-[#FF6A00]">{task.title}</Link>
+                        </div>
+                        <span className="text-[10px] text-[#6B7280] font-mono">{task.id.slice(0, 8)}...</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'blocked' ? 'bg-red-500/20 text-red-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
-                        {task.status}
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'blocked' ? 'bg-red-500/20 text-red-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
+                        {task.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[10px] text-[#9BA3AF]">{task.assigned_agent?.display_name || task.agent_id || 'Unassigned'}</span>
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-white">{task.assigned_agent?.display_name || task.agent_id?.slice(0, 8) || 'Unassigned'}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-[10px] text-[#9BA3AF]">{task.priority || 'medium'}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-3">
+                      <span className={`text-xs ${task.priority === 'high' ? 'text-[#FF3B30]' : task.priority === 'medium' ? 'text-[#FFB020]' : 'text-[#9BA3AF]'}`}>{task.priority || 'medium'}</span>
+                    </td>
+                    <td className="px-4 py-3">
                       {task.mission_id && missions[task.mission_id] ? (
-                        <Link href={`/operations/missions/${task.mission_id}`} className="text-[10px] text-[#FF6A00] hover:underline truncate block max-w-[100px]">
-                          {missions[task.mission_id].title.slice(0, 20)}...
+                        <Link href={`/operations/missions/${task.mission_id}`} className="text-xs text-[#FF6A00] hover:underline truncate block max-w-[120px]">
+                          {missions[task.mission_id].title}
                         </Link>
                       ) : task.mission ? (
-                        <Link href={`/operations/missions/${task.mission.id}`} className="text-[10px] text-[#FF6A00] hover:underline truncate block max-w-[100px]">
-                          {task.mission.title.slice(0, 20)}...
+                        <Link href={`/operations/missions/${task.mission.id}`} className="text-xs text-[#FF6A00] hover:underline truncate block max-w-[120px]">
+                          {task.mission.title}
                         </Link>
                       ) : (
-                        <span className="text-[10px] text-[#6B7280]">—</span>
+                        <span className="text-xs text-[#6B7280]">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-3">
                       {task.status === 'blocked' && (
-                        <span className="text-[10px] font-medium text-red-400">
-                          {task.stuck_duration ? `${task.stuck_duration}d` : 'Blocked'}
+                        <span className="text-xs font-medium text-red-400">
+                          {task.stuck_duration ? `${task.stuck_duration}d stuck` : 'Blocked'}
                         </span>
                       )}
                       {task.status === 'in_progress' && task.stuck_duration && task.stuck_duration > 3 && (
-                        <span className="text-[10px] font-medium text-[#FFB020]">
-                          {task.stuck_duration}d
+                        <span className="text-xs font-medium text-[#FFB020]">
+                          {task.stuck_duration}d no update
                         </span>
+                      )}
+                      {task.status !== 'blocked' && !(task.status === 'in_progress' && task.stuck_duration && task.stuck_duration > 3) && (
+                        <span className="text-xs text-[#6B7280]">{task.stuck_duration ? `${task.stuck_duration}d ago` : '—'}</span>
                       )}
                     </td>
                   </tr>
@@ -206,9 +214,12 @@ export default function TasksPage() {
               {loading ? <div className="p-4 text-center text-[#9BA3AF]">Loading...</div> : 
                tasks.filter(t => !t.parent_id).length === 0 ? <div className="p-4 text-center text-[#9BA3AF]">No tasks</div> :
                tasks.filter(t => !t.parent_id).map(task => (
-                 <div key={task.id} className="flex items-center gap-2 py-2 px-3 hover:bg-[#1F2226] rounded">
-                   <Circle className="w-4 h-4 text-[#9BA3AF]" />
-                   <span className="text-sm text-white truncate">{task.title}</span>
+                 <div key={task.id} className="flex flex-col py-2 px-3 hover:bg-[#1F2226] rounded">
+                   <div className="flex items-center gap-2">
+                     <Circle className="w-4 h-4 text-[#9BA3AF]" />
+                     <span className="text-sm text-white truncate">{task.title}</span>
+                   </div>
+                   <span className="text-[10px] text-[#6B7280] font-mono ml-6">{task.id.slice(0, 8)}... • {task.assigned_agent?.display_name || task.agent_id?.slice(0, 8) || 'Unassigned'}</span>
                  </div>
                ))}
             </div>

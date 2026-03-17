@@ -177,15 +177,21 @@ export default function MissionsPage() {
                   </div>
                 )}
 
-                {/* Title & ID */}
-                <p className="text-[10px] text-[#6B7280] font-mono mb-1">{mission.id}</p>
-                <h3 className="text-lg font-medium text-white mb-2">{mission.title}</h3>
+                {/* Title & Code - Human readable primary, ID secondary */}
+                <div className="mb-3">
+                  <h3 className="text-lg font-medium text-white mb-1">{mission.title}</h3>
+                  <p className="text-[10px] text-[#6B7280] font-mono">{mission.id.slice(0, 8)}...</p>
+                </div>
                 <p className="text-sm text-[#9BA3AF] mb-3 line-clamp-2">{mission.objective}</p>
 
-                {/* Owner */}
-                <div className="flex items-center gap-2 mb-3">
-                  <Users className="w-3.5 h-3.5 text-[#6B7280]" />
-                  <span className="text-xs text-[#9BA3AF]">Owner: <span className="text-white">{mission.owner_agent || mission.owner}</span></span>
+                {/* Owner & Status Row */}
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-[#6B7280]" />
+                    <span className="text-xs text-white">{mission.owner_agent || mission.owner || 'Unassigned'}</span>
+                  </div>
+                  <span className="text-xs text-[#6B7280]">•</span>
+                  <span className="text-xs text-[#9BA3AF]">{mission.assigned_agents?.length || mission.assignedAgents?.length || 0} agents assigned</span>
                 </div>
 
                 {/* Claimed vs Proven */}

@@ -60,20 +60,15 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // WRAPPED: Get mission with retry+timeout
-    const missionResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .select('id,status,phase,evidence_bundle')
-          .eq('id', missionId)
-          .is('deleted_at', null)
-          .single(),
-        3000
-      )
-    );
+    // Get mission
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id,status,phase,evidence_bundle')
+      .eq('id', missionId)
+      .is('deleted_at', null)
+      .single();
     
-    if (!missionResult.data) {
+    if (missionError || !mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -82,43 +77,38 @@ export async function POST(
       }, { status: 404 });
     }
     
-    if (missionResult.data.status !== 'closed' && missionResult.data.status !== 'cancelled') {
+    if (mission.status !== 'closed' && mission.status !== 'cancelled') {
       return NextResponse.json({
         success: false,
-        error: `Cannot reopen mission with status: ${missionResult.data.status}`,
+        error: `Cannot reopen mission with status: ${mission.status}`,
         requestId: rid,
         duration: Date.now() - startTime
       }, { status: 400 });
     }
     
-    // WRAPPED: Update mission with retry+timeout
-    const updateResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('missions')
-          .update({
-            status: 'active',
-            phase: new_phase,
-            actual_end_date: null,
-            evidence_bundle: {
-              ...missionResult.data.evidence_bundle,
-              reopen: {
-                reopened_at: timestamp,
-                reopened_by,
-                reason: reopen_reason,
-                previous_status: missionResult.data.status
-              }
-            },
-            updated_at: timestamp
-          })
-          .eq('id', missionId)
-          .select('id,status,phase')
-          .single(),
-        3000
-      )
-    );
+    // Update mission
+    const { data: updatedMission, error: updateError } = await supabase
+      .from('missions')
+      .update({
+        status: 'active',
+        phase: new_phase,
+        actual_end_date: null,
+        evidence_bundle: {
+          ...mission.evidence_bundle,
+          reopen: {
+            reopened_at: timestamp,
+            reopened_by,
+            reason: reopen_reason,
+            previous_status: mission.status
+          }
+        },
+        updated_at: timestamp
+      })
+      .eq('id', missionId)
+      .select('id,status,phase')
+      .single();
     
-    if (updateResult.error) throw updateResult.error;
+    if (updateError) throw updateError;
     
     const duration = Date.now() - startTime;
     console.log(JSON.stringify({
@@ -132,7 +122,7 @@ export async function POST(
     
     return NextResponse.json({
       success: true,
-      mission: updateResult.data,
+      mission: updatedMission,
       requestId: rid,
       duration
     });

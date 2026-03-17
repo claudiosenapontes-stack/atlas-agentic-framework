@@ -97,19 +97,12 @@ export async function POST(
     }));
     
     // WRAPPED: Insert tasks with retry+timeout
-    const tasksResult = await withRetry(() =>
-      withTimeout(
-        supabase
-          .from('tasks')
-          .insert(taskPayloads)
-          .select('id,title,status'),
-        3000
-      )
-    );
+    const { data: createdTasks, error: tasksError } = await supabase
+      .from('tasks')
+      .insert(taskPayloads)
+      .select('id,title,status');
     
-    if (tasksResult.error) throw tasksResult.error;
-    
-    const createdTasks = tasksResult.data || [];
+    if (tasksError) throw tasksError;
     
     // Fire-and-forget: Create mission_task links
     if (createdTasks.length > 0) {

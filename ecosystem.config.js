@@ -23,7 +23,7 @@ module.exports = {
     {
       name: 'mission-control',
       script: './node_modules/.bin/next',
-      args: 'start --port 3005',
+      args: 'start --port 3000',
       cwd: '/root/.openclaw/workspaces/atlas-agentic-framework',
       restart_delay: 10000,
       max_restarts: 5,

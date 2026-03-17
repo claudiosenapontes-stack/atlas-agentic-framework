@@ -85,7 +85,7 @@ export async function POST(
       );
     }
     
-    // Prepare task payloads
+    // Prepare task payloads (only use fields confirmed in schema)
     const taskPayloads = taskDefs.map((taskDef: any) => ({
       id: randomUUID(),
       title: taskDef.title,
@@ -93,10 +93,9 @@ export async function POST(
       status: taskDef.status || 'pending',
       priority: taskDef.priority || mission.priority || 'medium',
       assignee_id: taskDef.assignee_id || null,
-      assignee_agent: taskDef.assignee_agent || null,
       company_id: mission.company_id,
       task_type: taskDef.task_type || 'implementation',
-      metadata: { mission_id: missionId, created_from_decompose: true },
+      metadata: { mission_id: missionId, created_from_decompose: true, assignee_agent: taskDef.assignee_agent },
       created_at: timestamp,
       updated_at: timestamp,
     }));

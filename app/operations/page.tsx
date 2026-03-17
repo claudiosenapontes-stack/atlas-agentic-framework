@@ -14,12 +14,13 @@ function CardContent({ children, className = "" }: { children: React.ReactNode; 
 function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <div className={`px-4 py-3 border-b border-[#1F2226] ${className}`}>{children}</div>; }
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <span className={`px-2 py-0.5 text-xs rounded-full ${className}`}>{children}</span>; }
 
+// Lifecycle order: Missions → Milestones → Tasks → Delegation → Productivity
 const navItems = [
-  { href: "/operations/missions", icon: Target, title: "Missions", desc: "Track Henry & Olivia", color: "text-[#FF6A00]", primary: true },
-  { href: "/operations/tasks", icon: GitBranch, title: "Tasks", desc: "Task management", color: "text-blue-400" },
-  { href: "/operations/milestones", icon: Flag, title: "Milestones", desc: "Project phases", color: "text-green-400" },
-  { href: "/operations/delegation", icon: Users, title: "Delegation", desc: "Agent workloads", color: "text-purple-400" },
-  { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "Performance metrics", color: "text-pink-400" },
+  { href: "/operations/missions", icon: Target, title: "Missions", desc: "Whole goals, owners, blockers, verdicts", color: "text-[#FF6A00]", primary: true },
+  { href: "/operations/milestones", icon: Flag, title: "Milestones", desc: "Deadline checkpoints, timeline, flags", color: "text-green-400" },
+  { href: "/operations/tasks", icon: GitBranch, title: "Tasks", desc: "Child-task breakdown, dependencies, quality", color: "text-blue-400" },
+  { href: "/operations/delegation", icon: Users, title: "Delegation", desc: "Workload, queue depth, assignments", color: "text-purple-400" },
+  { href: "/operations/productivity", icon: TrendingUp, title: "Productivity", desc: "KPIs, throughput, metrics", color: "text-pink-400" },
 ];
 
 export default function UnifiedOperationsDashboard() {

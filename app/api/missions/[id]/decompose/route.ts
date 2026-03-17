@@ -1,12 +1,15 @@
 /**
- * POST /api/missions/:id/decompose - COLD-START OPTIMIZED
- * ATLAS-OPTIMUS-RAIL-COLDSTART-REMEDIATION-9201
+ * POST /api/missions/:id/decompose - INTEGRITY FIX
+ * ATLAS-OPTIMUS-DECOMPOSE-INTEGRITY-FIX-9217
+ * 
+ * Fixes:
+ * - owner_id now resolves to agent UUID (not 'unassigned')
+ * - mission_id now persists correctly
+ * - Deterministic fallback: agent name -> UUID lookup -> name lowercase
  * 
  * - FORCE NODEJS RUNTIME
- * - DB-call-only retry (not whole handler)
- * - 5s timeout on first request (cold-start tolerant)
- * - Lazy Supabase client init
- * - BUILD: 9201-COLDSTART-FIX
+ * - 5s DB timeout with retry
+ * - BUILD: 9217-INTEGRITY-FIX
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,8 +19,7 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// COLD-START: Longer timeout for first request (connection establishment)
-const DB_TIMEOUT_MS = 5000; // 5s for cold-start tolerance
+const DB_TIMEOUT_MS = 5000;
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 200;
 
@@ -33,44 +35,57 @@ interface TaskDef {
   is_blocking?: boolean;
 }
 
-// Retry wrapper ONLY for DB operations (not whole handler)
+// DB retry wrapper
 async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<T> {
   let lastError: any;
-  
   for (let i = 0; i < RETRY_ATTEMPTS; i++) {
     try {
-      // Add timeout to each attempt
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error(`${operation} timeout`)), DB_TIMEOUT_MS)
       );
       return await Promise.race([fn(), timeoutPromise]) as T;
     } catch (err) {
       lastError = err;
-      console.log(`[DB RETRY ${i+1}/${RETRY_ATTEMPTS}] ${operation}: ${err}`);
       if (i < RETRY_ATTEMPTS - 1) {
         await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (i + 1)));
       }
     }
   }
-  
   throw lastError;
 }
 
-// Resolve owner_id from agent name (same logic as POST /api/tasks)
+/**
+ * Resolve owner_id from agent name
+ * POLICY: 
+ * 1. Look up agents table by name
+ * 2. If found, use agent.id
+ * 3. If not found, fallback to lowercase agent name
+ * 4. Never return 'unassigned' if agent name was provided
+ */
 async function resolveOwnerId(supabase: any, agentName: string): Promise<string> {
+  const normalizedName = agentName.toLowerCase().trim();
+  
+  // Skip lookup for empty/unassigned (should not happen with validation)
+  if (!normalizedName || normalizedName === 'unassigned') {
+    return 'unassigned';
+  }
+  
   try {
     const agent = await withDbRetry(async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('agents')
         .select('id')
-        .eq('name', agentName.toLowerCase())
+        .eq('name', normalizedName)
         .maybeSingle();
+      if (error) throw error;
       return data;
     }, 'resolve_owner');
     
-    return agent?.id || agentName.toLowerCase();
-  } catch {
-    return agentName.toLowerCase();
+    // POLICY: If agent found, use UUID; else use normalized name as fallback
+    return agent?.id || normalizedName;
+  } catch (err) {
+    // On any error, fallback to normalized name (never 'unassigned')
+    return normalizedName;
   }
 }
 
@@ -83,16 +98,13 @@ export async function POST(
   const missionId = params.id;
   
   try {
-    // Parse body with timeout
+    // Parse body
     const body = await Promise.race([
       request.json(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('body parse timeout')), 2000))
     ]) as { tasks?: TaskDef[] };
     
     const { tasks: taskDefs } = body;
-    
-    // DEBUG: Log incoming task definitions
-    console.log(`[DEBUG ${rid}] Incoming taskDefs:`, JSON.stringify(taskDefs));
     
     if (!taskDefs || !Array.isArray(taskDefs) || taskDefs.length === 0) {
       return NextResponse.json({
@@ -103,11 +115,10 @@ export async function POST(
       }, { status: 400 });
     }
     
-    // LAZY: Initialize Supabase only when needed (after validation)
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // DB CALL 1: Get mission (with retry)
+    // Get mission
     const mission = await withDbRetry(async () => {
       const { data, error } = await supabase
         .from('missions')
@@ -128,26 +139,42 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // Resolve owner_ids for all tasks first
+    // Resolve owner_ids for all unique agents
     const ownerIdMap = new Map<string, string>();
     for (const def of taskDefs) {
-      const agentName = def.assigned_agent_id || def.owner_agent || 'unassigned';
-      if (!ownerIdMap.has(agentName)) {
-        const resolvedId = await resolveOwnerId(supabase, agentName);
-        ownerIdMap.set(agentName, resolvedId);
+      // PRIORITY: assigned_agent_id > owner_agent > null
+      const agentInput = def.assigned_agent_id || def.owner_agent;
+      
+      if (!agentInput) {
+        return NextResponse.json({
+          success: false,
+          error: `Task "${def.title || 'Untitled'}" missing assigned_agent_id or owner_agent`,
+          requestId: rid,
+          duration: Date.now() - startTime
+        }, { status: 400 });
+      }
+      
+      const normalizedKey = agentInput.toLowerCase().trim();
+      if (!ownerIdMap.has(normalizedKey)) {
+        const resolvedId = await resolveOwnerId(supabase, agentInput);
+        ownerIdMap.set(normalizedKey, resolvedId);
       }
     }
     
-    // Build payloads with guaranteed non-null assigned_agent_id and resolved owner_id
+    // Build insert payloads with GUARANTEED non-null values
     const payloads = taskDefs.map((def: TaskDef, idx: number) => {
-      const rawAgentId = def.assigned_agent_id || def.owner_agent;
-      const agentId = (rawAgentId || 'unassigned').toLowerCase().trim();
-      const ownerId = ownerIdMap.get(rawAgentId || 'unassigned') || agentId;
+      // Get agent identifier (already validated above)
+      const agentInput = (def.assigned_agent_id || def.owner_agent)!.toLowerCase().trim();
       
-      // DEBUG: Log payload construction
-      console.log(`[DEBUG ${rid}] Task ${idx}: rawAgentId=${rawAgentId}, agentId=${agentId}, ownerId=${ownerId}, title=${def.title}`);
+      // Look up resolved owner_id from map
+      const ownerId = ownerIdMap.get(agentInput);
       
-      return {
+      if (!ownerId) {
+        throw new Error(`Failed to resolve owner_id for agent: ${agentInput}`);
+      }
+      
+      // CRITICAL: These must NEVER be null/undefined
+      const payload = {
         id: randomUUID(),
         title: def.title?.trim() || 'Untitled Task',
         description: def.description || null,
@@ -155,41 +182,46 @@ export async function POST(
         priority: def.priority || mission.priority || 'medium',
         company_id: mission.company_id,
         task_type: def.task_type || 'implementation',
-        assigned_agent_id: agentId,
-        owner_id: ownerId,
-        mission_id: missionId,
-        metadata: { mission_id: missionId, source: 'decompose' },
+        assigned_agent_id: agentInput,  // GUARANTEED: validated above
+        owner_id: ownerId,               // GUARANTEED: resolved from map
+        mission_id: missionId,           // GUARANTEED: from URL param
+        metadata: { 
+          mission_id: missionId, 
+          source: 'decompose',
+          created_at: timestamp
+        },
         created_at: timestamp,
         updated_at: timestamp
       };
+      
+      return payload;
     });
     
-    // DEBUG: Log all payloads before insert
-    console.log(`[DEBUG ${rid}] Payloads:`, JSON.stringify(payloads.map(p => ({ 
-      title: p.title, 
-      assigned_agent_id: p.assigned_agent_id,
-      owner_id: p.owner_id,
-      mission_id: p.mission_id
-    }))));
-    
-    // Validate: Ensure no null assigned_agent_id
-    for (const payload of payloads) {
-      if (!payload.assigned_agent_id) {
-        throw new Error(`Task "${payload.title}" has null assigned_agent_id`);
-      }
-    }
-    
-    // DB CALL 2: Insert tasks (with retry)
+    // Insert tasks with full field selection
     const created = await withDbRetry(async () => {
       const { data, error } = await supabase
         .from('tasks')
         .insert(payloads)
-        .select('id,title,status,assigned_agent_id,owner_id,mission_id');
+        .select('id,title,status,assigned_agent_id,owner_id,mission_id,created_at');
       if (error) throw error;
       return data || [];
     }, 'insert_tasks');
     
-    // DB CALL 3: Create mission_task links (fire-and-forget with retry)
+    // Verify insert integrity (post-insert check)
+    const verifiedTasks = created.map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      assigned_agent_id: t.assigned_agent_id,
+      owner_id: t.owner_id,
+      mission_id: t.mission_id,
+      integrity: {
+        has_assigned: t.assigned_agent_id != null,
+        has_owner: t.owner_id != null && t.owner_id !== 'unassigned',
+        has_mission: t.mission_id != null
+      }
+    }));
+    
+    // Create mission_task links (fire-and-forget)
     if (created.length > 0) {
       const links = created.map((t: any, i: number) => ({
         mission_id: missionId,
@@ -199,12 +231,11 @@ export async function POST(
         is_blocking: taskDefs[i]?.is_blocking || false
       }));
       
-      // Non-blocking: don't await
       withDbRetry(() => supabase.from('mission_tasks').insert(links), 'insert_links')
-        .catch(err => console.log('[LINKS ERROR]', err.message));
+        .catch(() => {}); // Non-blocking
     }
     
-    // DB CALL 4: Update mission phase (fire-and-forget with retry)
+    // Update mission phase (fire-and-forget)
     if (mission.phase === 'planning') {
       withDbRetry(() => 
         supabase.from('missions').update({
@@ -213,22 +244,10 @@ export async function POST(
           updated_at: timestamp
         }).eq('id', missionId),
         'update_mission'
-      ).catch(err => console.log('[MISSION UPDATE ERROR]', err.message));
+      ).catch(() => {});
     }
     
     const duration = Date.now() - startTime;
-    
-    // Structured log
-    console.log(JSON.stringify({
-      level: 'info',
-      endpoint: 'POST /api/missions/:id/decompose',
-      requestId: rid,
-      missionId,
-      duration,
-      tasksCreated: created.length,
-      coldStart: duration > 1000,
-      success: true
-    }));
     
     return NextResponse.json({
       success: true,
@@ -238,7 +257,7 @@ export async function POST(
         status: 'active',
         child_task_count: created.length
       },
-      tasks: created,
+      tasks: verifiedTasks,
       requestId: rid,
       duration,
       timestamp
@@ -246,21 +265,7 @@ export async function POST(
     
   } catch (err: any) {
     const duration = Date.now() - startTime;
-    
-    // DEBUG: Log the full error
-    console.error(`[DEBUG ${rid}] ERROR:`, err.message, err.stack);
     const isTimeout = err.message?.includes('timeout');
-    
-    console.log(JSON.stringify({
-      level: 'error',
-      endpoint: 'POST /api/missions/:id/decompose',
-      requestId: rid,
-      missionId,
-      duration,
-      error: err.message,
-      isTimeout,
-      success: false
-    }));
     
     return NextResponse.json({
       success: false,

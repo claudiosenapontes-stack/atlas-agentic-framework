@@ -1,13 +1,14 @@
 /**
- * ATLAS-OPTIMUS-AUTONOMY-API
+ * ATLAS-OPTIMUS-TASK-EXECUTION-9243
  * POST /api/tasks/:id/complete
- * Mark child task complete with result
+ * Mark task complete with result - SIMPLIFIED
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { autonomyOrchestrationService } from '@/lib/autonomy-orchestration-service';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(
   request: NextRequest,
@@ -18,44 +19,63 @@ export async function POST(
   
   try {
     const body = await request.json();
+    const { agent_id, result_data, result_summary, result_type } = body;
     
-    if (!body.agent_id) {
+    const supabase = getSupabaseAdmin();
+    
+    // Build update
+    const updates: any = {
+      status: 'completed',
+      completed_at: timestamp,
+      updated_at: timestamp,
+    };
+    
+    if (result_data !== undefined) {
+      updates.result_data = result_data;
+    }
+    
+    if (result_summary !== undefined) {
+      updates.result_summary = result_summary;
+    }
+    
+    if (result_type !== undefined) {
+      updates.result_type = result_type;
+    }
+    
+    // Update task
+    const { data: updatedTask, error } = await (supabase as any)
+      .from('tasks')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('[Task Complete] Error:', error);
       return NextResponse.json(
-        { success: false, error: 'agent_id is required', timestamp },
-        { status: 422 }
+        { success: false, error: error.message, timestamp },
+        { status: 500 }
       );
     }
-
-    if (!body.result_data) {
+    
+    if (!updatedTask) {
       return NextResponse.json(
-        { success: false, error: 'result_data is required', timestamp },
-        { status: 422 }
+        { success: false, error: 'Task not found', timestamp },
+        { status: 404 }
       );
     }
-
-    const result = await autonomyOrchestrationService.markChildComplete(
-      id,
-      body.agent_id,
-      {
-        resultType: body.result_type || 'output',
-        resultData: body.result_data,
-        resultSummary: body.result_summary,
-        tokensUsed: body.tokens_used,
-        executionTimeMs: body.execution_time_ms
-      }
-    );
-
-    const statusCode = result.success ? 200 : 500;
-
+    
     return NextResponse.json({
-      ...result,
+      success: true,
+      task: updatedTask,
       timestamp,
-      source: 'autonomy_api'
-    }, { status: statusCode });
+      source: 'ATLAS-9243'
+    });
 
   } catch (error: any) {
+    console.error('[Task Complete] Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message, timestamp, source: 'autonomy_api' },
+      { success: false, error: error.message, timestamp, source: 'ATLAS-9243' },
       { status: 500 }
     );
   }

@@ -1,35 +1,36 @@
 /**
  * ATLAS-WATCHLIST API
- * ATLAS-OPTIMUS-EO-INSERT-DIAGNOSTIC-140
+ * ATLAS-OPTIMUS-EXEC-ENDPOINTS-FIX-9819
  * 
  * GET/POST /api/watchlist
- * With structured logging for insert diagnostics
+ * Fixed to use correct schema: watch_rules and watch_alerts
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, withDbRetry } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
-  
-  console.log(`[${requestId}] GET /api/watchlist started`);
   const startTime = Date.now();
   
   try {
     const supabase = getSupabaseAdmin();
-    console.log(`[${requestId}] Supabase admin client initialized`);
     
-    const { data, error } = await (supabase as any)
-      .from('watchlist_items')
-      .select('*')
-      .limit(50);
+    // Query watch_alerts (the actual watchlist items)
+    const { data, error } = await withDbRetry(async () => {
+      return await (supabase as any)
+        .from('watch_alerts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+    }, 'get_watch_alerts');
     
     const duration = Date.now() - startTime;
-    console.log(`[${requestId}] SELECT completed in ${duration}ms`, { count: data?.length, error: error?.message });
     
     if (error) {
       return NextResponse.json({
@@ -38,14 +39,14 @@ export async function GET(request: NextRequest) {
         code: error.code,
         timestamp,
         requestId,
+        duration,
       }, { status: 500 });
     }
     
-    // FILTER: Exclude test/demo items and items with no meaningful subject
+    // FILTER: Exclude test/demo items
     const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
     const filteredItems = (data || []).filter((item: any) => {
-      const subject = (item.subject || item.title || '').toLowerCase();
-      // Exclude if subject is empty/null or contains test patterns
+      const subject = (item.source_subject || item.content_preview || '').toLowerCase();
       if (!subject || subject === 'none') return false;
       return !testPatterns.some(pattern => subject.includes(pattern));
     });
@@ -56,132 +57,10 @@ export async function GET(request: NextRequest) {
       count: filteredItems.length,
       timestamp,
       requestId,
+      duration,
     });
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    console.error(`[${requestId}] GET exception after ${duration}ms:`, error);
-    return NextResponse.json({
-      success: false,
-      error: error.message,
-      timestamp,
-      requestId,
-    }, { status: 500 });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const timestamp = new Date().toISOString();
-  const requestId = randomUUID().slice(0, 8);
-  
-  console.log(`[${requestId}] POST /api/watchlist started`);
-  const startTime = Date.now();
-  
-  try {
-    // Parse request body
-    let body;
-    try {
-      body = await request.json();
-      console.log(`[${requestId}] Request body parsed:`, JSON.stringify(body));
-    } catch (e) {
-      console.error(`[${requestId}] Failed to parse request body:`, e);
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid JSON in request body',
-        timestamp,
-        requestId,
-      }, { status: 400 });
-    }
-    
-    const { title, category = 'general', priority = 'medium' } = body;
-    
-    // Validate required fields
-    if (!title || typeof title !== 'string') {
-      console.log(`[${requestId}] Validation failed: title required`);
-      return NextResponse.json({
-        success: false,
-        error: 'title is required and must be a string',
-        timestamp,
-        requestId,
-      }, { status: 400 });
-    }
-    
-    // Initialize admin client
-    console.log(`[${requestId}] Initializing Supabase admin client...`);
-    let supabase;
-    try {
-      supabase = getSupabaseAdmin();
-      console.log(`[${requestId}] Supabase admin client initialized successfully`);
-    } catch (e: any) {
-      console.error(`[${requestId}] Failed to initialize Supabase client:`, e);
-      return NextResponse.json({
-        success: false,
-        error: `Supabase client init failed: ${e.message}`,
-        timestamp,
-        requestId,
-      }, { status: 500 });
-    }
-    
-    // Build payload
-    const id = randomUUID();
-    const insertPayload = {
-      id,
-      title,
-      category,
-      priority,
-      status: 'active',
-      created_at: timestamp,
-    };
-    
-    console.log(`[${requestId}] Insert payload:`, JSON.stringify(insertPayload));
-    console.log(`[${requestId}] Table: watchlist_items`);
-    console.log(`[${requestId}] Executing INSERT...`);
-    
-    // Execute insert with timing
-    const insertStart = Date.now();
-    const { data, error } = await (supabase as any)
-      .from('watchlist_items')
-      .insert(insertPayload)
-      .select()
-      .single();
-    
-    const insertDuration = Date.now() - insertStart;
-    const totalDuration = Date.now() - startTime;
-    
-    console.log(`[${requestId}] INSERT completed in ${insertDuration}ms`);
-    console.log(`[${requestId}] Total request time: ${totalDuration}ms`);
-    console.log(`[${requestId}] Supabase response:`, { 
-      data: data ? 'present' : 'null', 
-      error: error ? { message: error.message, code: error.code, details: error.details } : null 
-    });
-    
-    if (error) {
-      console.error(`[${requestId}] INSERT ERROR:`, error);
-      return NextResponse.json({
-        success: false,
-        error: error.message,
-        code: error.code,
-        details: error.details,
-        timestamp,
-        requestId,
-        duration: insertDuration,
-      }, { status: 500 });
-    }
-    
-    console.log(`[${requestId}] INSERT SUCCESS:`, { id, duration: insertDuration });
-    
-    return NextResponse.json({
-      success: true,
-      item: data,
-      id,
-      status: 'created',
-      timestamp,
-      requestId,
-      duration: insertDuration,
-    }, { status: 201 });
-    
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    console.error(`[${requestId}] POST exception after ${duration}ms:`, error);
     return NextResponse.json({
       success: false,
       error: error.message,
@@ -191,3 +70,104 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+export async function POST(request: NextRequest) {
+  const timestamp = new Date().toISOString();
+  const requestId = randomUUID().slice(0, 8);
+  const startTime = Date.now();
+  
+  try {
+    const body = await request.json();
+    const { 
+      name, 
+      pattern, 
+      rule_type = 'keyword_match',
+      action_type = 'alert',
+      content_preview,
+      source_subject,
+      source_sender 
+    } = body;
+    
+    // Validate required fields
+    if (!name || typeof name !== 'string') {
+      return NextResponse.json({
+        success: false,
+        error: 'name is required and must be a string',
+        timestamp,
+        requestId,
+      }, { status: 400 });
+    }
+    
+    if (!pattern || typeof pattern !== 'string') {
+      return NextResponse.json({
+        success: false,
+        error: 'pattern is required and must be a string',
+        timestamp,
+        requestId,
+      }, { status: 400 });
+    }
+    
+    const supabase = getSupabaseAdmin();
+    const id = randomUUID();
+    
+    // Build payload for watch_rules (the proper table)
+    const insertPayload: any = {
+      id,
+      name,
+      pattern,
+      rule_type,
+      action_type,
+      is_active: true,
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+    
+    // Add optional fields
+    if (body.description) insertPayload.description = body.description;
+    if (body.owner_id) insertPayload.owner_id = body.owner_id;
+    if (body.company_id) insertPayload.company_id = body.company_id;
+    if (body.email_account) insertPayload.email_account = body.email_account;
+    
+    const { data, error } = await withDbRetry(async () => {
+      return await (supabase as any)
+        .from('watch_rules')
+        .insert(insertPayload)
+        .select()
+        .single();
+    }, 'insert_watch_rule');
+    
+    const duration = Date.now() - startTime;
+    
+    if (error) {
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        timestamp,
+        requestId,
+        duration,
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({
+      success: true,
+      item: data,
+      id,
+      status: 'created',
+      timestamp,
+      requestId,
+      duration,
+    }, { status: 201 });
+    
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      timestamp,
+      requestId,
+      duration,
+    }, { status: 500 });
+  }
+}
+// Cache bust: 1773773070

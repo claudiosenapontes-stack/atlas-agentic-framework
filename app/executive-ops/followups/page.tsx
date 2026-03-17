@@ -21,7 +21,8 @@ async function getFollowUps(): Promise<FollowUp[] | null> {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
     const res = await fetch(`${baseUrl}/api/followups`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch follow-ups');
-    return await res.json();
+    const data = await res.json();
+    return data.followups || [];
   } catch {
     return null;
   }

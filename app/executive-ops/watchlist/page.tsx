@@ -31,7 +31,8 @@ async function getWatchlist(): Promise<WatchlistItem[] | null> {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
     const res = await fetch(`${baseUrl}/api/watchlist`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch watchlist');
-    return await res.json();
+    const data = await res.json();
+    return data.items || [];
   } catch {
     return null;
   }

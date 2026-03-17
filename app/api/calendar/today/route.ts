@@ -48,8 +48,22 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    const events = data || [];
-    const nextEvent = events.find((e: any) => new Date(e.start_time) > new Date()) || null;
+    // Transform DB fields to CalendarEvent format
+    const events = (data || []).map((e: any) => ({
+      id: e.id,
+      title: e.title,
+      start: e.start_time,
+      end: e.end_time,
+      location: e.location || undefined,
+      meetLink: e.meet_link || undefined,
+      attendees: e.attendees || [],
+      isRecurring: false,
+      eventType: e.is_virtual ? 'virtual' : 'in_person',
+      confirmed: e.status === 'confirmed',
+      description: e.description || undefined
+    }));
+    
+    const nextEvent = events.find((e: any) => new Date(e.start) > new Date()) || null;
     
     return NextResponse.json({
       connected: true,

@@ -30,7 +30,8 @@ async function getApprovals(): Promise<Approval[] | null> {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
     const res = await fetch(`${baseUrl}/api/approvals`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch approvals');
-    return await res.json();
+    const data = await res.json();
+    return data.approvals || [];
   } catch {
     return null;
   }

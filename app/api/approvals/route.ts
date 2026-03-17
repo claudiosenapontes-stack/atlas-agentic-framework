@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     
     const { data, error } = await (supabase as any)
       .from('approval_requests')
-      .select('id, type, status, created_at')
+      .select('*')
       .limit(50);
     
     const duration = Date.now() - startTime;

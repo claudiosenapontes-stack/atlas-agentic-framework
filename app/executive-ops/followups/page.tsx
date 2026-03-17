@@ -5,15 +5,15 @@ import { Clock, CheckCircle2, Loader2, AlertCircle, Calendar, User, ArrowRight }
 
 interface FollowUp {
   id: string;
-  title: string;
+  title?: string;
   description?: string;
-  assignee: string;
-  dueDate: string;
-  status: 'pending' | 'completed' | 'overdue';
-  source: string;
-  priority: 'low' | 'medium' | 'high';
-  createdAt: string;
-  completedAt?: string;
+  assignee?: string;
+  due_date?: string;
+  status: string;
+  source?: string;
+  priority?: string;
+  created_at?: string;
+  completed_at?: string;
 }
 
 async function getFollowUps(): Promise<FollowUp[] | null> {
@@ -75,7 +75,13 @@ export default function FollowUpsPage() {
   }) || [];
 
   const pendingCount = followups?.filter(f => f.status === 'pending').length || 0;
-  const overdueCount = followups?.filter(f => f.status === 'overdue').length || 0;
+  const overdueCount = followups?.filter(f => {
+    if (f.status === 'overdue') return true;
+    if (f.status === 'pending' && f.due_date) {
+      return new Date(f.due_date) < new Date();
+    }
+    return false;
+  }).length || 0;
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
@@ -158,38 +164,48 @@ export default function FollowUpsPage() {
 }
 
 function FollowUpCard({ followup }: { followup: FollowUp }) {
-  const isOverdue = followup.status === 'overdue' || (followup.status === 'pending' && new Date(followup.dueDate) < new Date());
+  const isOverdue = followup.status === 'overdue' || (followup.status === 'pending' && followup.due_date && new Date(followup.due_date) < new Date());
+  
+  const priority = followup.priority || 'medium';
+  const priorityKey = ['low', 'medium', 'high'].includes(priority) ? priority as keyof typeof PRIORITY_COLORS : 'medium';
+  
+  const status = followup.status || 'pending';
+  const statusKey = ['pending', 'completed', 'overdue'].includes(status) ? status as keyof typeof STATUS_COLORS : 'pending';
   
   return (
     <div className={`p-4 bg-[#111214] border rounded-[10px] ${isOverdue ? 'border-[#FF3B30]/30' : 'border-[#1F2226]'}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[followup.priority]}`}>
-              {followup.priority.toUpperCase()}
+            <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[priorityKey]}`}>
+              {priorityKey.toUpperCase()}
             </span>
-            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[followup.status]}`}>
-              {followup.status}
+            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[statusKey]}`}>
+              {status}
             </span>
-            <span className="text-xs text-[#6B7280]">{followup.source}</span>
+            {followup.source && <span className="text-xs text-[#6B7280]">{followup.source}</span>}
           </div>
-          <h3 className="font-medium text-white mb-1">{followup.title}</h3>
+          <h3 className="font-medium text-white mb-1">{followup.title || 'Untitled Follow-up'}</h3>
           {followup.description && (
             <p className="text-sm text-[#6B7280] mb-2">{followup.description}</p>
           )}
           <div className="flex items-center gap-4 text-xs text-[#6B7280]">
-            <span className="flex items-center gap-1">
-              <User className="w-3 h-3" />
-              {followup.assignee}
-            </span>
-            <span className={`flex items-center gap-1 ${isOverdue ? 'text-[#FF3B30]' : ''}`}>
-              <Calendar className="w-3 h-3" />
-              {new Date(followup.dueDate).toLocaleDateString()}
-            </span>
+            {followup.assignee && (
+              <span className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {followup.assignee}
+              </span>
+            )}
+            {followup.due_date && (
+              <span className={`flex items-center gap-1 ${isOverdue ? 'text-[#FF3B30]' : ''}`}>
+                <Calendar className="w-3 h-3" />
+                {new Date(followup.due_date).toLocaleDateString()}
+              </span>
+            )}
           </div>
         </div>
         
-        {followup.status === 'pending' && (
+        {status === 'pending' && (
           <button className="flex items-center gap-1 px-3 py-1.5 bg-[#16C784]/20 text-[#16C784] rounded-lg text-xs hover:bg-[#16C784]/30 transition-colors">
             <CheckCircle2 className="w-3 h-3" />
             Complete

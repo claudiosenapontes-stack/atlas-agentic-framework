@@ -15,14 +15,12 @@ import {
 
 interface Approval {
   id: string;
-  title: string;
-  description: string;
-  requester: string;
-  category: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  dueDate?: string;
+  type?: string;
+  description?: string;
+  status: string;
+  created_at: string;
+  amount?: number;
+  requester_id?: string;
 }
 
 async function getApprovals(): Promise<Approval[] | null> {
@@ -140,29 +138,32 @@ function ApprovalCard({ approval }: { approval: Approval }) {
     setActionLoading(null);
   };
 
+  // Derive priority from amount
+  const priority: keyof typeof PRIORITY_COLORS = (approval.amount && approval.amount > 10000) ? 'high' : 
+    (approval.amount && approval.amount > 1000) ? 'medium' : 'low';
+
   return (
     <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[approval.priority]}`}>
-              {approval.priority.toUpperCase()}
+            <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[priority]}`}>
+              {priority.toUpperCase()}
             </span>
-            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[approval.status]}`}>
+            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[approval.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.pending}`}>
               {approval.status}
             </span>
-            <span className="text-xs text-[#6B7280]">{approval.category}</span>
           </div>
-          <h3 className="font-medium text-white mb-1">{approval.title}</h3>
+          <h3 className="font-medium text-white mb-1">{approval.type || 'Untitled Request'}</h3>
           {approval.description && (
             <p className="text-sm text-[#6B7280] mb-2">{approval.description}</p>
           )}
+          {approval.amount && (
+            <p className="text-sm text-[#FFB020] mb-2">${approval.amount.toLocaleString()}</p>
+          )}
           <div className="flex items-center gap-4 text-xs text-[#6B7280]">
-            <span>Requested by: {approval.requester}</span>
-            <span>{new Date(approval.createdAt).toLocaleDateString()}</span>
-            {approval.dueDate && (
-              <span className="text-[#FFB020]">Due: {new Date(approval.dueDate).toLocaleDateString()}</span>
-            )}
+            {approval.requester_id && <span>Requested by: {approval.requester_id}</span>}
+            <span>{new Date(approval.created_at).toLocaleDateString()}</span>
           </div>
         </div>
         

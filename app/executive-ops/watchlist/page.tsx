@@ -16,14 +16,14 @@ import {
 
 interface WatchlistItem {
   id: string;
-  title: string;
-  priority: 'p0' | 'p1' | 'p2' | 'p3';
-  status: 'on_track' | 'at_risk' | 'blocked' | 'completed';
-  owner?: string;
-  sourceUrl?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  subject: string | null;
+  priority: string | null;
+  status: string;
+  category: string;
+  description: string | null;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 async function getWatchlist(): Promise<WatchlistItem[] | null> {
@@ -36,6 +36,21 @@ async function getWatchlist(): Promise<WatchlistItem[] | null> {
   } catch {
     return null;
   }
+}
+
+function mapPriority(priority: string | null): 'p0' | 'p1' | 'p2' | 'p3' {
+  if (!priority) return 'p3';
+  if (priority === 'urgent' || priority === 'high') return 'p0';
+  if (priority === 'medium') return 'p1';
+  if (priority === 'low') return 'p2';
+  return 'p3';
+}
+
+function mapStatus(status: string): 'on_track' | 'at_risk' | 'blocked' | 'completed' {
+  if (status === 'active' || status === 'confirmed') return 'on_track';
+  if (status === 'blocked') return 'blocked';
+  if (status === 'completed' || status === 'done') return 'completed';
+  return 'at_risk';
 }
 
 const PRIORITY_COLORS = {
@@ -74,12 +89,12 @@ export default function WatchlistPage() {
 
   const filteredItems = items?.filter(item => {
     if (filter === 'all') return true;
-    if (filter === 'blocked') return item.status === 'blocked';
-    return item.priority === filter;
+    if (filter === 'blocked') return mapStatus(item.status) === 'blocked';
+    return mapPriority(item.priority) === filter;
   }) || [];
 
-  const p0Count = items?.filter(i => i.priority === 'p0').length || 0;
-  const blockedCount = items?.filter(i => i.status === 'blocked').length || 0;
+  const p0Count = items?.filter(i => mapPriority(i.priority) === 'p0').length || 0;
+  const blockedCount = items?.filter(i => mapStatus(i.status) === 'blocked').length || 0;
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
@@ -140,7 +155,9 @@ export default function WatchlistPage() {
         ) : (
           <div className="space-y-2">
             {filteredItems.map((item) => {
-              const StatusIcon = STATUS_ICONS[item.status];
+              const mappedStatus = mapStatus(item.status);
+              const mappedPriority = mapPriority(item.priority);
+              const StatusIcon = STATUS_ICONS[mappedStatus];
               return (
                 <div
                   key={item.id}
@@ -149,29 +166,22 @@ export default function WatchlistPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[item.priority]}`}>
-                          {item.priority.toUpperCase()}
+                        <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[mappedPriority]}`}>
+                          {mappedPriority.toUpperCase()}
                         </span>
-                        <span className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${STATUS_COLORS[item.status]}`}>
+                        <span className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${STATUS_COLORS[mappedStatus]}`}>
                           <StatusIcon className="w-3 h-3" />
-                          {item.status.replace('_', ' ')}
+                          {mappedStatus.replace('_', ' ')}
                         </span>
                       </div>
-                      <h3 className="font-medium text-white mb-1">{item.title}</h3>
-                      {item.notes && (
-                        <p className="text-sm text-[#6B7280] mb-2">{item.notes}</p>
+                      <h3 className="font-medium text-white mb-1">{item.subject || 'Untitled'}</h3>
+                      {item.description && (
+                        <p className="text-sm text-[#6B7280] mb-2">{item.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-xs text-[#6B7280]">
-                        {item.owner && <span>Owner: {item.owner}</span>}
-                        {item.sourceUrl && (
-                          <a
-                            href={item.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#3B82F6] hover:underline"
-                          >
-                            Source
-                          </a>
+                        <span>Category: {item.category}</span>
+                        {item.source && (
+                          <span>Source: {item.source}</span>
                         )}
                       </div>
                     </div>

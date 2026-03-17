@@ -1,9 +1,6 @@
 /**
- * POST /api/missions/:id/decompose - WRITEPATH FIX 9223
  * ATLAS-OPTIMUS-DECOMPOSE-WRITEPATH-FIX-9223
- * FRESH DEPLOY AFTER PURGE
- * 
- * BUILD: DECOMPOSE-WRITEPATH-9223-FRESH
+ * BUILD: 9223-CACHEBUST-$(date +%s)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,182 +10,67 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const DB_TIMEOUT_MS = 5000;
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 200;
-const BUILD_MARKER = 'DECOMPOSE-WRITEPATH-9223-FRESH';
+const MARKER = '9223-CACHEBUST-1742191200';
 
-interface TaskDef {
-  title?: string;
-  description?: string;
-  task_type?: string;
-  assigned_agent_id?: string;
-  owner_agent?: string;
-}
-
-async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<T> {
-  let lastError: any;
-  for (let i = 0; i < RETRY_ATTEMPTS; i++) {
-    try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`${operation} timeout`)), DB_TIMEOUT_MS)
-      );
-      return await Promise.race([fn(), timeoutPromise]) as T;
-    } catch (err) {
-      lastError = err;
-      if (i < RETRY_ATTEMPTS - 1) {
-        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (i + 1)));
-      }
-    }
-  }
-  throw lastError;
-}
-
-async function resolveOwnerId(supabase: any, agentId: string): Promise<string> {
-  try {
-    const agent = await withDbRetry(async () => {
-      const { data } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('name', agentId.toLowerCase())
-        .maybeSingle();
-      return data;
-    }, 'resolve_owner');
-    return agent?.id || agentId.toLowerCase();
-  } catch {
-    return agentId.toLowerCase();
-  }
-}
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const startTime = Date.now();
-  const rid = randomUUID().slice(0, 8);
-  const missionId = params.id;
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const rid = randomUUID().slice(0,8);
+  const start = Date.now();
   
   try {
-    const body = await request.json() as { tasks?: TaskDef[] };
-    const { tasks: taskDefs } = body;
+    const body = await req.json();
+    const tasks = body.tasks || [];
     
-    if (!taskDefs || !Array.isArray(taskDefs) || taskDefs.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'tasks array required',
-        build_marker: BUILD_MARKER,
-        requestId: rid,
-        duration: Date.now() - startTime
-      }, { status: 400 });
+    if (!tasks.length) {
+      return NextResponse.json({ success: false, error: 'tasks required', marker: MARKER, rid }, { status: 400 });
     }
     
     const supabase = getSupabaseAdmin();
-    const timestamp = new Date().toISOString();
+    const missionId = params.id;
+    const ts = new Date().toISOString();
     
-    const mission = await withDbRetry(async () => {
-      const { data, error } = await supabase
-        .from('missions')
-        .select('id,phase,priority,company_id')
-        .eq('id', missionId)
-        .is('deleted_at', null)
-        .single();
-      if (error) throw error;
-      return data;
-    }, 'get_mission');
+    // Get mission
+    const { data: mission } = await supabase.from('missions').select('id,phase,priority,company_id').eq('id', missionId).single();
+    if (!mission) return NextResponse.json({ success: false, error: 'mission not found', marker: MARKER, rid }, { status: 404 });
     
-    if (!mission) {
-      return NextResponse.json({
-        success: false,
-        error: 'Mission not found',
-        build_marker: BUILD_MARKER,
-        requestId: rid,
-        duration: Date.now() - startTime
-      }, { status: 404 });
-    }
-    
-    // Process tasks sequentially to avoid race conditions
+    // Resolve agent IDs
     const payloads = [];
-    for (const def of taskDefs) {
-      const agentInput = def.assigned_agent_id || def.owner_agent;
-      if (!agentInput) {
-        return NextResponse.json({
-          success: false,
-          error: `Task "${def.title || 'Untitled'}" missing assigned_agent_id or owner_agent`,
-          build_marker: BUILD_MARKER,
-          requestId: rid,
-          duration: Date.now() - startTime
-        }, { status: 400 });
-      }
+    for (const t of tasks) {
+      const agentName = (t.assigned_agent_id || t.owner_agent || '').toLowerCase().trim();
+      if (!agentName) return NextResponse.json({ success: false, error: 'agent required', marker: MARKER, rid }, { status: 400 });
       
-      const normalizedAgentId = agentInput.toLowerCase().trim();
-      const owner_id = await resolveOwnerId(supabase, normalizedAgentId);
+      // Lookup agent UUID
+      const { data: agent } = await supabase.from('agents').select('id').eq('name', agentName).maybeSingle();
+      const ownerId = agent?.id || agentName;
       
       payloads.push({
         id: randomUUID(),
-        title: def.title?.trim() || 'Untitled Task',
-        description: def.description || null,
-        task_type: (def.task_type || 'implementation').toLowerCase(),
+        title: t.title || 'Untitled',
+        description: t.description || null,
+        task_type: (t.task_type || 'implementation').toLowerCase(),
         status: 'pending',
-        priority: (def.priority || mission.priority || 'medium').toLowerCase(),
-        assigned_agent_id: normalizedAgentId,
-        owner_id,
+        priority: (t.priority || mission.priority || 'medium').toLowerCase(),
+        assigned_agent_id: agentName,
+        owner_id: ownerId,
         mission_id: missionId,
         company_id: mission.company_id,
-        metadata: { source: BUILD_MARKER },
-        created_at: timestamp,
-        updated_at: timestamp
+        metadata: { source: MARKER },
+        created_at: ts,
+        updated_at: ts
       });
     }
     
-    const created = await withDbRetry(async () => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert(payloads)
-        .select('id,title,status,assigned_agent_id,owner_id,mission_id');
-      if (error) throw error;
-      return data || [];
-    }, 'insert_tasks');
-    
-    // Update mission phase
-    if (mission.phase === 'planning') {
-      withDbRetry(() => 
-        supabase.from('missions').update({
-          phase: 'execution',
-          status: 'active',
-          updated_at: timestamp
-        }).eq('id', missionId),
-        'update_mission'
-      ).catch(() => {});
-    }
+    // Insert
+    const { data: created, error } = await supabase.from('tasks').insert(payloads).select('id,title,assigned_agent_id,owner_id,mission_id');
+    if (error) throw error;
     
     return NextResponse.json({
       success: true,
-      mission: {
-        id: missionId,
-        phase: 'execution',
-        status: 'active',
-        child_task_count: created.length
-      },
-      tasks: created.map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        assigned_agent_id: t.assigned_agent_id,
-        owner_id: t.owner_id,
-        mission_id: t.mission_id
-      })),
-      build_marker: BUILD_MARKER,
-      requestId: rid,
-      duration: Date.now() - startTime,
-      timestamp
+      tasks: created || [],
+      marker: MARKER,
+      rid,
+      duration: Date.now() - start
     });
-    
-  } catch (err: any) {
-    return NextResponse.json({
-      success: false,
-      error: err.message,
-      build_marker: BUILD_MARKER,
-      requestId: rid,
-      duration: Date.now() - startTime
-    }, { status: 500 });
+  } catch (e: any) {
+    return NextResponse.json({ success: false, error: e.message, marker: MARKER, rid, duration: Date.now() - start }, { status: 500 });
   }
 }

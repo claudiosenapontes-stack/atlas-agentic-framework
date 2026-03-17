@@ -15,6 +15,9 @@ interface ExecutiveSnapshot {
   pendingApprovals: number;
   pendingFollowups: number;
   unreadNotifications: number;
+  activeMissionCount?: number;
+  source?: string;
+  build_marker?: string;
 }
 
 interface Notification {
@@ -45,7 +48,7 @@ async function getExecutiveSnapshot(): Promise<ExecutiveSnapshot | null> {
 async function getNotifications(): Promise<Notification[]> {
   try {
     const res = await fetch('/api/notifications?limit=5', { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch');
+    if (!res.ok) return [];
     const data = await res.json();
     return data.notifications || [];
   } catch { return []; }
@@ -55,7 +58,8 @@ async function getDecisions(): Promise<Decision[]> {
   try {
     const res = await fetch('/api/decisions?limit=3', { cache: 'no-store' });
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    return data.decisions || [];
   } catch { return []; }
 }
 
@@ -104,7 +108,7 @@ export default function ExecutiveOpsPage() {
       setNotifications(notifs);
       setDecisions(decs);
       setLoading(false);
-      setDataSource(snap ? 'live' : 'unavailable');
+      setDataSource(snap?.source === 'live' ? 'live' : 'unavailable');
     });
   }, []);
 

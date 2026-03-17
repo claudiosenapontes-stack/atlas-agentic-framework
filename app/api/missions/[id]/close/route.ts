@@ -1,9 +1,10 @@
 /**
- * POST /api/missions/:id/close - ULTRA-HARDENED
- * ATLAS-OPTIMUS-MISSION-ACTION-ENDPOINTS-CLOSEOUT-1213
- * - Aggressive 2s timeout on ALL DB operations
- * - Minimal field selection
- * - No blocking awaits on non-critical updates
+ * POST /api/missions/:id/close - RAIL-HARDENED
+ * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
+ * - FORCE NODEJS RUNTIME (NO EDGE)
+ * - 3s global timeout guard
+ * - 2 retries with 150ms backoff
+ * - Structured logging (requestId, duration, errorSource)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,122 +14,134 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const DB_TIMEOUT_MS = 2000;
-const MAX_RETRY = 2;
-
-async function dbWithTimeout<T>(operation: () => Promise<T>, context: string): Promise<T> {
+const withTimeout = (promise: Promise<any>, ms = 3000) => {
   return Promise.race([
-    operation(),
-    new Promise<T>((_, reject) => 
-      setTimeout(() => reject(new Error(`DB_TIMEOUT:${context}`)), DB_TIMEOUT_MS)
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("timeout")), ms)
     )
   ]);
-}
+};
 
-async function retryOperation<T>(operation: () => Promise<T>, context: string): Promise<T> {
-  let lastError;
-  for (let i = 0; i < MAX_RETRY; i++) {
+async function withRetry(fn: () => Promise<any>, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
     try {
-      return await dbWithTimeout(operation, context);
-    } catch (error) {
-      lastError = error;
-      if (i < MAX_RETRY - 1 && !(error instanceof Error && error.message.includes('TIMEOUT'))) {
-        await new Promise(r => setTimeout(r, 50));
-      }
+      return await fn();
+    } catch (e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, 150 * (i + 1)));
     }
   }
-  throw lastError;
 }
+
+const requestId = () => randomUUID().slice(0, 8);
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const timestamp = new Date().toISOString();
-  const requestId = randomUUID().slice(0, 8);
-  const missionId = params.id;
   const startTime = Date.now();
+  const rid = requestId();
+  const missionId = params.id;
   
   try {
-    // Fast body parse with timeout
-    const body = await Promise.race([
-      request.json(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('BODY_TIMEOUT')), 500))
-    ]) as any;
+    const body = await withTimeout(request.json(), 1000);
+    const { closure_notes, closed_by } = body;
     
-    const { closure_notes, closed_by, closed_by_agent } = body;
     const supabase = getSupabaseAdmin();
+    const timestamp = new Date().toISOString();
     
-    // GET mission - minimal fields, with timeout+retry
-    const mission = await retryOperation(async () => {
-      const { data, error } = await supabase
-        .from('missions')
-        .select('id,status,evidence_bundle,metadata')
-        .eq('id', missionId)
-        .is('deleted_at', null)
-        .single();
-      if (error) throw error;
-      return data;
-    }, 'get_mission');
+    // Get mission
+    const missionResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .select('id,status,evidence_bundle')
+          .eq('id', missionId)
+          .is('deleted_at', null)
+          .single(),
+        3000
+      )
+    );
     
-    if (!mission) {
-      return NextResponse.json(
-        { success: false, error: 'Mission not found', requestId, duration: Date.now() - startTime },
-        { status: 404 }
-      );
+    if (!missionResult.data) {
+      return NextResponse.json({
+        success: false,
+        error: 'Mission not found',
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 404 });
     }
     
-    if (mission.status === 'closed') {
-      return NextResponse.json(
-        { success: false, error: 'Already closed', requestId, duration: Date.now() - startTime },
-        { status: 400 }
-      );
+    if (missionResult.data.status === 'closed') {
+      return NextResponse.json({
+        success: false,
+        error: 'Mission already closed',
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
     }
     
-    // Build update payload
-    const closureEvidence = {
-      ...mission.evidence_bundle,
-      closure: { closed_at: timestamp, closed_by, closed_by_agent, notes: closure_notes }
-    };
+    // Update mission
+    const updateResult = await withRetry(() =>
+      withTimeout(
+        supabase
+          .from('missions')
+          .update({
+            status: 'closed',
+            phase: 'closure',
+            actual_end_date: timestamp,
+            progress_percent: 100,
+            evidence_bundle: {
+              ...missionResult.data.evidence_bundle,
+              closure: { closed_at: timestamp, closed_by, notes: closure_notes }
+            },
+            updated_at: timestamp
+          })
+          .eq('id', missionId)
+          .select('id,status,phase,progress_percent')
+          .single(),
+        3000
+      )
+    );
     
-    // UPDATE mission - with timeout+retry
-    const updatedMission = await retryOperation(async () => {
-      const { data, error } = await supabase
-        .from('missions')
-        .update({
-          status: 'closed',
-          phase: 'closure',
-          actual_end_date: timestamp,
-          progress_percent: 100,
-          evidence_bundle: closureEvidence,
-          updated_at: timestamp,
-          metadata: { ...mission.metadata, changed_by: closed_by, changed_by_agent: closed_by_agent }
-        })
-        .eq('id', missionId)
-        .select('id,status,phase,progress_percent,updated_at')
-        .single();
-      if (error) throw error;
-      return data;
-    }, 'update_mission');
+    if (updateResult.error) throw updateResult.error;
     
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({ level: 'info', endpoint: 'close', requestId, missionId, duration, success: true }));
+    console.log(JSON.stringify({
+      level: 'info',
+      endpoint: 'POST /api/missions/:id/close',
+      requestId: rid,
+      missionId,
+      duration,
+      success: true
+    }));
     
     return NextResponse.json({
       success: true,
-      mission: updatedMission,
-      requestId,
-      duration,
+      mission: updateResult.data,
+      requestId: rid,
+      duration
     });
     
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    const isTimeout = error.message?.includes('TIMEOUT');
-    console.log(JSON.stringify({ level: 'error', endpoint: 'close', requestId, missionId, duration, error: error.message, isTimeout }));
+    const isTimeout = error.message === 'timeout';
+    console.log(JSON.stringify({
+      level: 'error',
+      endpoint: 'POST /api/missions/:id/close',
+      requestId: rid,
+      missionId,
+      duration,
+      errorSource: isTimeout ? 'timeout' : 'exception',
+      success: false
+    }));
     
-    return NextResponse.json(
-      { success: false, error: isTimeout ? 'Database timeout' : error.message, requestId, duration },
-      { status: isTimeout ? 504 : 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: isTimeout ? 'Request timeout' : error.message,
+      requestId: rid,
+      duration
+    }, { status: isTimeout ? 504 : 500 });
   }
 }

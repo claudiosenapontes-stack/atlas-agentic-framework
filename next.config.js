@@ -7,6 +7,15 @@ const nextConfig = {
     MISSION_COUNT_FIX: '9703-DEPLOYED',
     BUILD_ID: '9703-' + Date.now()
   },
+  async redirects() {
+    return [
+      {
+        source: '/executive-ops/feed',
+        destination: '/executive-ops',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

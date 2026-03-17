@@ -217,6 +217,8 @@ export async function POST(
     
     return NextResponse.json({
       success: true,
+      build_marker: "DECOMPOSE-WRITEPATH-9223",
+      version: "9217-INTEGRITY-FIX",
       mission: {
         id: missionId,
         phase: 'execution',

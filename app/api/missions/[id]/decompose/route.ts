@@ -108,10 +108,12 @@ export async function POST(
     }
     
     // Build payloads with guaranteed non-null assigned_agent_id
-    const payloads = taskDefs.map((def: TaskDef) => {
-      const agentId = (def.assigned_agent_id || def.owner_agent || 'unassigned')
-        .toLowerCase()
-        .trim();
+    const payloads = taskDefs.map((def: TaskDef, idx: number) => {
+      const rawAgentId = def.assigned_agent_id || def.owner_agent;
+      const agentId = (rawAgentId || 'unassigned').toLowerCase().trim();
+      
+      // DEBUG: Log payload construction
+      console.log(`[DEBUG ${rid}] Task ${idx}: rawAgentId=${rawAgentId}, agentId=${agentId}, title=${def.title}`);
       
       return {
         id: randomUUID(),
@@ -129,6 +131,14 @@ export async function POST(
         updated_at: timestamp
       };
     });
+    
+    // DEBUG: Log all payloads before insert
+    console.log(`[DEBUG ${rid}] Payloads:`, JSON.stringify(payloads.map(p => ({ 
+      title: p.title, 
+      assigned_agent_id: p.assigned_agent_id,
+      owner_id: p.owner_id,
+      mission_id: p.mission_id
+    }))));
     
     // DB CALL 2: Insert tasks (with retry)
     const created = await withDbRetry(async () => {
@@ -197,6 +207,9 @@ export async function POST(
     
   } catch (err: any) {
     const duration = Date.now() - startTime;
+    
+    // DEBUG: Log the full error
+    console.error(`[DEBUG ${rid}] ERROR:`, err.message, err.stack);
     const isTimeout = err.message?.includes('timeout');
     
     console.log(JSON.stringify({

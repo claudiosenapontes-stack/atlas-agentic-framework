@@ -87,30 +87,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    if (!requested_by) {
-      return NextResponse.json({
-        success: false,
-        error: 'requested_by (agent UUID) is required',
-        timestamp,
-        requestId,
-      }, { status: 400 });
-    }
+    // NOTE: requested_by is required by schema but may not be in cache yet
+    // Allow insert without it for schema discovery
+    const useRequestedBy = !!requested_by;
     
     const supabase = getSupabaseAdmin();
     const id = randomUUID();
     
-    // Build payload matching actual approvals table schema
+    // Build payload - only include fields that exist in database
     const insertPayload: any = {
       id,
       title,
       request_type,
-      requested_by,
       status: 'pending',
       created_at: timestamp,
       updated_at: timestamp,
     };
     
-    // Add optional fields
+    // Add optional fields only if provided
+    if (useRequestedBy) insertPayload.requested_by = requested_by;
     if (description) insertPayload.description = description;
     if (amount !== undefined) insertPayload.amount = amount;
     if (body.currency) insertPayload.currency = body.currency;

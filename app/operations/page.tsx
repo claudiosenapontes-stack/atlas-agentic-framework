@@ -94,7 +94,9 @@ export default function UnifiedOperationsDashboard() {
       return acc;
     }, {} as Record<string, number>);
     const avgTasksPerAgent = agents.length > 0 ? tasks.length / agents.length : 0;
-    return { total: tasks.length, inProgress: byStatus.in_progress || 0, completed: byStatus.completed || 0, blocked: byStatus.blocked || 0, byAgent, avgTasksPerAgent };
+    const overloadedThreshold = 5;
+    const overloadedAgents = Object.entries(byAgent).filter(([_, count]) => count > overloadedThreshold).length;
+    return { total: tasks.length, inProgress: byStatus.in_progress || 0, completed: byStatus.completed || 0, blocked: byStatus.blocked || 0, byAgent, avgTasksPerAgent, overloadedAgents, overloadedThreshold };
   }, [tasks, agents]);
 
   const executionMetrics = useMemo(() => {
@@ -215,6 +217,28 @@ export default function UnifiedOperationsDashboard() {
         </section>
       )}
 
+      {taskMetrics.overloadedAgents > 0 && (
+        <section>
+          <h2 className="text-sm font-medium text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> Overloaded Agents ({taskMetrics.overloadedAgents})
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.entries(taskMetrics.byAgent)
+              .filter(([_, count]) => count > taskMetrics.overloadedThreshold)
+              .sort(([_, a], [__, b]) => b - a)
+              .map(([agentId, count]) => (
+                <Card key={agentId} className="border-red-500/30 bg-red-500/5">
+                  <CardContent className="p-3">
+                    <p className="text-red-400 text-xs font-medium truncate">{agentId}</p>
+                    <p className="text-xl font-bold text-red-500">{count} tasks</p>
+                    <p className="text-[#9BA3AF] text-[10px]">Threshold: {taskMetrics.overloadedThreshold}</p>
+                  </CardContent>
+                </Card>
+              ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <h2 className="text-sm font-medium text-[#9BA3AF] uppercase tracking-wider mb-3 flex items-center gap-2">
           <Activity className="w-4 h-4" /> Task Execution Health
@@ -226,6 +250,7 @@ export default function UnifiedOperationsDashboard() {
             { label: "Completed", value: taskMetrics.completed, color: "text-green-500" },
             { label: "Blocked Tasks", value: taskMetrics.blocked, color: "text-red-500" },
             { label: "Tasks/Agent", value: taskMetrics.avgTasksPerAgent.toFixed(1), color: "text-[#9BA3AF]" },
+            { label: "Overloaded Agents", value: taskMetrics.overloadedAgents, color: taskMetrics.overloadedAgents > 0 ? "text-red-500" : "text-green-500" },
             { label: "Success Rate", value: `${executionMetrics.successRate.toFixed(0)}%`, color: "text-green-500" },
             { label: "Executions", value: executionMetrics.total },
             { label: "Agents Online", value: agentMetrics.online, color: "text-green-500" },

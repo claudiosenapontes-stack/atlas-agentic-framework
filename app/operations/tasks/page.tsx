@@ -28,6 +28,8 @@ interface Task {
   updated_at: string;
   priority?: string;
   assigned_agent?: { display_name: string };
+  blocked_since?: string;
+  stuck_duration?: number;
 }
 
 export default function TasksPage() {
@@ -43,7 +45,13 @@ export default function TasksPage() {
     try {
       const res = await fetch("/api/tasks?limit=200");
       const data = await res.json();
-      setTasks(data.tasks || []);
+      const enrichedTasks = (data.tasks || []).map((task: Task) => {
+        const now = new Date();
+        const updated = new Date(task.updated_at);
+        const daysStuck = Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+        return { ...task, stuck_duration: daysStuck };
+      });
+      setTasks(enrichedTasks);
     } catch (error) { console.error("Failed:", error); }
     finally { setLoading(false); }
   };
@@ -112,6 +120,7 @@ export default function TasksPage() {
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Status</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Owner</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Stuck Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F2226]">
@@ -132,6 +141,18 @@ export default function TasksPage() {
                       <span className="text-[10px] text-[#9BA3AF]">{task.assigned_agent?.display_name || task.agent_id || 'Unassigned'}</span>
                     </td>
                     <td className="px-4 py-2.5 text-[10px] text-[#9BA3AF]">{task.priority || 'medium'}</td>
+                    <td className="px-4 py-2.5">
+                      {task.status === 'blocked' && (
+                        <span className="text-[10px] font-medium text-red-400">
+                          {task.stuck_duration ? `${task.stuck_duration}d` : 'Blocked'}
+                        </span>
+                      )}
+                      {task.status === 'in_progress' && task.stuck_duration && task.stuck_duration > 3 && (
+                        <span className="text-[10px] font-medium text-[#FFB020]">
+                          {task.stuck_duration}d
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

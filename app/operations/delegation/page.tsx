@@ -8,7 +8,11 @@ import {
   Plus,
   CheckCircle2,
   Circle,
-  ArrowRight
+  ArrowRight,
+  HeartPulse,
+  Loader2,
+  AlertCircle,
+  CheckCircle
 } from "lucide-react";
 
 interface Agent {
@@ -38,11 +42,12 @@ function CardContent({ children, className = "" }: { children: React.ReactNode; 
   return <div className={`p-4 ${className}`}>{children}</div>;
 }
 
-function Button({ children, onClick, className = "", variant = "primary" }: { 
+function Button({ children, onClick, className = "", variant = "primary", disabled = false }: { 
   children: React.ReactNode; 
   onClick?: () => void;
   className?: string;
   variant?: "primary" | "ghost" | "outline";
+  disabled?: boolean;
 }) {
   const variants = {
     primary: "bg-[#FF6A00] hover:bg-[#FF6A00]/90 text-white",
@@ -50,7 +55,11 @@ function Button({ children, onClick, className = "", variant = "primary" }: {
     outline: "border border-[#1F2226] text-[#9BA3AF] hover:bg-[#1F2226]"
   };
   return (
-    <button onClick={onClick} className={`px-4 py-2 rounded-lg transition-colors flex items-center ${variants[variant]} ${className}`}>
+    <button 
+      onClick={onClick} 
+      disabled={disabled}
+      className={`px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+    >
       {children}
     </button>
   );
@@ -68,6 +77,9 @@ export default function DelegationPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assigningHelp, setAssigningHelp] = useState(false);
+  const [assignmentResult, setAssignmentResult] = useState<{ success: boolean; message: string; agent?: string } | null>(null);
+  const [healthCheckStatus, setHealthCheckStatus] = useState<'idle' | 'running' | 'passed' | 'failed'>('idle');
 
   useEffect(() => {
     fetchData();
@@ -131,6 +143,84 @@ export default function DelegationPage() {
     return "text-red-500";
   };
 
+  const findBestAvailableAgent = (): Agent | null => {
+    const availableAgents = agents.filter(a => 
+      a.status === "online" && 
+      a.current_load < 70 &&
+      a.active_tasks < 5
+    );
+    if (availableAgents.length === 0) return null;
+    return availableAgents.sort((a, b) => a.current_load - b.current_load)[0];
+  };
+
+  const triggerHealthCheck = async () => {
+    setHealthCheckStatus('running');
+    try {
+      const res = await fetch('/api/health', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        setHealthCheckStatus('passed');
+        return true;
+      } else {
+        setHealthCheckStatus('failed');
+        return false;
+      }
+    } catch (error) {
+      setHealthCheckStatus('failed');
+      return false;
+    }
+  };
+
+  const handleAssignHelp = async () => {
+    if (unassignedTasks.length === 0) {
+      setAssignmentResult({ success: false, message: "No unassigned tasks available" });
+      return;
+    }
+
+    setAssigningHelp(true);
+    setAssignmentResult(null);
+    setHealthCheckStatus('idle');
+
+    const healthPassed = await triggerHealthCheck();
+    if (!healthPassed) {
+      setAssignmentResult({ success: false, message: "Severino health check failed - cannot assign tasks" });
+      setAssigningHelp(false);
+      return;
+    }
+
+    const bestAgent = findBestAvailableAgent();
+    if (!bestAgent) {
+      setAssignmentResult({ success: false, message: "No available agents (all overloaded or offline)" });
+      setAssigningHelp(false);
+      return;
+    }
+
+    const taskToAssign = unassignedTasks[0];
+    
+    try {
+      const res = await fetch(`/api/tasks/${taskToAssign.id}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: bestAgent.name }),
+      });
+
+      if (res.ok) {
+        setAssignmentResult({ 
+          success: true, 
+          message: `Task "${taskToAssign.title.slice(0, 30)}..." assigned to ${bestAgent.name}`,
+          agent: bestAgent.name
+        });
+        fetchData();
+      } else {
+        setAssignmentResult({ success: false, message: "Assignment failed - API error" });
+      }
+    } catch (error) {
+      setAssignmentResult({ success: false, message: "Assignment failed - network error" });
+    } finally {
+      setAssigningHelp(false);
+    }
+  };
+
   const onlineAgents = agents.filter(a => a.status === "online").length;
   const totalActiveTasks = agents.reduce((acc, a) => acc + a.active_tasks, 0);
 
@@ -146,8 +236,35 @@ export default function DelegationPage() {
             <p className="text-[#9BA3AF] text-sm">Agent workload and task assignment</p>
           </div>
         </div>
-        <Button><Plus className="w-4 h-4 mr-2" /> Assign Task</Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleAssignHelp} 
+            disabled={assigningHelp || unassignedTasks.length === 0}
+            className={assigningHelp ? 'opacity-70' : ''}
+          >
+            {assigningHelp ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-2" />}
+            Assign Help
+          </Button>
+          <Button variant="ghost"><Plus className="w-4 h-4 mr-2" /> Assign Task</Button>
+        </div>
       </div>
+
+      {assignmentResult && (
+        <div className={`p-4 rounded-lg flex items-center gap-3 ${assignmentResult.success ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+          {assignmentResult.success ? <CheckCircle className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
+          <div>
+            <p className={`text-sm font-medium ${assignmentResult.success ? 'text-green-400' : 'text-red-400'}`}>
+              {assignmentResult.success ? 'Assignment Successful' : 'Assignment Failed'}
+            </p>
+            <p className="text-[#9BA3AF] text-xs">{assignmentResult.message}</p>
+            {healthCheckStatus === 'passed' && (
+              <p className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                <HeartPulse className="w-3 h-3" /> Severino health check passed
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4"><div className="flex items-center gap-3"><Users className="w-5 h-5 text-[#9BA3AF]" /><div><p className="text-[#9BA3AF] text-sm">Online Agents</p><p className="text-2xl font-bold text-white">{onlineAgents}/{agents.length}</p></div></div></CardContent></Card>

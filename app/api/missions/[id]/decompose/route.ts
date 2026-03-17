@@ -115,17 +115,26 @@ export async function POST(
       sequence_order: taskDefs[i]?.sequence_order || i,
       is_blocking: taskDefs[i]?.is_blocking || false,
     }));
-    supabase.from('mission_tasks').insert(linkPayloads).then(() => {}).catch(() => {});
+    // Fire-and-forget inserts (non-blocking)
+    (async () => {
+      try {
+        await supabase.from('mission_tasks').insert(linkPayloads);
+      } catch {}
+    })();
     
     // Fire-and-forget mission update (non-blocking)
     if (mission.phase === 'planning') {
-      supabase.from('missions').update({
-        phase: 'execution',
-        status: 'active',
-        actual_start_date: timestamp,
-        updated_at: timestamp,
-        metadata: { ...mission.metadata, changed_by: created_by, changed_by_agent: created_by_agent }
-      }).eq('id', missionId).then(() => {}).catch(() => {});
+      (async () => {
+        try {
+          await supabase.from('missions').update({
+            phase: 'execution',
+            status: 'active',
+            actual_start_date: timestamp,
+            updated_at: timestamp,
+            metadata: { ...mission.metadata, changed_by: created_by, changed_by_agent: created_by_agent }
+          }).eq('id', missionId);
+        } catch {}
+      })();
     }
     
     const duration = Date.now() - startTime;

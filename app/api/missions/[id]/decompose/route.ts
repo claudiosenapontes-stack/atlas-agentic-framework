@@ -1,15 +1,7 @@
 /**
- * POST /api/missions/:id/decompose - RAIL-HARDENED v4
+ * POST /api/missions/:id/decompose - ATLAS-9002
  * ATLAS-OPTIMUS-TASK-MISSION-INTEGRITY-9002
- * - FORCE NODEJS RUNTIME (NO EDGE)
- * - 3s global timeout guard (ALL DB calls wrapped)
- * - 2 retries with 150ms backoff (ALL DB calls)
- * - FIXED: assigned_agent_id mapping from taskDef
- * - ENSURES: assigned_agent_id NEVER NULL
- * - Structured logging (requestId, duration, errorSource)
- * 
- * VERSION: 9002-LIVE
- * BUILD: 2026-03-17-001
+ * FORCE NODEJS RUNTIME - BUILD 2026-03-17-0050
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -19,46 +11,19 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const withTimeout = (promise: Promise<any>, ms = 3000) => {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("timeout")), ms)
-    )
-  ]);
-};
-
-async function withRetry(fn: () => Promise<any>, retries = 2) {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fn();
-    } catch (e) {
-      if (i === retries) throw e;
-      await new Promise(r => setTimeout(r, 150 * (i + 1)));
-    }
-  }
-}
-
-const requestId = () => randomUUID().slice(0, 8);
-
-// BUILD_TIMESTAMP: 2026-03-17-0047-9002-FORCE-REBUILD
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const startTime = Date.now();
-  const rid = requestId();
+  const rid = randomUUID().slice(0, 8);
   const missionId = params.id;
   
   try {
-    const body = await withTimeout(request.json(), 1000);
+    const body = await request.json();
     const { tasks: taskDefs } = body;
     
     if (!taskDefs || !Array.isArray(taskDefs) || taskDefs.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'tasks array is required',
+        error: 'tasks array required',
         requestId: rid,
         duration: Date.now() - startTime
       }, { status: 400 });
@@ -68,14 +33,14 @@ export async function POST(
     const timestamp = new Date().toISOString();
     
     // Get mission
-    const { data: mission, error: missionError } = await supabase
+    const { data: mission } = await supabase
       .from('missions')
       .select('id,phase,priority,company_id')
       .eq('id', missionId)
       .is('deleted_at', null)
       .single();
     
-    if (missionError || !mission) {
+    if (!mission) {
       return NextResponse.json({
         success: false,
         error: 'Mission not found',
@@ -84,123 +49,75 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // HARD VALIDATION: Ensure all tasks have assigned_agent_id
-    for (const taskDef of taskDefs) {
-      const hasAssignee = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id');
-      if (!hasAssignee) {
-        return NextResponse.json({
-          success: false,
-          error: `Task "${taskDef.title}" missing assigned_agent_id`,
-          requestId: rid,
-          duration: Date.now() - startTime
-        }, { status: 400 });
-      }
-    }
-    
-    // Prepare task payloads - GUARANTEED non-null assigned_agent_id
-    const taskPayloads = taskDefs.map((taskDef: any) => {
-      // Resolution chain: assigned_agent_id -> owner_agent -> x-agent-id header -> 'unassigned'
-      const resolvedId = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned';
-      const assignedAgentId = resolvedId.toLowerCase().trim();
-      
-      return {
+    // Build payloads with guaranteed non-null assigned_agent_id
+    const payloads = [];
+    for (const def of taskDefs) {
+      const agentId = (def.assigned_agent_id || def.owner_agent || 'unassigned').toLowerCase().trim();
+      payloads.push({
         id: randomUUID(),
-        title: taskDef.title?.trim() || 'Untitled Task',
-        description: taskDef.description || null,
-        status: taskDef.status || 'pending',
-        priority: taskDef.priority || mission.priority || 'medium',
+        title: def.title?.trim() || 'Untitled',
+        description: def.description || null,
+        status: def.status || 'pending',
+        priority: def.priority || mission.priority || 'medium',
         company_id: mission.company_id,
-        task_type: taskDef.task_type || 'implementation',
-        assigned_agent_id: assignedAgentId,  // NEVER NULL
-        owner_id: assignedAgentId,           // NEVER NULL
-        metadata: { 
-          mission_id: missionId, 
-          source: 'decompose',
-          assigned_agent_id: assignedAgentId
-        },
+        task_type: def.task_type || 'implementation',
+        assigned_agent_id: agentId,  // NEVER NULL
+        owner_id: agentId,           // NEVER NULL
+        metadata: { mission_id: missionId, source: 'decompose' },
         created_at: timestamp,
-        updated_at: timestamp,
-      };
-    });
+        updated_at: timestamp
+      });
+    }
     
-    // WRAPPED: Insert tasks with retry+timeout
-    const { data: createdTasks, error: tasksError } = await supabase
+    // Insert tasks
+    const { data: created, error: insertErr } = await supabase
       .from('tasks')
-      .insert(taskPayloads)
-      .select('id,title,status');
+      .insert(payloads)
+      .select('id,title,status,assigned_agent_id,owner_id');
     
-    if (tasksError) throw tasksError;
-    
-    // Fire-and-forget: Create mission_task links
-    if (createdTasks.length > 0) {
-      const linkPayloads = createdTasks.map((task: any, i: number) => ({
-        mission_id: missionId,
-        task_id: task.id,
-        task_role: taskDefs[i]?.role || 'subtask',
-        sequence_order: i,
-        is_blocking: taskDefs[i]?.is_blocking || false,
-      }));
-      
-      (async () => {
-        try {
-          await supabase.from('mission_tasks').insert(linkPayloads);
-        } catch {}
-      })();
+    if (insertErr) {
+      return NextResponse.json({
+        success: false,
+        error: insertErr.message,
+        requestId: rid,
+        duration: Date.now() - startTime
+      }, { status: 400 });
     }
     
-    // Fire-and-forget: Update mission phase
-    if (mission.phase === 'planning') {
-      (async () => {
-        try {
-          await supabase.from('missions').update({
-            phase: 'execution',
-            status: 'active',
-            actual_start_date: timestamp,
-            updated_at: timestamp
-          }).eq('id', missionId);
-        } catch {}
-      })();
-    }
+    // Create mission_task links
+    const links = created.map((t: any, i: number) => ({
+      mission_id: missionId,
+      task_id: t.id,
+      task_role: taskDefs[i]?.role || 'subtask',
+      sequence_order: i,
+      is_blocking: taskDefs[i]?.is_blocking || false
+    }));
+    
+    await supabase.from('mission_tasks').insert(links);
+    
+    // Update mission
+    await supabase.from('missions').update({
+      phase: 'execution',
+      status: 'active',
+      updated_at: timestamp
+    }).eq('id', missionId);
     
     const duration = Date.now() - startTime;
-    console.log(JSON.stringify({
-      level: 'info',
-      endpoint: 'POST /api/missions/:id/decompose',
-      requestId: rid,
-      missionId,
-      duration,
-      tasksCreated: createdTasks.length,
-      success: true
-    }));
     
     return NextResponse.json({
       success: true,
-      mission_id: missionId,
-      tasks_created: createdTasks.length,
-      tasks: createdTasks,
+      mission: { id: missionId, phase: 'execution', status: 'active', child_task_count: created.length },
+      tasks: created,
       requestId: rid,
       duration
     });
     
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    const isTimeout = error.message === 'timeout';
-    console.log(JSON.stringify({
-      level: 'error',
-      endpoint: 'POST /api/missions/:id/decompose',
-      requestId: rid,
-      missionId,
-      duration,
-      errorSource: isTimeout ? 'timeout' : 'exception',
-      success: false
-    }));
-    
+  } catch (err: any) {
     return NextResponse.json({
       success: false,
-      error: isTimeout ? 'Request timeout' : error.message,
+      error: err.message || 'Internal error',
       requestId: rid,
-      duration
-    }, { status: isTimeout ? 504 : 500 });
+      duration: Date.now() - startTime
+    }, { status: 500 });
   }
 }
-

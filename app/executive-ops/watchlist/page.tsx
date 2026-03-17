@@ -135,7 +135,7 @@ export default function WatchlistPage() {
             >
               {f === 'all' && `All (${items?.length || 0})`}
               {f === 'p0' && `P0 (${p0Count})`}
-              {f === 'p1' && `P1 (${items?.filter(i => i.priority === 'p1').length || 0})`}
+              {f === 'p1' && `P1 (${items?.filter(i => mapPriority(i.priority) === 'p1').length || 0})`}
               {f === 'blocked' && `Blocked (${blockedCount})`}
             </button>
           ))}
@@ -157,7 +157,7 @@ export default function WatchlistPage() {
             {filteredItems.map((item) => {
               const mappedStatus = mapStatus(item.status);
               const mappedPriority = mapPriority(item.priority);
-              const StatusIcon = STATUS_ICONS[mappedStatus];
+              const StatusIcon = STATUS_ICONS[mappedStatus] || AlertCircle;
               return (
                 <div
                   key={item.id}
@@ -166,12 +166,12 @@ export default function WatchlistPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[mappedPriority]}`}>
-                          {mappedPriority.toUpperCase()}
+                        <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[mappedPriority] || PRIORITY_COLORS.p3}`}>
+                          {(mappedPriority || 'p3').toUpperCase()}
                         </span>
-                        <span className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${STATUS_COLORS[mappedStatus]}`}>
+                        <span className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${STATUS_COLORS[mappedStatus] || STATUS_COLORS.at_risk}`}>
                           <StatusIcon className="w-3 h-3" />
-                          {mappedStatus.replace('_', ' ')}
+                          {(mappedStatus || 'at_risk').replace('_', ' ')}
                         </span>
                       </div>
                       <h3 className="font-medium text-white mb-1">{item.subject || 'Untitled'}</h3>

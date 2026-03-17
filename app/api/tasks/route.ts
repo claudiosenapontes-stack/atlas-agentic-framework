@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await withTimeout(request.json(), 1000);
-    const { title, description, task_type, assigned_agent_id, priority = 'medium', mission_id } = body;
+    const { title, description, task_type, assigned_agent_id, priority = 'medium' } = body;
     
     // Validation: title required
     if (!title || typeof title !== 'string' || title.trim() === '') {
@@ -131,7 +131,6 @@ export async function POST(request: NextRequest) {
         priority: priority.toLowerCase(),
         assigned_agent_id: assigned_agent_id.toLowerCase(),
         owner_id: owner_id,
-        mission_id: mission_id || null,
         created_at: timestamp,
         updated_at: timestamp,
       })

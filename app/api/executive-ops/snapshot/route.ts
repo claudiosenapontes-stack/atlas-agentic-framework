@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
       approvalsResult,
       notificationsResult,
       missionsResult,
-      followupsResult
+      followupsResult,
+      whatsappResult
     ] = await Promise.allSettled([
       // Today's meetings (exclude test events)
       (supabase as any)
@@ -81,7 +82,14 @@ export async function GET(request: NextRequest) {
       (supabase as any)
         .from('followups')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
+        .eq('status', 'pending'),
+      
+      // Unread WhatsApp messages
+      (supabase as any)
+        .from('communications')
+        .select('id', { count: 'exact', head: true })
+        .eq('source_channel', 'whatsapp')
+        .eq('status', 'received')
     ]);
     
     // Extract counts safely
@@ -96,6 +104,7 @@ export async function GET(request: NextRequest) {
     const unreadNotifications = getCount(notificationsResult);
     const activeMissions = getCount(missionsResult);
     const pendingFollowups = getCount(followupsResult);
+    const unreadWhatsApp = getCount(whatsappResult);
     
     // Build priorities list from active missions
     let priorities: any[] = [];
@@ -126,6 +135,7 @@ export async function GET(request: NextRequest) {
       pendingApprovals,
       pendingFollowups,
       unreadNotifications,
+      unreadWhatsApp,
       activeMissionCount: activeMissions,
       timestamp,
       source: 'live',
@@ -143,6 +153,7 @@ export async function GET(request: NextRequest) {
       pendingApprovals: 0,
       pendingFollowups: 0,
       unreadNotifications: 0,
+      unreadWhatsApp: 0,
       timestamp,
       source: 'error',
       error: error.message,

@@ -3,7 +3,7 @@
  * ATLAS-PRIME-EXEC-OPS-CLEAN-UI-9802
  * 
  * GET /api/notifications
- * Returns REAL notifications from database
+ * Returns REAL notifications from database + WhatsApp messages from communications
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,35 +21,65 @@ export async function GET(request: NextRequest) {
     
     const supabase = getSupabaseAdmin();
     
-    let query = (supabase as any)
+    // Query notifications
+    let notifQuery = (supabase as any)
       .from('notifications')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(limit);
     
     if (unreadOnly) {
-      query = query.eq('read', false);
+      notifQuery = notifQuery.eq('read', false);
     }
     
-    const { data, error, count } = await query;
+    const { data: notificationsData, error: notifError, count: notifCount } = await notifQuery;
     
-    if (error) {
-      console.error('[Notifications] Query error:', error);
-      return NextResponse.json({
-        notifications: [],
-        unreadCount: 0,
-        timestamp,
-        error: error.message,
-        build_marker: 'EXEC-OPS-CLEAN-9802'
-      });
+    if (notifError) {
+      console.error('[Notifications] Query error:', notifError);
     }
     
-    const unreadCount = (data || []).filter((n: any) => !n.read).length;
+    // Query WhatsApp messages from communications
+    const { data: whatsappData, error: whatsappError } = await (supabase as any)
+      .from('communications')
+      .select('*')
+      .eq('source_channel', 'whatsapp')
+      .in('status', ['received', 'summarized'])
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (whatsappError) {
+      console.error('[Notifications] WhatsApp query error:', whatsappError);
+    }
+    
+    // Transform WhatsApp messages to notification format
+    const whatsappNotifications = (whatsappData || []).map((msg: any) => ({
+      id: `whatsapp-${msg.id}`,
+      title: msg.sender || 'WhatsApp Message',
+      message: msg.content || msg.subject || 'New message',
+      type: 'info',
+      createdAt: msg.created_at,
+      read: msg.status !== 'received', // Mark as read if processed
+      source: 'whatsapp',
+      thread_id: msg.thread_id,
+      priority: msg.priority || 'normal'
+    }));
+    
+    // Combine and sort all notifications
+    const allNotifications = [
+      ...(notificationsData || []),
+      ...whatsappNotifications
+    ].sort((a: any, b: any) => {
+      const dateA = new Date(a.createdAt || a.created_at).getTime();
+      const dateB = new Date(b.createdAt || b.created_at).getTime();
+      return dateB - dateA; // Newest first
+    }).slice(0, limit);
+    
+    const unreadCount = allNotifications.filter((n: any) => !n.read).length;
     
     return NextResponse.json({
-      notifications: data || [],
+      notifications: allNotifications,
       unreadCount,
-      total: count || 0,
+      total: (notifCount || 0) + (whatsappData?.length || 0),
       timestamp,
       build_marker: 'EXEC-OPS-CLEAN-9802'
     });

@@ -15,6 +15,7 @@ interface ExecutiveSnapshot {
   pendingApprovals: number;
   pendingFollowups: number;
   unreadNotifications: number;
+  unreadWhatsApp?: number;
   activeMissionCount?: number;
   source?: string;
   build_marker?: string;
@@ -150,13 +151,20 @@ export default function ExecutiveOpsPage() {
         </div>
 
         {/* Stats - Knowledge Pattern */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
           <StatCard icon={Target} label="Priorities" value={snapshot?.priorities?.length} loading={loading} />
           <StatCard icon={Calendar} label="Meetings" value={snapshot?.meetingsToday} loading={loading} />
           <StatCard icon={GitBranch} label="Decisions" value={snapshot?.pendingDecisions} loading={loading} />
           <StatCard icon={Eye} label="Watchlist" value={snapshot?.watchlistItems} loading={loading} />
           <StatCard icon={CheckCircle2} label="Approvals" value={snapshot?.pendingApprovals} loading={loading} />
           <StatCard icon={Clock} label="Follow-ups" value={snapshot?.pendingFollowups} loading={loading} />
+          <div className="p-4 bg-[#111214] border border-[#1F2226] rounded-[10px]">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">📱</span>
+              <span className="text-xs text-[#6B7280]">WhatsApp</span>
+            </div>
+            <p className="text-2xl font-semibold text-white">{loading ? '-' : (snapshot?.unreadWhatsApp || 0)}</p>
+          </div>
         </div>
 
         {/* Main Content */}
@@ -255,10 +263,20 @@ export default function ExecutiveOpsPage() {
                 notifications.map((notif) => (
                   <div key={notif.id} className={`p-3 rounded-lg border ${notif.read ? 'bg-[#1F2226] border-[#2A2D32]' : 'bg-[#FF6A00]/5 border-[#FF6A00]/20'}`}>
                     <div className="flex items-start gap-2">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 ${notif.type === 'urgent' ? 'bg-[#FF3B30]' : notif.type === 'warning' ? 'bg-[#FFB020]' : 'bg-[#3B82F6]'}`} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-white">{notif.title}</p>
-                        <p className="text-xs text-[#6B7280]">{notif.message}</p>
+                      {/* Source Icon */}
+                      {notif.source === 'whatsapp' ? (
+                        <span className="text-sm mt-0.5">📱</span>
+                      ) : (
+                        <div className={`w-2 h-2 rounded-full mt-1.5 ${notif.type === 'urgent' ? 'bg-[#FF3B30]' : notif.type === 'warning' ? 'bg-[#FFB020]' : 'bg-[#3B82F6]'}`} />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-white truncate">{notif.title}</p>
+                          {notif.source === 'whatsapp' && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#16C784]/20 text-[#16C784] rounded">WhatsApp</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#6B7280] truncate">{notif.message}</p>
                       </div>
                     </div>
                   </div>

@@ -1,46 +1,74 @@
+/**
+ * ATLAS-OPTIMUS-AGENT-PROFILE-SOURCE-FIX-9847
+ * Live Agents API - SOUL.md as Single Source of Truth
+ * 
+ * Priority:
+ * 1. SOUL.md (PRIMARY) - role, title, displayName
+ * 2. Runtime data - status, pid, memory
+ * 3. NO FALLBACK DEFAULTS - null if missing
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenClawClient } from "@/lib/openclaw";
 import { supabase } from "@/lib/supabase";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 const execAsync = promisify(exec);
 
 interface AgentMetrics {
   pid: number;
   name: string;
-  displayName: string;
+  displayName: string | null;
   status: string;
   cpu: number;
   memory: number;
   uptime: number;
   restarts: number;
   currentTask?: string;
-  agentType: string;
+  agentType: string | null;
   lastSeen: string;
   source: 'openclaw' | 'database' | 'process';
 }
 
-// Known agent configurations from OpenClaw
-const AGENT_CONFIG: Record<string, { displayName: string; role: string; emoji: string }> = {
-  henry: { displayName: "Henry", role: "CEO", emoji: "👔" },
-  harvey: { displayName: "Harvey", role: "Finance", emoji: "💰" },
-  einstein: { displayName: "Einstein", role: "Research", emoji: "🔬" },
-  sophia: { displayName: "Sophia", role: "Marketing", emoji: "📈" },
-  severino: { displayName: "Severino", role: "Operations", emoji: "⚙️" },
-  olivia: { displayName: "Olivia", role: "Executive Assistant", emoji: "🗂️" },
-  optimus: { displayName: "Optimus", role: "Tech Lead", emoji: "🧰" },
-  prime: { displayName: "Prime", role: "Senior Dev", emoji: "🏗️" },
-  "optimus-prime": { displayName: "Prime", role: "Senior Dev", emoji: "🏗️" },
-  sentinel: { displayName: "Sentinel", role: "Monitoring", emoji: "👁️" },
-  argus: { displayName: "Argus", role: "Security", emoji: "🛡️" },
-  chronos: { displayName: "Chronos", role: "Scheduler", emoji: "⏰" },
-  hermes: { displayName: "Hermes", role: "Messaging", emoji: "📨" },
-  mercury: { displayName: "Mercury", role: "Speed", emoji: "⚡" },
-  aegis: { displayName: "Aegis", role: "Protection", emoji: "🛡️" },
-  astra: { displayName: "Astra", role: "Analytics", emoji: "⭐" },
-  echo: { displayName: "Echo", role: "Communication", emoji: "📢" },
+// Known agent workspace mappings only - NO hardcoded metadata
+const AGENT_WORKSPACES: Record<string, string> = {
+  henry: 'henry',
+  harvey: 'harvey',
+  einstein: 'einstein',
+  sophia: 'sophia',
+  severino: 'severino',
+  olivia: 'olivia',
+  optimus: 'optimus',
+  prime: 'optimus-prime',
+  'optimus-prime': 'optimus-prime',
+  sentinel: 'sentinel',
+  argus: 'argus',
+  chronos: 'chronos',
+  hermes: 'hermes',
+  mercury: 'mercury',
+  aegis: 'aegis',
+  astra: 'astra',
+  echo: 'echo',
 };
+
+/**
+ * Parse SOUL.md to extract role/displayName
+ * Format: "_You're {displayName} — the {role}_"
+ */
+function parseSoulRole(content: string): { displayName: string | null; role: string | null } {
+  // Extract from pattern: "_You're Optimus — the Productivity Lead._"
+  const match = content.match(/You're\s+(\w+)\s+[—-]\s+the\s+([^._\n]+)/i);
+  if (match) {
+    return {
+      displayName: match[1].trim(),
+      role: match[2].trim(),
+    };
+  }
+  return { displayName: null, role: null };
+}
 
 async function getProcessList(): Promise<any[]> {
   try {
@@ -88,52 +116,85 @@ export async function GET() {
 
       // Add active agents from OpenClaw sessions
       for (const agent of activeAgents) {
-        const config = AGENT_CONFIG[agent.id.toLowerCase()] || { 
-          displayName: agent.name, 
-          role: agent.id,
-          emoji: "🤖"
-        };
+        const agentName = agent.id.toLowerCase();
+        const workspace = AGENT_WORKSPACES[agentName];
+        
+        // Parse SOUL.md for role (PRIMARY source)
+        let role: string | null = null;
+        let displayName: string | null = null;
+        if (workspace) {
+          try {
+            const soulPath = join('/root/.openclaw/workspaces', workspace, 'SOUL.md');
+            if (existsSync(soulPath)) {
+              const soulContent = readFileSync(soulPath, 'utf-8');
+              const parsed = parseSoulRole(soulContent);
+              role = parsed.role;
+              displayName = parsed.displayName;
+            }
+          } catch (e) {
+            console.error(`[Live Agents] Failed to parse SOUL.md for ${agentName}:`, e);
+          }
+        }
 
         agents.push({
           pid: 0,
           name: agent.id,
-          displayName: config.displayName,
+          displayName: displayName || agent.name,
           status: agent.status,
           cpu: 0,
           memory: 0,
           uptime: 0,
           restarts: 0,
           currentTask: agent.currentTask,
-          agentType: config.role,
+          agentType: role,
           lastSeen: agent.lastSeen || new Date().toISOString(),
           source: 'openclaw',
         });
-        processedNames.add(agent.id.toLowerCase());
+        processedNames.add(agentName);
       }
 
       // Add cron jobs as "scheduled tasks" for agents
       for (const job of cronJobs) {
         const agentName = job.agentId || 'system';
-        if (!processedNames.has(agentName.toLowerCase()) && agentName !== 'main') {
-          const config = AGENT_CONFIG[agentName.toLowerCase()];
-          if (config) {
+        const agentKey = agentName.toLowerCase();
+        if (!processedNames.has(agentKey) && agentName !== 'main') {
+          const workspace = AGENT_WORKSPACES[agentKey];
+          
+          // Parse SOUL.md for role
+          let role: string | null = null;
+          let displayName: string | null = null;
+          if (workspace) {
+            try {
+              const soulPath = join('/root/.openclaw/workspaces', workspace, 'SOUL.md');
+              if (existsSync(soulPath)) {
+                const soulContent = readFileSync(soulPath, 'utf-8');
+                const parsed = parseSoulRole(soulContent);
+                role = parsed.role;
+                displayName = parsed.displayName;
+              }
+            } catch (e) {
+              console.error(`[Live Agents] Failed to parse SOUL.md for ${agentName}:`, e);
+            }
+          }
+          
+          if (role || displayName) {
             agents.push({
               pid: 0,
               name: agentName,
-              displayName: config.displayName,
+              displayName: displayName || agentName,
               status: 'scheduled',
               cpu: 0,
               memory: 0,
               uptime: 0,
               restarts: 0,
               currentTask: job.name,
-              agentType: config.role,
+              agentType: role,
               lastSeen: job.state?.lastRunAt 
                 ? new Date(job.state.lastRunAt).toISOString()
                 : new Date().toISOString(),
               source: 'openclaw',
             });
-            processedNames.add(agentName.toLowerCase());
+            processedNames.add(agentKey);
           }
         }
       }
@@ -151,23 +212,36 @@ export async function GET() {
       for (const dbAgent of dbAgents) {
         const agentKey = dbAgent.name.toLowerCase();
         if (!processedNames.has(agentKey)) {
-          const config = AGENT_CONFIG[agentKey] || { 
-            displayName: dbAgent.display_name || dbAgent.name, 
-            role: dbAgent.role || "Agent",
-            emoji: "🤖"
-          };
+          const workspace = AGENT_WORKSPACES[agentKey];
+          
+          // Parse SOUL.md for role (PRIMARY over database)
+          let role: string | null = dbAgent.role;
+          let displayName: string | null = dbAgent.display_name;
+          if (workspace) {
+            try {
+              const soulPath = join('/root/.openclaw/workspaces', workspace, 'SOUL.md');
+              if (existsSync(soulPath)) {
+                const soulContent = readFileSync(soulPath, 'utf-8');
+                const parsed = parseSoulRole(soulContent);
+                if (parsed.role) role = parsed.role;
+                if (parsed.displayName) displayName = parsed.displayName;
+              }
+            } catch (e) {
+              // Keep database values if SOUL.md fails
+            }
+          }
 
           agents.push({
             pid: 0,
             name: dbAgent.name,
-            displayName: config.displayName,
+            displayName: displayName,
             status: dbAgent.status === "active" ? "online" : dbAgent.status || "offline",
             cpu: 0,
             memory: 0,
             uptime: 0,
             restarts: 0,
             currentTask: undefined,
-            agentType: config.role,
+            agentType: role,
             lastSeen: new Date().toISOString(),
             source: 'database',
           });

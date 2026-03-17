@@ -2,8 +2,9 @@
 const nextConfig = {
   images: { unoptimized: true },
   env: {
-    FORCE_DEPLOY_TIMESTAMP: '1773731500',
-    DECOMPOSE_MARKER: '9223-CACHEBUST-1742191200'
+    FORCE_DEPLOY_TIMESTAMP: '1773764200',
+    DECOMPOSE_MARKER: '9223-CACHEBUST-1742191200',
+    MISSION_COUNT_FIX: '9502-TRUTH-FIX'
   },
   async headers() {
     return [
@@ -17,4 +18,4 @@ const nextConfig = {
   }
 }
 module.exports = nextConfig
-// Cache bust Tue Mar 17 03:11:40 EDT 2026 - ATLAS-PRIME-HARD-FORCE-9229
+// Cache bust Tue Mar 17 12:20:00 EDT 2026 - ATLAS-PRIME-MISSION-COUNT-FIX-9502

@@ -6,7 +6,7 @@ import { GitBranch, Flag, Users, TrendingUp, ArrowRight, Activity, CheckCircle2,
 
 interface Task { id: string; title: string; status: string; agent_id: string | null; created_at: string; }
 interface Execution { id: string; status: string; agent_name: string | null; started_at: string; cost_usd?: number; }
-interface Agent { name: string; displayName: string; status: string; agentType: string; emoji?: string; currentTask?: string; }
+interface Agent { name: string; displayName: string; status: string; agentType: string; emoji?: string; currentTask?: string; successRate?: number; queueDepth?: number; }
 interface SystemHealth { pm2: { status: string; processes: number; online: number }; redis: { status: string; queues: number }; supabase: { status: string; latency: number }; }
 interface Mission { id: string; title: string; status: string; phase: string; priority: string; progress_percent: number; closure_confidence: number; owner_agent: string | null; }
 
@@ -162,19 +162,30 @@ export default function UnifiedOperationsDashboard() {
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {[
-            { label: "Total Missions", value: missionMetrics.total, color: "text-white" },
-            { label: "Executing", value: missionMetrics.executing, color: "text-[#FFB020]" },
-            { label: "Verifying", value: missionMetrics.verifying, color: "text-[#14B8A6]" },
-            { label: "Blocked", value: missionMetrics.blocked, color: "text-[#FF3B30]" },
-            { label: "Closed", value: missionMetrics.closed, color: "text-green-500" },
+            { label: "Total Missions", value: missionMetrics.total, color: "text-white", href: "/operations/missions" },
+            { label: "Executing", value: missionMetrics.executing, color: "text-[#FFB020]", href: "/operations/missions?status=executing" },
+            { label: "Verifying", value: missionMetrics.verifying, color: "text-[#14B8A6]", href: "/operations/missions?status=verifying" },
+            { label: "Blocked", value: missionMetrics.blocked, color: "text-[#FF3B30]", href: "/operations/missions?status=blocked", highlight: missionMetrics.blocked > 0 },
+            { label: "Closed", value: missionMetrics.closed, color: "text-green-500", href: "/operations/missions?status=closed" },
             { label: "Avg Confidence", value: `${Math.round(missionMetrics.avgConfidence)}%`, color: "text-white" },
           ].map((kpi, i) => (
-            <Card key={i}>
-              <CardContent className="p-3">
-                <p className="text-[#9BA3AF] text-xs">{kpi.label}</p>
-                <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
-              </CardContent>
-            </Card>
+            kpi.href ? (
+              <Link key={i} href={kpi.href}>
+                <Card className={`hover:border-[#FF6A00]/50 transition-colors cursor-pointer ${kpi.highlight ? 'border-red-500/50 bg-red-500/5' : ''}`}>
+                  <CardContent className="p-3">
+                    <p className="text-[#9BA3AF] text-xs">{kpi.label}</p>
+                    <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ) : (
+              <Card key={i}>
+                <CardContent className="p-3">
+                  <p className="text-[#9BA3AF] text-xs">{kpi.label}</p>
+                  <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                </CardContent>
+              </Card>
+            )
           ))}
         </div>
       </section>

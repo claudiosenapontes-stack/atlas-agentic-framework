@@ -84,7 +84,7 @@ export async function POST(
     
     const mission = missionResult.data;
     
-    // Prepare task payloads with ownership
+    // Prepare task payloads with ownership (schema-compliant fields only)
     const taskPayloads = taskDefs.map((taskDef: any) => ({
       id: randomUUID(),
       title: taskDef.title,
@@ -93,9 +93,12 @@ export async function POST(
       priority: taskDef.priority || mission.priority || 'medium',
       company_id: mission.company_id,
       task_type: taskDef.task_type || 'implementation',
-      owner_agent: taskDef.owner_agent || request.headers.get('x-agent-id') || null,
-      assignee_id: taskDef.assignee_id || null,
-      metadata: { mission_id: missionId, source: 'decompose' },
+      assigned_agent_id: taskDef.owner_agent || request.headers.get('x-agent-id') || null,
+      metadata: { 
+        mission_id: missionId, 
+        source: 'decompose',
+        owner_agent: taskDef.owner_agent || request.headers.get('x-agent-id') || null
+      },
       created_at: timestamp,
       updated_at: timestamp,
     }));

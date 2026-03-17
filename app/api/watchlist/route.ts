@@ -41,10 +41,17 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
+    // FILTER: Exclude test/demo items
+    const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
+    const filteredItems = (data || []).filter((item: any) => {
+      const subject = (item.subject || item.title || '').toLowerCase();
+      return !testPatterns.some(pattern => subject.includes(pattern));
+    });
+    
     return NextResponse.json({
       success: true,
-      items: data || [],
-      count: data?.length || 0,
+      items: filteredItems,
+      count: filteredItems.length,
       timestamp,
       requestId,
     });

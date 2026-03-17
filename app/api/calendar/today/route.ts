@@ -49,19 +49,26 @@ export async function GET(request: NextRequest) {
     }
     
     // Transform DB fields to CalendarEvent format
-    const events = (data || []).map((e: any) => ({
-      id: e.id,
-      title: e.title,
-      start: e.start_time,
-      end: e.end_time,
-      location: e.location || undefined,
-      meetLink: e.meet_link || undefined,
-      attendees: e.attendees || [],
-      isRecurring: false,
-      eventType: e.is_virtual ? 'virtual' : 'in_person',
-      confirmed: e.status === 'confirmed',
-      description: e.description || undefined
-    }));
+    // FILTER: Exclude test/demo events
+    const testPatterns = ['test', 'demo', 'debug', 'verify', 'canonical'];
+    const events = (data || [])
+      .filter((e: any) => {
+        const title = (e.title || '').toLowerCase();
+        return !testPatterns.some(pattern => title.includes(pattern));
+      })
+      .map((e: any) => ({
+        id: e.id,
+        title: e.title,
+        start: e.start_time,
+        end: e.end_time,
+        location: e.location || undefined,
+        meetLink: e.meet_link || undefined,
+        attendees: e.attendees || [],
+        isRecurring: false,
+        eventType: e.is_virtual ? 'virtual' : 'in_person',
+        confirmed: e.status === 'confirmed',
+        description: e.description || undefined
+      }));
     
     const nextEvent = events.find((e: any) => new Date(e.start) > new Date()) || null;
     

@@ -1,13 +1,15 @@
 /**
- * POST /api/missions/:id/decompose - RAIL-HARDENED v3
- * ATLAS-OPTIMUS-DECOMPOSE-LIVE-RAIL-6008
+ * POST /api/missions/:id/decompose - RAIL-HARDENED v4
+ * ATLAS-OPTIMUS-TASK-MISSION-INTEGRITY-9002
  * - FORCE NODEJS RUNTIME (NO EDGE)
  * - 3s global timeout guard (ALL DB calls wrapped)
  * - 2 retries with 150ms backoff (ALL DB calls)
  * - FIXED: assigned_agent_id mapping from taskDef
+ * - ENSURES: assigned_agent_id NEVER NULL
  * - Structured logging (requestId, duration, errorSource)
  * 
- * VERSION: 6008-FIXED
+ * VERSION: 9002-LIVE
+ * BUILD: 2026-03-17-001
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -80,20 +82,35 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // Prepare task payloads with DEBUG logging
+    // HARD VALIDATION: Ensure all tasks have assigned_agent_id
+    for (const taskDef of taskDefs) {
+      const hasAssignee = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id');
+      if (!hasAssignee) {
+        return NextResponse.json({
+          success: false,
+          error: `Task "${taskDef.title}" missing assigned_agent_id`,
+          requestId: rid,
+          duration: Date.now() - startTime
+        }, { status: 400 });
+      }
+    }
+    
+    // Prepare task payloads - GUARANTEED non-null assigned_agent_id
     const taskPayloads = taskDefs.map((taskDef: any) => {
-      const assignedAgentId = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned';
-      console.log(`[DEBUG] Task ${taskDef.title}: assigned_agent_id=${assignedAgentId}, input=${taskDef.assigned_agent_id}`);
+      // Resolution chain: assigned_agent_id -> owner_agent -> x-agent-id header -> 'unassigned'
+      const resolvedId = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned';
+      const assignedAgentId = resolvedId.toLowerCase().trim();
+      
       return {
         id: randomUUID(),
-        title: taskDef.title,
+        title: taskDef.title?.trim() || 'Untitled Task',
         description: taskDef.description || null,
         status: taskDef.status || 'pending',
         priority: taskDef.priority || mission.priority || 'medium',
         company_id: mission.company_id,
         task_type: taskDef.task_type || 'implementation',
-        assigned_agent_id: assignedAgentId,
-        owner_id: assignedAgentId,
+        assigned_agent_id: assignedAgentId,  // NEVER NULL
+        owner_id: assignedAgentId,           // NEVER NULL
         metadata: { 
           mission_id: missionId, 
           source: 'decompose',

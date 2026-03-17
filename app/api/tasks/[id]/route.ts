@@ -84,7 +84,7 @@ export async function PUT(
   
   try {
     const body = await request.json();
-    const { status, result_data, result_summary } = body;
+    const { status, result_data } = body;
     
     // Build update object
     const updates: any = {
@@ -102,10 +102,6 @@ export async function PUT(
     
     if (result_data !== undefined) {
       updates.result_data = result_data;
-    }
-    
-    if (result_summary !== undefined) {
-      updates.result_summary = result_summary;
     }
     
     // Update task
@@ -160,33 +156,29 @@ export async function PATCH(
   const supabase = getSupabaseAdmin();
   const taskId = params.id;
   const timestamp = new Date().toISOString();
-  
+
   try {
     const body = await request.json();
-    const { status, result_data, result_summary } = body;
-    
+    const { status, result_data } = body;
+
     // Build update object
     const updates: any = {
       updated_at: timestamp,
     };
-    
+
     if (status) {
       updates.status = status;
-      
+
       // Set completed_at if transitioning to completed
       if (status === 'completed') {
         updates.completed_at = timestamp;
       }
     }
-    
+
     if (result_data !== undefined) {
       updates.result_data = result_data;
     }
-    
-    if (result_summary !== undefined) {
-      updates.result_summary = result_summary;
-    }
-    
+
     // Update task
     const { data: updatedTask, error } = await (supabase as any)
       .from('tasks')
@@ -194,7 +186,7 @@ export async function PATCH(
       .eq('id', taskId)
       .select('*')
       .single();
-    
+
     if (error) {
       console.error('[Tasks] Patch error:', error);
       return NextResponse.json(
@@ -202,14 +194,14 @@ export async function PATCH(
         { status: 500 }
       );
     }
-    
+
     if (!updatedTask) {
       return NextResponse.json(
         { success: false, error: 'Task not found', timestamp },
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       task: updatedTask,

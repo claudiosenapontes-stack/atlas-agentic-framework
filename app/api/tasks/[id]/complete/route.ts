@@ -16,32 +16,24 @@ export async function POST(
 ) {
   const timestamp = new Date().toISOString();
   const { id } = params;
-  
+
   try {
     const body = await request.json();
-    const { agent_id, result_data, result_summary, result_type } = body;
-    
+    const { result_data } = body;
+
     const supabase = getSupabaseAdmin();
-    
+
     // Build update
     const updates: any = {
       status: 'completed',
       completed_at: timestamp,
       updated_at: timestamp,
     };
-    
+
     if (result_data !== undefined) {
       updates.result_data = result_data;
     }
-    
-    if (result_summary !== undefined) {
-      updates.result_summary = result_summary;
-    }
-    
-    if (result_type !== undefined) {
-      updates.result_type = result_type;
-    }
-    
+
     // Update task
     const { data: updatedTask, error } = await (supabase as any)
       .from('tasks')
@@ -49,7 +41,7 @@ export async function POST(
       .eq('id', id)
       .select('*')
       .single();
-    
+
     if (error) {
       console.error('[Task Complete] Error:', error);
       return NextResponse.json(
@@ -57,14 +49,14 @@ export async function POST(
         { status: 500 }
       );
     }
-    
+
     if (!updatedTask) {
       return NextResponse.json(
         { success: false, error: 'Task not found', timestamp },
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       task: updatedTask,

@@ -1,14 +1,14 @@
 /**
- * POST /api/missions/:id/decompose - INTEGRITY FIX 9217
- * ATLAS-OPTIMUS-DECOMPOSE-INTEGRITY-FIX-9217
+ * POST /api/missions/:id/decompose - WRITEPATH FIX 9223
+ * ATLAS-OPTIMUS-DECOMPOSE-WRITEPATH-FIX-9223
  * 
  * FIXED:
- * - owner_id now resolves to agent UUID (not 'unassigned')
- * - mission_id now persists correctly on all child tasks
- * - Hard validation: rejects tasks missing agent assignment
- * - Deterministic fallback: name -> UUID lookup -> name lowercase
+ * - Uses same pattern as POST /api/tasks for owner_id resolution
+ * - assigned_agent_id-only payloads now work correctly
+ * - mission_id persists correctly (from URL param, not optional)
+ * - Build marker for stale deploy detection
  * 
- * BUILD: 9217-FRESH-DEPLOY
+ * BUILD: DECOMPOSE-WRITEPATH-9223
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,6 +21,7 @@ export const runtime = 'nodejs';
 const DB_TIMEOUT_MS = 5000;
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 200;
+const BUILD_MARKER = 'DECOMPOSE-WRITEPATH-9223';
 
 interface TaskDef {
   title?: string;
@@ -34,6 +35,7 @@ interface TaskDef {
   is_blocking?: boolean;
 }
 
+// DB retry wrapper - EXACT MATCH to POST /api/tasks
 async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<T> {
   let lastError: any;
   for (let i = 0; i < RETRY_ATTEMPTS; i++) {
@@ -52,24 +54,21 @@ async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<
   throw lastError;
 }
 
-async function resolveOwnerId(supabase: any, agentName: string): Promise<string> {
-  const normalizedName = agentName.toLowerCase().trim();
-  if (!normalizedName || normalizedName === 'unassigned') return 'unassigned';
-  
+// Owner resolution - EXACT MATCH to POST /api/tasks
+async function resolveOwnerId(supabase: any, assigned_agent_id: string): Promise<string> {
   try {
     const agent = await withDbRetry(async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('agents')
         .select('id')
-        .eq('name', normalizedName)
+        .eq('name', assigned_agent_id.toLowerCase())
         .maybeSingle();
-      if (error) throw error;
       return data;
     }, 'resolve_owner');
     
-    return agent?.id || normalizedName;
+    return agent?.id || assigned_agent_id.toLowerCase();
   } catch {
-    return normalizedName;
+    return assigned_agent_id.toLowerCase();
   }
 }
 
@@ -94,6 +93,7 @@ export async function POST(
         success: false,
         error: 'tasks array required',
         requestId: rid,
+        build_marker: BUILD_MARKER,
         duration: Date.now() - startTime
       }, { status: 400 });
     }
@@ -101,7 +101,7 @@ export async function POST(
     const supabase = getSupabaseAdmin();
     const timestamp = new Date().toISOString();
     
-    // Get mission
+    // Get mission (for priority, company_id context)
     const mission = await withDbRetry(async () => {
       const { data, error } = await supabase
         .from('missions')
@@ -118,56 +118,47 @@ export async function POST(
         success: false,
         error: 'Mission not found',
         requestId: rid,
+        build_marker: BUILD_MARKER,
         duration: Date.now() - startTime
       }, { status: 404 });
     }
     
-    // HARD VALIDATION: Every task must have agent assignment
-    for (const def of taskDefs) {
-      const hasAgent = def.assigned_agent_id || def.owner_agent;
-      if (!hasAgent) {
-        return NextResponse.json({
-          success: false,
-          error: `Task "${def.title || 'Untitled'}" missing assigned_agent_id or owner_agent`,
-          requestId: rid,
-          duration: Date.now() - startTime
-        }, { status: 400 });
+    // Build payloads using EXACT same pattern as POST /api/tasks
+    const payloads = await Promise.all(taskDefs.map(async (def: TaskDef) => {
+      // Get agent identifier: assigned_agent_id takes priority over owner_agent
+      const agentInput = def.assigned_agent_id || def.owner_agent;
+      
+      if (!agentInput) {
+        throw new Error(`Task "${def.title || 'Untitled'}" missing assigned_agent_id or owner_agent`);
       }
-    }
-    
-    // Resolve owner_ids
-    const ownerIdMap = new Map<string, string>();
-    for (const def of taskDefs) {
-      const agentInput = (def.assigned_agent_id || def.owner_agent)!;
-      const normalizedKey = agentInput.toLowerCase().trim();
-      if (!ownerIdMap.has(normalizedKey)) {
-        ownerIdMap.set(normalizedKey, await resolveOwnerId(supabase, agentInput));
-      }
-    }
-    
-    // Build payloads with GUARANTEED values
-    const payloads = taskDefs.map((def: TaskDef) => {
-      const agentInput = (def.assigned_agent_id || def.owner_agent)!.toLowerCase().trim();
-      const ownerId = ownerIdMap.get(agentInput)!;
+      
+      const normalizedAgentId = agentInput.toLowerCase().trim();
+      
+      // Resolve owner_id using SAME function as POST /api/tasks
+      const owner_id = await resolveOwnerId(supabase, normalizedAgentId);
       
       return {
         id: randomUUID(),
         title: def.title?.trim() || 'Untitled Task',
         description: def.description || null,
+        task_type: (def.task_type || 'implementation').toLowerCase(),
         status: def.status || 'pending',
-        priority: def.priority || mission.priority || 'medium',
+        priority: (def.priority || mission.priority || 'medium').toLowerCase(),
+        assigned_agent_id: normalizedAgentId,
+        owner_id,
+        mission_id: missionId, // REQUIRED: from URL param
         company_id: mission.company_id,
-        task_type: def.task_type || 'implementation',
-        assigned_agent_id: agentInput,
-        owner_id: ownerId,
-        mission_id: missionId,
-        metadata: { mission_id: missionId, source: 'decompose-9217' },
+        metadata: { 
+          mission_id: missionId, 
+          source: BUILD_MARKER,
+          created_at: timestamp 
+        },
         created_at: timestamp,
         updated_at: timestamp
       };
-    });
+    }));
     
-    // Insert with full field verification
+    // Insert tasks with full field verification
     const created = await withDbRetry(async () => {
       const { data, error } = await supabase
         .from('tasks')
@@ -177,7 +168,7 @@ export async function POST(
       return data || [];
     }, 'insert_tasks');
     
-    // Verify integrity
+    // Build integrity-verified response
     const verifiedTasks = created.map((t: any) => ({
       id: t.id,
       title: t.title,
@@ -191,7 +182,7 @@ export async function POST(
       }
     }));
     
-    // Create mission_task links
+    // Create mission_task links (fire-and-forget)
     if (created.length > 0) {
       const links = created.map((t: any, i: number) => ({
         mission_id: missionId,
@@ -203,7 +194,7 @@ export async function POST(
       withDbRetry(() => supabase.from('mission_tasks').insert(links), 'insert_links').catch(() => {});
     }
     
-    // Update mission phase
+    // Update mission phase (fire-and-forget)
     if (mission.phase === 'planning') {
       withDbRetry(() => 
         supabase.from('missions').update({
@@ -217,8 +208,6 @@ export async function POST(
     
     return NextResponse.json({
       success: true,
-      build_marker: "DECOMPOSE-WRITEPATH-9223",
-      version: "9217-INTEGRITY-FIX",
       mission: {
         id: missionId,
         phase: 'execution',
@@ -226,6 +215,7 @@ export async function POST(
         child_task_count: created.length
       },
       tasks: verifiedTasks,
+      build_marker: BUILD_MARKER,
       requestId: rid,
       duration: Date.now() - startTime,
       timestamp
@@ -235,6 +225,7 @@ export async function POST(
     return NextResponse.json({
       success: false,
       error: err.message,
+      build_marker: BUILD_MARKER,
       requestId: rid,
       duration: Date.now() - startTime
     }, { status: 500 });

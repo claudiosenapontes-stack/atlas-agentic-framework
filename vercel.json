@@ -4,5 +4,10 @@
       "main": true
     }
   },
-  "public": true
+  "public": true,
+  "build": {
+    "env": {
+      "FORCE_BUILD": "2026-03-16-2335"
+    }
+  }
 }

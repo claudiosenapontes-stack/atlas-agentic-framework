@@ -1,10 +1,13 @@
 /**
- * POST /api/missions/:id/decompose - RAIL-HARDENED v2
- * ATLAS-OPTIMUS-RAIL-HARDENING-FINAL-3001
+ * POST /api/missions/:id/decompose - RAIL-HARDENED v3
+ * ATLAS-OPTIMUS-DECOMPOSE-LIVE-RAIL-6008
  * - FORCE NODEJS RUNTIME (NO EDGE)
  * - 3s global timeout guard (ALL DB calls wrapped)
  * - 2 retries with 150ms backoff (ALL DB calls)
+ * - FIXED: assigned_agent_id mapping from taskDef
  * - Structured logging (requestId, duration, errorSource)
+ * 
+ * VERSION: 6008-FIXED
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -77,25 +80,29 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // Prepare task payloads
-    const taskPayloads = taskDefs.map((taskDef: any) => ({
-      id: randomUUID(),
-      title: taskDef.title,
-      description: taskDef.description || null,
-      status: taskDef.status || 'pending',
-      priority: taskDef.priority || mission.priority || 'medium',
-      company_id: mission.company_id,
-      task_type: taskDef.task_type || 'implementation',
-      assigned_agent_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned',
-      owner_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned',
-      metadata: { 
-        mission_id: missionId, 
-        source: 'decompose',
-        assigned_agent_id: taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || null
-      },
-      created_at: timestamp,
-      updated_at: timestamp,
-    }));
+    // Prepare task payloads with DEBUG logging
+    const taskPayloads = taskDefs.map((taskDef: any) => {
+      const assignedAgentId = taskDef.assigned_agent_id || taskDef.owner_agent || request.headers.get('x-agent-id') || 'unassigned';
+      console.log(`[DEBUG] Task ${taskDef.title}: assigned_agent_id=${assignedAgentId}, input=${taskDef.assigned_agent_id}`);
+      return {
+        id: randomUUID(),
+        title: taskDef.title,
+        description: taskDef.description || null,
+        status: taskDef.status || 'pending',
+        priority: taskDef.priority || mission.priority || 'medium',
+        company_id: mission.company_id,
+        task_type: taskDef.task_type || 'implementation',
+        assigned_agent_id: assignedAgentId,
+        owner_id: assignedAgentId,
+        metadata: { 
+          mission_id: missionId, 
+          source: 'decompose',
+          assigned_agent_id: assignedAgentId
+        },
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+    });
     
     // WRAPPED: Insert tasks with retry+timeout
     const { data: createdTasks, error: tasksError } = await supabase

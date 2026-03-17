@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Build payload for watch_rules
-    // Note: action_payload may not exist in schema yet, store in description as JSON fallback
+    // Note: action_payload column doesn't exist yet, store metadata in description as JSON
     const insertPayload: any = {
       id,
       name,
@@ -156,24 +156,16 @@ export async function POST(request: NextRequest) {
       updated_at: timestamp,
     };
     
-    // Try to include action_payload if it exists
-    // If not, metadata will be stored in description as JSON
-    try {
-      insertPayload.action_payload = ruleMetadata;
-    } catch (e) {
-      // Column doesn't exist, will fall back to description
-    }
-    
     // Always store metadata in description as JSON for compatibility
     // This ensures data persists even if action_payload column is missing
-    if (body.description) {
-      insertPayload.description = body.description + "\n\n[METADATA]" + JSON.stringify(ruleMetadata);
+    const userDescription = body.description || '';
+    if (userDescription) {
+      insertPayload.description = userDescription + "\n\n[METADATA]" + JSON.stringify(ruleMetadata);
     } else {
       insertPayload.description = "[METADATA]" + JSON.stringify(ruleMetadata);
     }
     
     // Add optional fields
-    if (body.description) insertPayload.description = body.description;
     if (body.owner_id) insertPayload.owner_id = body.owner_id;
     if (body.company_id) insertPayload.company_id = body.company_id;
     if (body.email_account) insertPayload.email_account = body.email_account;
@@ -223,3 +215,4 @@ export async function POST(request: NextRequest) {
   }
 }
 // Cache bust: 1773773070
+// Force cache bust: 1773776850

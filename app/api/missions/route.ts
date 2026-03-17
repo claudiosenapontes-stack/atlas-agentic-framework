@@ -132,7 +132,11 @@ export async function POST(request: NextRequest) {
             phase: body.phase || 'planning',
             description: body.description || null,
             objective: body.objective || null,
-            priority: body.priority || 'medium'
+            priority: body.priority || 'medium',
+            owner_agent: body.owner_agent || request.headers.get('x-agent-id') || null,
+            henry_audit_verdict: 'pending',
+            closure_confidence: 0,
+            blocked_reason: body.blocked_reason || null
           })
           .select()
           .single(),

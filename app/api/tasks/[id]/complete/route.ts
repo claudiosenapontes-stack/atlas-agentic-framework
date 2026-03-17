@@ -26,7 +26,6 @@ export async function POST(
     // Build update
     const updates: any = {
       status: 'completed',
-      completed_at: timestamp,
       updated_at: timestamp,
     };
 

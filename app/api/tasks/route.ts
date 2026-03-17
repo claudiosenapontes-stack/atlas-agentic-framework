@@ -11,35 +11,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin, withDbRetry } from "@/lib/supabase-admin";
 import { randomUUID } from "crypto";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const DB_TIMEOUT_MS = 5000;
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 200;
-
-// DB retry wrapper - only wraps DB calls
-async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<T> {
-  let lastError: any;
-  for (let i = 0; i < RETRY_ATTEMPTS; i++) {
-    try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`${operation} timeout`)), DB_TIMEOUT_MS)
-      );
-      return await Promise.race([fn(), timeoutPromise]) as T;
-    } catch (err) {
-      lastError = err;
-      console.log(`[DB RETRY ${i+1}/${RETRY_ATTEMPTS}] ${operation}`);
-      if (i < RETRY_ATTEMPTS - 1) {
-        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (i + 1)));
-      }
-    }
-  }
-  throw lastError;
-}
 
 const requestId = () => randomUUID().slice(0, 8);
 

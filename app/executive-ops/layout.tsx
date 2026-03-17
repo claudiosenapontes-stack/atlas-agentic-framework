@@ -6,6 +6,7 @@ export const metadata = {
 };
 
 const executiveNavItems = [
+  { href: "/executive-ops/feed", label: "Feed" },
   { href: "/executive-ops", label: "Dashboard" },
   { href: "/executive-ops/calendar", label: "Calendar" },
   { href: "/executive-ops/watchlist", label: "Watchlist" },

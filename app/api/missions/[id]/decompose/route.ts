@@ -56,6 +56,24 @@ async function withDbRetry<T>(fn: () => Promise<T>, operation: string): Promise<
   throw lastError;
 }
 
+// Resolve owner_id from agent name (same logic as POST /api/tasks)
+async function resolveOwnerId(supabase: any, agentName: string): Promise<string> {
+  try {
+    const agent = await withDbRetry(async () => {
+      const { data } = await supabase
+        .from('agents')
+        .select('id')
+        .eq('name', agentName.toLowerCase())
+        .maybeSingle();
+      return data;
+    }, 'resolve_owner');
+    
+    return agent?.id || agentName.toLowerCase();
+  } catch {
+    return agentName.toLowerCase();
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -110,13 +128,24 @@ export async function POST(
       }, { status: 404 });
     }
     
-    // Build payloads with guaranteed non-null assigned_agent_id
+    // Resolve owner_ids for all tasks first
+    const ownerIdMap = new Map<string, string>();
+    for (const def of taskDefs) {
+      const agentName = def.assigned_agent_id || def.owner_agent || 'unassigned';
+      if (!ownerIdMap.has(agentName)) {
+        const resolvedId = await resolveOwnerId(supabase, agentName);
+        ownerIdMap.set(agentName, resolvedId);
+      }
+    }
+    
+    // Build payloads with guaranteed non-null assigned_agent_id and resolved owner_id
     const payloads = taskDefs.map((def: TaskDef, idx: number) => {
       const rawAgentId = def.assigned_agent_id || def.owner_agent;
       const agentId = (rawAgentId || 'unassigned').toLowerCase().trim();
+      const ownerId = ownerIdMap.get(rawAgentId || 'unassigned') || agentId;
       
       // DEBUG: Log payload construction
-      console.log(`[DEBUG ${rid}] Task ${idx}: rawAgentId=${rawAgentId}, agentId=${agentId}, title=${def.title}`);
+      console.log(`[DEBUG ${rid}] Task ${idx}: rawAgentId=${rawAgentId}, agentId=${agentId}, ownerId=${ownerId}, title=${def.title}`);
       
       return {
         id: randomUUID(),
@@ -127,7 +156,7 @@ export async function POST(
         company_id: mission.company_id,
         task_type: def.task_type || 'implementation',
         assigned_agent_id: agentId,
-        owner_id: agentId,
+        owner_id: ownerId,
         mission_id: missionId,
         metadata: { mission_id: missionId, source: 'decompose' },
         created_at: timestamp,
@@ -142,6 +171,13 @@ export async function POST(
       owner_id: p.owner_id,
       mission_id: p.mission_id
     }))));
+    
+    // Validate: Ensure no null assigned_agent_id
+    for (const payload of payloads) {
+      if (!payload.assigned_agent_id) {
+        throw new Error(`Task "${payload.title}" has null assigned_agent_id`);
+      }
+    }
     
     // DB CALL 2: Insert tasks (with retry)
     const created = await withDbRetry(async () => {

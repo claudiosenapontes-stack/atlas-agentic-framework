@@ -41,10 +41,12 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // FILTER: Exclude test/demo items
+    // FILTER: Exclude test/demo items and items with no meaningful subject
     const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
     const filteredItems = (data || []).filter((item: any) => {
       const subject = (item.subject || item.title || '').toLowerCase();
+      // Exclude if subject is empty/null or contains test patterns
+      if (!subject || subject === 'none') return false;
       return !testPatterns.some(pattern => subject.includes(pattern));
     });
     

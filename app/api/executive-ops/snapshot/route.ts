@@ -28,19 +28,35 @@ export async function GET(request: NextRequest) {
       missionsResult,
       followupsResult
     ] = await Promise.allSettled([
-      // Today's meetings
+      // Today's meetings (exclude test events)
       (supabase as any)
         .from('executive_events')
-        .select('id', { count: 'exact', head: true })
+        .select('id, title')
         .gte('start_time', today)
         .lt('start_time', tomorrow)
-        .in('status', ['confirmed', 'pending']),
+        .in('status', ['confirmed', 'pending'])
+        .then((res: any) => ({
+          ...res,
+          count: (res.data || []).filter((e: any) => {
+            const title = (e.title || '').toLowerCase();
+            return !['test', 'demo', 'debug', 'verify', 'canonical'].some(p => title.includes(p));
+          }).length,
+          data: null // Clear data to save memory
+        })),
       
-      // Watchlist items
+      // Watchlist items (exclude test items)
       (supabase as any)
         .from('watchlist_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active'),
+        .select('id, subject')
+        .eq('status', 'active')
+        .then((res: any) => ({
+          ...res,
+          count: (res.data || []).filter((w: any) => {
+            const sub = (w.subject || '').toLowerCase();
+            return sub && !['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow', 'none'].some(p => sub.includes(p));
+          }).length,
+          data: null
+        })),
       
       // Pending approvals
       (supabase as any)

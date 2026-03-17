@@ -1,4 +1,4 @@
-interface FeedItem {
+export interface FeedItem {
   id: string;
   type: 'reply' | 'approve' | 'blocked' | 'delegate' | 'followup' | 'meeting' | 'mission';
   title: string;

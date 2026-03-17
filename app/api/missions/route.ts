@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // LAZY: Init Supabase only when needed
     const supabase = getSupabaseAdmin();
     
-    // DB CALL with retry
+    // DB CALL with retry - include actual task counts
     const result = await withDbRetry(async () => {
       const { data, error, count } = await supabase
         .from('missions')
@@ -42,7 +42,33 @@ export async function GET(request: NextRequest) {
         .range(offset, offset + limit - 1);
       
       if (error) throw error;
-      return { data: data || [], count };
+      
+      // Derive child_task_count from actual tasks
+      const missionIds = (data || []).map(m => m.id);
+      let taskCounts: Record<string, number> = {};
+      
+      if (missionIds.length > 0) {
+        const { data: tasks, error: taskError } = await supabase
+          .from('tasks')
+          .select('mission_id')
+          .in('mission_id', missionIds)
+          .is('deleted_at', null);
+        
+        if (!taskError && tasks) {
+          taskCounts = tasks.reduce((acc, t) => {
+            acc[t.mission_id] = (acc[t.mission_id] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+        }
+      }
+      
+      // Merge actual counts into mission data
+      const missionsWithCounts = (data || []).map(m => ({
+        ...m,
+        child_task_count: taskCounts[m.id] || 0
+      }));
+      
+      return { data: missionsWithCounts, count };
     }, 'get_missions');
     
     const duration = Date.now() - startTime;

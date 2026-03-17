@@ -67,10 +67,24 @@ export async function GET(
       }, { status: 404 });
     }
     
+    // Derive actual child_task_count from tasks table
+    const { data: tasks, error: taskError } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('mission_id', missionId)
+      .is('deleted_at', null);
+    
+    const actualTaskCount = taskError ? 0 : (tasks?.length || 0);
+    
+    const missionWithCount = {
+      ...mission,
+      child_task_count: actualTaskCount
+    };
+    
     const duration = Date.now() - startTime;
     return NextResponse.json({
       success: true,
-      mission: mission,
+      mission: missionWithCount,
       requestId: rid,
       duration
     });

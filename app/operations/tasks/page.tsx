@@ -110,6 +110,7 @@ export default function TasksPage() {
                 <tr>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase">Task</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Status</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Owner</th>
                   <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
                 </tr>
               </thead>
@@ -117,12 +118,18 @@ export default function TasksPage() {
                 {filteredTasks.slice(0, 50).map(task => (
                   <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
                     <td className="px-4 py-2.5">
-                      <Link href={`/operations/tasks/${task.id}`} className="text-xs text-white hover:text-[#9BA3AF]">{task.title}</Link>
+                      <div className="flex items-center gap-2">
+                        {task.status === 'blocked' && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
+                        <Link href={`/operations/tasks/${task.id}`} className="text-xs text-white hover:text-[#9BA3AF]">{task.title}</Link>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'blocked' ? 'bg-red-500/20 text-red-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
                         {task.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-[10px] text-[#9BA3AF]">{task.assigned_agent?.display_name || task.agent_id || 'Unassigned'}</span>
                     </td>
                     <td className="px-4 py-2.5 text-[10px] text-[#9BA3AF]">{task.priority || 'medium'}</td>
                   </tr>

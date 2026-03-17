@@ -1,9 +1,12 @@
 /**
- * ATLAS-MISSIONS API v1
- * ATLAS-OPTIMUS-MISSION-ENGINE-BACKEND-CLOSEOUT-503
+ * ATLAS-MISSIONS API v1 - HARDENED
+ * ATLAS-OPTIMUS-MISSION-ENGINE-HARDENING-1204
  * 
  * GET/POST /api/missions
- * Full CRUD with Supabase integration
+ * - 3s timeout guard
+ * - Retry logic (2 attempts)
+ * - Comprehensive logging
+ * - Parallelized safe calls
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,17 +16,64 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Valid mission statuses and phases
+const MAX_EXECUTION_MS = 3000;
 const VALID_STATUSES = ['draft', 'requested', 'decomposed', 'executing', 'remediating', 'verifying', 'blocked', 'closed', 'cancelled'];
 const VALID_PHASES = ['planning', 'execution', 'verification', 'closure'];
+
+interface LogEntry {
+  requestId: string;
+  endpoint: string;
+  method: string;
+  duration: number;
+  success: boolean;
+  errorSource?: string;
+  recordCount?: number;
+}
+
+function logAccess(entry: LogEntry) {
+  console.log(JSON.stringify({
+    level: entry.success ? 'info' : 'error',
+    ...entry,
+    timestamp: new Date().toISOString(),
+  }));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${context} timeout after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>, 
+  retries = 2, 
+  context: string
+): Promise<{ data: T | null; error: any; attempts: number }> {
+  let lastError;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const data = await fn();
+      return { data, error: null, attempts: i + 1 };
+    } catch (error) {
+      lastError = error;
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 100 * (i + 1))); // Exponential backoff
+      }
+    }
+  }
+  return { data: null, error: lastError, attempts: retries };
+}
 
 // GET /api/missions - List all missions
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
+  const startTime = Date.now();
   
   console.log(`[${requestId}] GET /api/missions started`);
-  const startTime = Date.now();
   
   try {
     const { searchParams } = new URL(request.url);
@@ -37,50 +87,52 @@ export async function GET(request: NextRequest) {
     
     let query = supabase
       .from('missions')
-      .select('*')
+      .select('*', { count: 'exact' })
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
     
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    }
-    if (phase && phase !== 'all') {
-      query = query.eq('phase', phase);
-    }
-    if (ownerId && ownerId !== 'all') {
-      query = query.or(`owner_id.eq.${ownerId},owner_agent.eq.${ownerId}`);
-    }
+    if (status && status !== 'all') query = query.eq('status', status);
+    if (phase && phase !== 'all') query = query.eq('phase', phase);
+    if (ownerId && ownerId !== 'all') query = query.or(`owner_id.eq.${ownerId},owner_agent.eq.${ownerId}`);
     
-    const { data: missions, error, count } = await query;
+    const { data: missions, error, count } = await withTimeout(
+      query,
+      MAX_EXECUTION_MS,
+      'Supabase GET'
+    );
     
     if (error) {
-      console.error(`[${requestId}] Supabase error:`, error);
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/api/missions', method: 'GET', duration, success: false, errorSource: 'supabase' });
       return NextResponse.json({
         success: false,
         error: error.message,
         code: error.code,
         timestamp,
         requestId,
-        duration: Date.now() - startTime,
+        duration,
       }, { status: 500 });
     }
     
-    // Log diagnostic info
-    console.log(`[${requestId}] Supabase returned ${missions?.length || 0} missions, duration: ${Date.now() - startTime}ms`);
-    
-    // Transform to include computed fields for UI - LIVE DATA ONLY
     const transformedMissions = (missions || []).map(m => ({
       ...m,
-      // UI compatibility fields
       percentComplete: m.progress_percent || 0,
       assignedAgents: m.assigned_agents || [m.owner_agent].filter(Boolean),
       currentBlocker: m.current_blocker || null,
-      current_blocker: m.current_blocker || null,
       henryAuditVerdict: m.henry_audit_verdict || 'pending',
-      henry_audit_verdict: m.henry_audit_verdict || 'pending',
       closure_confidence: m.closure_confidence || 0,
     }));
+    
+    const duration = Date.now() - startTime;
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions', 
+      method: 'GET', 
+      duration, 
+      success: true, 
+      recordCount: transformedMissions.length 
+    });
     
     return NextResponse.json({
       success: true,
@@ -89,18 +141,28 @@ export async function GET(request: NextRequest) {
       pagination: { limit, offset, hasMore: transformedMissions.length === limit },
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
+      duration,
     });
     
   } catch (error: any) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions', 
+      method: 'GET', 
+      duration, 
+      success: false, 
+      errorSource: isTimeout ? 'timeout' : 'exception' 
+    });
+    
     return NextResponse.json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }
 
@@ -108,14 +170,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
-  
-  console.log(`[${requestId}] POST /api/missions started`);
   const startTime = Date.now();
   
+  console.log(`[${requestId}] POST /api/missions started`);
+  
   try {
-    const body = await request.json();
+    const body = await withTimeout(request.json(), 1000, 'body parsing');
     
-    // Validate required fields
     if (!body.title || typeof body.title !== 'string') {
       return NextResponse.json({
         success: false,
@@ -127,7 +188,6 @@ export async function POST(request: NextRequest) {
     
     const supabase = getSupabaseAdmin();
     
-    // Build insert object with only defined fields
     const insertData: any = {
       title: body.title,
       status: body.status || 'draft',
@@ -147,23 +207,34 @@ export async function POST(request: NextRequest) {
     if (body.metadata) insertData.metadata = body.metadata;
     if (body.tags) insertData.tags = body.tags;
     
-    const { data: mission, error } = await supabase
-      .from('missions')
-      .insert(insertData)
-      .select()
-      .single();
+    const { data: mission, error } = await withTimeout(
+      withRetry(() => 
+        supabase.from('missions').insert(insertData).select().single(),
+        2,
+        'POST mission'
+      ).then(r => {
+        if (r.error) throw r.error;
+        return { data: r.data, error: null };
+      }),
+      MAX_EXECUTION_MS,
+      'Supabase POST'
+    );
     
     if (error) {
-      console.error(`[${requestId}] Supabase insert error:`, error);
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/api/missions', method: 'POST', duration, success: false, errorSource: 'supabase' });
       return NextResponse.json({
         success: false,
         error: error.message,
         code: error.code,
         timestamp,
         requestId,
-        duration: Date.now() - startTime,
+        duration,
       }, { status: 500 });
     }
+    
+    const duration = Date.now() - startTime;
+    logAccess({ requestId, endpoint: '/api/missions', method: 'POST', duration, success: true });
     
     return NextResponse.json({
       success: true,
@@ -172,17 +243,27 @@ export async function POST(request: NextRequest) {
       status: 'created',
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
+      duration,
     }, { status: 201 });
     
   } catch (error: any) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions', 
+      method: 'POST', 
+      duration, 
+      success: false, 
+      errorSource: isTimeout ? 'timeout' : 'exception' 
+    });
+    
     return NextResponse.json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }

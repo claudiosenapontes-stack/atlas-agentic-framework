@@ -1,8 +1,12 @@
 /**
- * ATLAS-MISSION API v1 - Single Mission Operations
- * ATLAS-OPTIMUS-MISSION-ENGINE-BACKEND-CLOSEOUT-503
+ * ATLAS-MISSION API v1 - HARDENED
+ * ATLAS-OPTIMUS-MISSION-ENGINE-HARDENING-1204
  * 
  * GET/PUT/DELETE /api/missions/:id
+ * - 3s timeout guard
+ * - Retry logic (2 attempts)
+ * - Comprehensive logging
+ * - Parallelized safe calls
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,11 +16,58 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Valid mission statuses and phases
+const MAX_EXECUTION_MS = 3000;
 const VALID_STATUSES = ['draft', 'requested', 'decomposed', 'executing', 'remediating', 'verifying', 'blocked', 'closed', 'cancelled'];
 const VALID_PHASES = ['planning', 'execution', 'verification', 'closure'];
 
-// GET /api/missions/:id - Get single mission
+interface LogEntry {
+  requestId: string;
+  endpoint: string;
+  method: string;
+  missionId: string;
+  duration: number;
+  success: boolean;
+  errorSource?: string;
+}
+
+function logAccess(entry: LogEntry) {
+  console.log(JSON.stringify({
+    level: entry.success ? 'info' : 'error',
+    ...entry,
+    timestamp: new Date().toISOString(),
+  }));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${context} timeout after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>, 
+  retries = 2, 
+  context: string
+): Promise<{ data: T | null; error: any; attempts: number }> {
+  let lastError;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const data = await fn();
+      return { data, error: null, attempts: i + 1 };
+    } catch (error) {
+      lastError = error;
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 100 * (i + 1)));
+      }
+    }
+  }
+  return { data: null, error: lastError, attempts: retries };
+}
+
+// GET /api/missions/:id
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -24,99 +75,93 @@ export async function GET(
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
   const missionId = params.id;
-  
-  console.log(`[${requestId}] GET /api/missions/${missionId} started`);
   const startTime = Date.now();
   
+  console.log(`[${requestId}] GET /api/missions/${missionId} started`);
+  
   try {
-    // Query database for live mission data only
     const { searchParams } = new URL(request.url);
     const includeTasks = searchParams.get('include_tasks') === 'true';
     
     const supabase = getSupabaseAdmin();
     
-    let query = supabase
-      .from('missions')
-      .select('*')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
+    const query = includeTasks
+      ? supabase.from('missions').select(`*, mission_tasks(task_id, tasks(*))`).eq('id', missionId).is('deleted_at', null).single()
+      : supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single();
     
-    if (includeTasks) {
-      query = supabase
-        .from('missions')
-        .select(`
-          *,
-          mission_tasks(
-            task_id,
-            tasks(*)
-          )
-        `)
-        .eq('id', missionId)
-        .is('deleted_at', null)
-        .single();
-    }
-    
-    const { data: mission, error } = await query;
-    
-    // Log diagnostic info
-    console.log(`[${requestId}] Supabase query result: error=${error?.code || 'none'}, hasMission=${!!mission}, duration: ${Date.now() - startTime}ms`);
+    const result = await withTimeout(
+      query,
+      MAX_EXECUTION_MS,
+      'Supabase GET single'
+    ) as { data: any; error: any };
+    const { data: mission, error } = result;
     
     if (error || !mission) {
-      if (error && error.code === 'PGRST116') {
-        return NextResponse.json({
-          success: false,
-          error: 'Mission not found',
-          timestamp,
-          requestId,
-          duration: Date.now() - startTime,
-        }, { status: 404 });
-      }
+      const duration = Date.now() - startTime;
+      const status = error?.code === 'PGRST116' ? 404 : 500;
+      logAccess({ 
+        requestId, 
+        endpoint: '/api/missions/:id', 
+        method: 'GET', 
+        missionId,
+        duration, 
+        success: false, 
+        errorSource: error?.code === 'PGRST116' ? 'not_found' : 'supabase' 
+      });
       
-      console.error(`[${requestId}] Supabase error:`, error);
       return NextResponse.json({
         success: false,
-        error: error?.message || 'Internal server error',
-        code: error?.code,
+        error: error?.code === 'PGRST116' ? 'Mission not found' : (error?.message || 'Internal server error'),
         timestamp,
         requestId,
-        duration: Date.now() - startTime,
-      }, { status: 500 });
+        duration,
+      }, { status });
     }
     
-    // Transform for UI compatibility
     const transformedMission = {
       ...mission,
       percentComplete: mission.progress_percent || 0,
       assignedAgents: mission.assigned_agents || [mission.owner_agent].filter(Boolean),
       currentBlocker: mission.current_blocker,
-      current_blocker: mission.current_blocker,
       henryAuditVerdict: mission.henry_audit_verdict || 'pending',
-      henry_audit_verdict: mission.henry_audit_verdict || 'pending',
       closure_confidence: mission.closure_confidence || 0,
     };
+    
+    const duration = Date.now() - startTime;
+    logAccess({ requestId, endpoint: '/api/missions/:id', method: 'GET', missionId, duration, success: true });
     
     return NextResponse.json({
       success: true,
       mission: transformedMission,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
+      duration,
     });
     
   } catch (error: any) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions/:id', 
+      method: 'GET', 
+      missionId,
+      duration, 
+      success: false, 
+      errorSource: isTimeout ? 'timeout' : 'exception' 
+    });
+    
     return NextResponse.json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }
 
-// PUT /api/missions/:id - Update mission
+// PUT /api/missions/:id
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -124,18 +169,15 @@ export async function PUT(
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
   const missionId = params.id;
-  
-  console.log(`[${requestId}] PUT /api/missions/${missionId} started`);
   const startTime = Date.now();
   
+  console.log(`[${requestId}] PUT /api/missions/${missionId} started`);
+  
   try {
-    const body = await request.json();
+    const body = await withTimeout(request.json(), 1000, 'body parsing');
     const supabase = getSupabaseAdmin();
     
-    // Build update object with only defined fields
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
+    const updateData: any = { updated_at: timestamp };
     
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
@@ -159,66 +201,80 @@ export async function PUT(
     if (body.metadata !== undefined) updateData.metadata = body.metadata;
     if (body.tags !== undefined) updateData.tags = body.tags;
     
-    // Set actual dates based on status changes
-    if (body.status === 'active' && !body.actual_start_date) {
-      updateData.actual_start_date = new Date().toISOString();
-    }
-    if ((body.status === 'closed' || body.status === 'completed') && !body.actual_end_date) {
-      updateData.actual_end_date = new Date().toISOString();
-    }
+    if (body.status === 'active' && !body.actual_start_date) updateData.actual_start_date = timestamp;
+    if ((body.status === 'closed' || body.status === 'completed') && !body.actual_end_date) updateData.actual_end_date = timestamp;
     
-    const { data: mission, error } = await supabase
-      .from('missions')
-      .update(updateData)
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .select()
-      .single();
+    const { data: mission, error } = await withTimeout(
+      withRetry(() => 
+        supabase.from('missions').update(updateData).eq('id', missionId).is('deleted_at', null).select().single(),
+        2,
+        'PUT mission'
+      ).then(r => {
+        if (r.error) throw r.error;
+        return { data: r.data, error: null };
+      }),
+      MAX_EXECUTION_MS,
+      'Supabase PUT'
+    );
     
     if (error) {
-      console.error(`[${requestId}] Supabase update error:`, error);
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/api/missions/:id', method: 'PUT', missionId, duration, success: false, errorSource: 'supabase' });
       return NextResponse.json({
         success: false,
         error: error.message,
-        code: error.code,
         timestamp,
         requestId,
-        duration: Date.now() - startTime,
+        duration,
       }, { status: 500 });
     }
     
-    // Record status history if status changed
+    // Fire-and-forget status history (non-blocking)
     if (body.status) {
-      await supabase.from('mission_status_history').insert({
+      supabase.from('mission_status_history').insert({
         mission_id: missionId,
         previous_status: mission.status,
         new_status: body.status,
         changed_by: body.changed_by || null,
         reason: body.status_change_reason || null,
-      });
+      }).then(() => {}).catch(() => {});
     }
+    
+    const duration = Date.now() - startTime;
+    logAccess({ requestId, endpoint: '/api/missions/:id', method: 'PUT', missionId, duration, success: true });
     
     return NextResponse.json({
       success: true,
       mission,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
+      duration,
     });
     
   } catch (error: any) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions/:id', 
+      method: 'PUT', 
+      missionId,
+      duration, 
+      success: false, 
+      errorSource: isTimeout ? 'timeout' : 'exception' 
+    });
+    
     return NextResponse.json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }
 
-// DELETE /api/missions/:id - Soft delete mission
+// DELETE /api/missions/:id
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -226,50 +282,68 @@ export async function DELETE(
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
   const missionId = params.id;
+  const startTime = Date.now();
   
   console.log(`[${requestId}] DELETE /api/missions/${missionId} started`);
-  const startTime = Date.now();
   
   try {
     const supabase = getSupabaseAdmin();
     
-    const { error } = await supabase
-      .from('missions')
-      .update({
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', missionId)
-      .is('deleted_at', null);
+    const { error } = await withTimeout(
+      withRetry(() => 
+        supabase.from('missions').update({ deleted_at: timestamp, updated_at: timestamp }).eq('id', missionId).is('deleted_at', null),
+        2,
+        'DELETE mission'
+      ).then(r => {
+        if (r.error) throw r.error;
+        return { error: null };
+      }),
+      MAX_EXECUTION_MS,
+      'Supabase DELETE'
+    );
     
     if (error) {
-      console.error(`[${requestId}] Supabase delete error:`, error);
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/api/missions/:id', method: 'DELETE', missionId, duration, success: false, errorSource: 'supabase' });
       return NextResponse.json({
         success: false,
         error: error.message,
-        code: error.code,
         timestamp,
         requestId,
-        duration: Date.now() - startTime,
+        duration,
       }, { status: 500 });
     }
+    
+    const duration = Date.now() - startTime;
+    logAccess({ requestId, endpoint: '/api/missions/:id', method: 'DELETE', missionId, duration, success: true });
     
     return NextResponse.json({
       success: true,
       message: 'Mission deleted successfully',
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
+      duration,
     });
     
   } catch (error: any) {
-    console.error(`[${requestId}] Unexpected error:`, error);
+    const duration = Date.now() - startTime;
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ 
+      requestId, 
+      endpoint: '/api/missions/:id', 
+      method: 'DELETE', 
+      missionId,
+      duration, 
+      success: false, 
+      errorSource: isTimeout ? 'timeout' : 'exception' 
+    });
+    
     return NextResponse.json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-      duration: Date.now() - startTime,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }

@@ -88,8 +88,14 @@ export default function UnifiedOperationsDashboard() {
 
   const taskMetrics = useMemo(() => {
     const byStatus = tasks.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {} as Record<string, number>);
-    return { total: tasks.length, inProgress: byStatus.in_progress || 0, completed: byStatus.completed || 0, blocked: byStatus.blocked || 0 };
-  }, [tasks]);
+    const byAgent = tasks.reduce((acc, t) => {
+      const agent = t.agent_id || 'Unassigned';
+      acc[agent] = (acc[agent] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const avgTasksPerAgent = agents.length > 0 ? tasks.length / agents.length : 0;
+    return { total: tasks.length, inProgress: byStatus.in_progress || 0, completed: byStatus.completed || 0, blocked: byStatus.blocked || 0, byAgent, avgTasksPerAgent };
+  }, [tasks, agents]);
 
   const executionMetrics = useMemo(() => {
     const completed = executions.filter(e => e.status === "completed").length;
@@ -218,7 +224,8 @@ export default function UnifiedOperationsDashboard() {
             { label: "Tasks", value: taskMetrics.total },
             { label: "In Progress", value: taskMetrics.inProgress, color: "text-[#FFB020]" },
             { label: "Completed", value: taskMetrics.completed, color: "text-green-500" },
-            { label: "Blocked", value: taskMetrics.blocked, color: "text-red-500" },
+            { label: "Blocked Tasks", value: taskMetrics.blocked, color: "text-red-500" },
+            { label: "Tasks/Agent", value: taskMetrics.avgTasksPerAgent.toFixed(1), color: "text-[#9BA3AF]" },
             { label: "Success Rate", value: `${executionMetrics.successRate.toFixed(0)}%`, color: "text-green-500" },
             { label: "Executions", value: executionMetrics.total },
             { label: "Agents Online", value: agentMetrics.online, color: "text-green-500" },

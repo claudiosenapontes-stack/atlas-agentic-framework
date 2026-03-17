@@ -1,6 +1,10 @@
 /**
- * POST /api/missions/:id/decompose
- * Decompose a mission into child tasks
+ * POST /api/missions/:id/decompose - HARDENED
+ * ATLAS-OPTIMUS-MISSION-ENGINE-HARDENING-1204
+ * - 3s timeout guard
+ * - Retry logic
+ * - Comprehensive logging
+ * - Parallel task creation
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,6 +14,49 @@ import { randomUUID } from "crypto";
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const MAX_EXECUTION_MS = 3000;
+
+interface LogEntry {
+  requestId: string;
+  endpoint: string;
+  missionId: string;
+  duration: number;
+  success: boolean;
+  errorSource?: string;
+  tasksCreated?: number;
+}
+
+function logAccess(entry: LogEntry) {
+  console.log(JSON.stringify({
+    level: entry.success ? 'info' : 'error',
+    ...entry,
+    timestamp: new Date().toISOString(),
+  }));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, context: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${context} timeout after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, context: string): Promise<{ data: T | null; error: any; attempts: number }> {
+  let lastError;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const data = await fn();
+      return { data, error: null, attempts: i + 1 };
+    } catch (error) {
+      lastError = error;
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 100 * (i + 1)));
+    }
+  }
+  return { data: null, error: lastError, attempts: retries };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -17,15 +64,15 @@ export async function POST(
   const timestamp = new Date().toISOString();
   const requestId = randomUUID().slice(0, 8);
   const { id: missionId } = params;
-  
-  console.log(`[${requestId}] POST /api/missions/${missionId}/decompose started`);
   const startTime = Date.now();
   
+  console.log(`[${requestId}] POST /api/missions/${missionId}/decompose started`);
+  
   try {
-    const body = await request.json();
-    const { tasks, created_by, created_by_agent } = body;
+    const body = await withTimeout(request.json(), 1000, 'body parsing');
+    const { tasks: taskDefs, created_by, created_by_agent } = body;
     
-    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+    if (!taskDefs || !Array.isArray(taskDefs) || taskDefs.length === 0) {
       return NextResponse.json({
         success: false,
         error: 'tasks array is required',
@@ -36,125 +83,122 @@ export async function POST(
     
     const supabase = getSupabaseAdmin();
     
-    // Verify mission exists
-    const { data: mission, error: missionError } = await (supabase as any)
-      .from('missions')
-      .select('*')
-      .eq('id', missionId)
-      .is('deleted_at', null)
-      .single();
+    // Get mission with retry
+    const { data: mission, error: missionError } = await withTimeout(
+      withRetry(() => 
+        supabase.from('missions').select('*').eq('id', missionId).is('deleted_at', null).single(),
+        2,
+        'GET mission for decompose'
+      ).then(r => {
+        if (r.error) throw r.error;
+        return { data: r.data, error: null };
+      }),
+      MAX_EXECUTION_MS,
+      'Supabase GET mission'
+    );
     
     if (missionError || !mission) {
-      return NextResponse.json({
-        success: false,
-        error: 'Mission not found',
-        timestamp,
-        requestId,
-      }, { status: 404 });
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/decompose', missionId, duration, success: false, errorSource: 'not_found' });
+      return NextResponse.json({ success: false, error: 'Mission not found', timestamp, requestId, duration }, { status: 404 });
     }
     
-    // Create tasks and link to mission
-    const createdTasks = [];
-    const taskLinks = [];
+    // Create all tasks in parallel (batch insert)
+    const taskPayloads = taskDefs.map((taskDef: any, i: number) => ({
+      id: randomUUID(),
+      title: taskDef.title,
+      description: taskDef.description || null,
+      status: taskDef.status || 'pending',
+      priority: taskDef.priority || mission.priority || 'medium',
+      assignee_id: taskDef.assignee_id || null,
+      assignee_agent: taskDef.assignee_agent || null,
+      company_id: mission.company_id,
+      parent_id: null,
+      due_date: taskDef.due_date || null,
+      task_type: taskDef.task_type || 'implementation',
+      metadata: { mission_id: missionId, created_from_decompose: true, ...taskDef.metadata },
+      created_at: timestamp,
+      updated_at: timestamp,
+    }));
     
-    for (let i = 0; i < tasks.length; i++) {
-      const taskDef = tasks[i];
-      const taskId = randomUUID();
-      
-      // Create the task
-      const taskPayload = {
-        id: taskId,
-        title: taskDef.title,
-        description: taskDef.description || null,
-        status: taskDef.status || 'pending',
-        priority: taskDef.priority || mission.priority || 'medium',
-        assignee_id: taskDef.assignee_id || null,
-        assignee_agent: taskDef.assignee_agent || null,
-        company_id: mission.company_id,
-        parent_id: null,
-        due_date: taskDef.due_date || null,
-        task_type: taskDef.task_type || 'implementation',
-        metadata: {
-          mission_id: missionId,
-          created_from_decompose: true,
-          ...taskDef.metadata,
-        },
-        created_at: timestamp,
-        updated_at: timestamp,
-      };
-      
-      const { data: task, error: taskError } = await (supabase as any)
-        .from('tasks')
-        .insert(taskPayload)
-        .select()
-        .single();
-      
-      if (taskError) {
-        console.error(`[${requestId}] Task creation error:`, taskError);
-        continue;
-      }
-      
-      createdTasks.push(task);
-      
-      // Link task to mission
-      const linkPayload = {
-        mission_id: missionId,
-        task_id: taskId,
-        task_role: taskDef.role || 'subtask',
-        sequence_order: taskDef.sequence_order || i,
-        is_blocking: taskDef.is_blocking || false,
-      };
-      
-      const { data: link, error: linkError } = await (supabase as any)
-        .from('mission_tasks')
-        .insert(linkPayload)
-        .select()
-        .single();
-      
-      if (!linkError) {
-        taskLinks.push(link);
-      }
+    // Insert tasks with retry
+    const { data: createdTasks, error: tasksError } = await withTimeout(
+      withRetry(() => 
+        supabase.from('tasks').insert(taskPayloads).select(),
+        2,
+        'INSERT tasks'
+      ).then(r => {
+        if (r.error) throw r.error;
+        return { data: r.data, error: null };
+      }),
+      MAX_EXECUTION_MS,
+      'Supabase INSERT tasks'
+    );
+    
+    if (tasksError) {
+      const duration = Date.now() - startTime;
+      logAccess({ requestId, endpoint: '/decompose', missionId, duration, success: false, errorSource: 'tasks_insert' });
+      return NextResponse.json({ success: false, error: tasksError.message, timestamp, requestId, duration }, { status: 500 });
     }
     
-    // Update mission phase to execution if in planning
+    // Create mission_task links in parallel
+    const linkPayloads = (createdTasks || []).map((task: any, i: number) => ({
+      mission_id: missionId,
+      task_id: task.id,
+      task_role: taskDefs[i]?.role || 'subtask',
+      sequence_order: taskDefs[i]?.sequence_order || i,
+      is_blocking: taskDefs[i]?.is_blocking || false,
+    }));
+    
+    const { data: taskLinks } = await withTimeout(
+      supabase.from('mission_tasks').insert(linkPayloads).select(),
+      MAX_EXECUTION_MS,
+      'Supabase INSERT links'
+    );
+    
+    // Fire-and-forget mission update (non-blocking)
     if (mission.phase === 'planning') {
-      await (supabase as any)
-        .from('missions')
-        .update({ 
-          phase: 'execution', 
-          status: 'active',
-          actual_start_date: timestamp,
-          updated_at: timestamp,
-          metadata: {
-            ...mission.metadata,
-            changed_by: created_by,
-            changed_by_agent: created_by_agent,
-          }
-        })
-        .eq('id', missionId);
+      supabase.from('missions').update({
+        phase: 'execution',
+        status: 'active',
+        actual_start_date: timestamp,
+        updated_at: timestamp,
+        metadata: { ...mission.metadata, changed_by: created_by, changed_by_agent: created_by_agent }
+      }).eq('id', missionId).then(() => {}).catch(() => {});
     }
     
     const duration = Date.now() - startTime;
-    console.log(`[${requestId}] Decomposed mission into ${createdTasks.length} tasks in ${duration}ms`);
+    logAccess({ 
+      requestId, 
+      endpoint: '/decompose', 
+      missionId, 
+      duration, 
+      success: true, 
+      tasksCreated: createdTasks?.length || 0 
+    });
     
     return NextResponse.json({
       success: true,
       mission_id: missionId,
-      tasks_created: createdTasks.length,
-      tasks: createdTasks,
-      links: taskLinks,
+      tasks_created: createdTasks?.length || 0,
+      tasks: createdTasks || [],
+      links: taskLinks || [],
       timestamp,
       requestId,
+      duration,
     });
     
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    console.error(`[${requestId}] POST exception after ${duration}ms:`, error);
+    const isTimeout = error.message?.includes('timeout');
+    logAccess({ requestId, endpoint: '/decompose', missionId, duration, success: false, errorSource: isTimeout ? 'timeout' : 'exception' });
+    
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: isTimeout ? 'Request timeout' : error.message,
       timestamp,
       requestId,
-    }, { status: 500 });
+      duration,
+    }, { status: isTimeout ? 504 : 500 });
   }
 }

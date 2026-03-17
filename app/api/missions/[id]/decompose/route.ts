@@ -73,6 +73,9 @@ export async function POST(
     
     const { tasks: taskDefs } = body;
     
+    // DEBUG: Log incoming task definitions
+    console.log(`[DEBUG ${rid}] Incoming taskDefs:`, JSON.stringify(taskDefs));
+    
     if (!taskDefs || !Array.isArray(taskDefs) || taskDefs.length === 0) {
       return NextResponse.json({
         success: false,

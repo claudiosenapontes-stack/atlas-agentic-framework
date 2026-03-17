@@ -52,13 +52,13 @@ export async function GET(request: NextRequest) {
     }).map((item: any) => {
       // Extract metadata from description if action_payload is empty/missing
       if ((!item.action_payload || Object.keys(item.action_payload).length === 0) && item.description) {
-        const metaMatch = item.description.match(/\[METADATA\](.+)$/s);
+        const metaMatch = item.description.match(/\[METADATA\]([\s\S]+)$/);
         if (metaMatch) {
           try {
             const parsedMeta = JSON.parse(metaMatch[1]);
             item.action_payload = parsedMeta;
             // Clean up description for display
-            item.description = item.description.replace(/\[METADATA\].+$/s, '').trim();
+            item.description = item.description.replace(/\[METADATA\][\s\S]+$/, '').trim();
           } catch (e) {
             // Invalid JSON, leave as-is
           }

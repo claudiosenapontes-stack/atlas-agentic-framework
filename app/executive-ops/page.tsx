@@ -28,6 +28,7 @@ interface Notification {
   type: 'info' | 'warning' | 'urgent';
   createdAt: string;
   read: boolean;
+  source?: 'gmail' | 'whatsapp' | 'system';
 }
 
 interface Decision {

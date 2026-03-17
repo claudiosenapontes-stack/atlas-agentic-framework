@@ -89,12 +89,12 @@ export default function WatchlistPage() {
 
   const filteredItems = items?.filter(item => {
     if (filter === 'all') return true;
-    if (filter === 'blocked') return mapStatus(item.status) === 'blocked';
-    return mapPriority(item.priority) === filter;
+    if (filter === 'blocked') return !item.is_active;
+    return getRulePriority(item.rule_type) === filter;
   }) || [];
 
-  const p0Count = items?.filter(i => mapPriority(i.priority) === 'p0').length || 0;
-  const blockedCount = items?.filter(i => mapStatus(i.status) === 'blocked').length || 0;
+  const p0Count = items?.filter(i => getRulePriority(i.rule_type) === 'p0').length || 0;
+  const blockedCount = items?.filter(i => !i.is_active).length || 0;
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
@@ -135,7 +135,7 @@ export default function WatchlistPage() {
             >
               {f === 'all' && `All (${items?.length || 0})`}
               {f === 'p0' && `P0 (${p0Count})`}
-              {f === 'p1' && `P1 (${items?.filter(i => mapPriority(i.priority) === 'p1').length || 0})`}
+              {f === 'p1' && `P1 (${items?.filter(i => getRulePriority(i.rule_type) === 'p1').length || 0})`}
               {f === 'blocked' && `Blocked (${blockedCount})`}
             </button>
           ))}
@@ -150,13 +150,13 @@ export default function WatchlistPage() {
           <div className="flex flex-col items-center justify-center py-12 bg-[#111214] border border-[#1F2226] rounded-[10px]">
             <Eye className="w-8 h-8 text-[#6B7280] mb-4" />
             <p className="text-sm text-[#9BA3AF]">{filter === 'all' ? 'Watchlist empty' : `No ${filter} items`}</p>
-            <p className="text-xs text-[#6B7280] mt-1">Add items to track priorities</p>
+            <p className="text-xs text-[#6B7280] mt-1">Add rules to track priorities</p>
           </div>
         ) : (
           <div className="space-y-2">
             {filteredItems.map((item) => {
-              const mappedStatus = mapStatus(item.status);
-              const mappedPriority = mapPriority(item.priority);
+              const mappedStatus = getItemStatus(item.is_active);
+              const mappedPriority = getRulePriority(item.rule_type);
               const StatusIcon = STATUS_ICONS[mappedStatus] || AlertCircle;
               return (
                 <div
@@ -171,17 +171,21 @@ export default function WatchlistPage() {
                         </span>
                         <span className={`px-2 py-0.5 text-xs rounded flex items-center gap-1 ${STATUS_COLORS[mappedStatus] || STATUS_COLORS.at_risk}`}>
                           <StatusIcon className="w-3 h-3" />
-                          {(mappedStatus || 'at_risk').replace('_', ' ')}
+                          {item.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        <span className="px-2 py-0.5 text-xs rounded bg-[#1F2226] text-[#6B7280]">
+                          {item.rule_type}
                         </span>
                       </div>
-                      <h3 className="font-medium text-white mb-1">{item.subject || 'Untitled'}</h3>
+                      <h3 className="font-medium text-white mb-1">{item.name}</h3>
+                      <p className="text-sm text-[#6B7280] mb-2 font-mono">{item.pattern}</p>
                       {item.description && (
                         <p className="text-sm text-[#6B7280] mb-2">{item.description}</p>
                       )}
                       <div className="flex items-center gap-4 text-xs text-[#6B7280]">
-                        <span>Category: {item.category}</span>
-                        {item.source && (
-                          <span>Source: {item.source}</span>
+                        <span>Action: {item.action_type}</span>
+                        {item.owner_id && (
+                          <span>Owner: {item.owner_id.slice(0, 8)}</span>
                         )}
                       </div>
                     </div>

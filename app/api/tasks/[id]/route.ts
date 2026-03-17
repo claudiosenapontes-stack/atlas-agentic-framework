@@ -84,7 +84,7 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const { status, result_data } = body;
+    const { status, metadata } = body;
 
     // Build update object
     const updates: any = {
@@ -95,8 +95,8 @@ export async function PUT(
       updates.status = status;
     }
 
-    if (result_data !== undefined) {
-      updates.result_data = result_data;
+    if (metadata !== undefined) {
+      updates.metadata = metadata;
     }
 
     // Update task
@@ -142,7 +142,7 @@ export async function PUT(
  * PATCH /api/tasks/{id}
  * ATLAS-OPTIMUS-TASK-EXECUTION-9243
  *
- * Partial update for task status and result_data
+ * Partial update for task status and metadata
  */
 export async function PATCH(
   request: NextRequest,
@@ -154,7 +154,7 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { status, result_data } = body;
+    const { status, metadata } = body;
 
     // Build update object
     const updates: any = {
@@ -165,8 +165,8 @@ export async function PATCH(
       updates.status = status;
     }
 
-    if (result_data !== undefined) {
-      updates.result_data = result_data;
+    if (metadata !== undefined) {
+      updates.metadata = metadata;
     }
 
     // Update task

@@ -19,7 +19,7 @@ export async function POST(
 
   try {
     const body = await request.json();
-    const { result_data } = body;
+    const { metadata } = body;
 
     const supabase = getSupabaseAdmin();
 
@@ -29,8 +29,8 @@ export async function POST(
       updated_at: timestamp,
     };
 
-    if (result_data !== undefined) {
-      updates.result_data = result_data;
+    if (metadata !== undefined) {
+      updates.metadata = metadata;
     }
 
     // Update task
@@ -60,13 +60,13 @@ export async function POST(
       success: true,
       task: updatedTask,
       timestamp,
-      source: 'ATLAS-9243'
+      source: 'ATLAS-9248'
     });
 
   } catch (error: any) {
     console.error('[Task Complete] Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message, timestamp, source: 'ATLAS-9243' },
+      { success: false, error: error.message, timestamp, source: 'ATLAS-9248' },
       { status: 500 }
     );
   }

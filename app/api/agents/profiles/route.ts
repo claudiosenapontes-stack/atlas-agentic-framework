@@ -4,6 +4,7 @@
  *
  * GET /api/agents/profiles
  * Returns real agent data from PM2, SOUL.md, AGENTS.md, and model-routing.json
+ * Build: 9829-FORCE-$(date +%s)
  */
 
 import { NextRequest, NextResponse } from 'next/server';

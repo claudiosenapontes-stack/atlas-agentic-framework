@@ -21,14 +21,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     
-    // Query watch_alerts (the actual watchlist items)
+    // Query watch_rules (the watch patterns/rules)
     const { data, error } = await withDbRetry(async () => {
       return await (supabase as any)
-        .from('watch_alerts')
+        .from('watch_rules')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
-    }, 'get_watch_alerts');
+    }, 'get_watch_rules');
     
     const duration = Date.now() - startTime;
     
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
     // FILTER: Exclude test/demo items
     const testPatterns = ['test', 'demo', 'debug', 'verify', 'untitled', 'final', 'quick', 'workflow'];
     const filteredItems = (data || []).filter((item: any) => {
-      const subject = (item.source_subject || item.content_preview || '').toLowerCase();
-      if (!subject || subject === 'none') return false;
-      return !testPatterns.some(pattern => subject.includes(pattern));
+      const name = (item.name || '').toLowerCase();
+      if (!name || name === 'none') return false;
+      return !testPatterns.some(pattern => name.includes(pattern));
     });
     
     return NextResponse.json({

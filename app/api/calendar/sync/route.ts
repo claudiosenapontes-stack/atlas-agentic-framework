@@ -1,148 +1,172 @@
-/**
- * ATLAS-CALENDAR-SYNC API
- * ATLAS-EXECUTIVE-OPS-SCHEMA-001
- * 
- * POST /api/calendar/sync
- * Sync calendar events from Google Calendar to Atlas
- */
+import { NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+const execAsync = promisify(exec);
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
-  const timestamp = new Date().toISOString();
-  
-  try {
-    const body = await request.json();
-    const { 
-      owner_id, 
-      owner_email, 
-      sync_direction = 'pull', 
-      days_back = 7, 
-      days_forward = 30,
-      calendar_id = 'primary'
-    } = body;
-    
-    if (!owner_id) {
-      return NextResponse.json(
-        { success: false, error: 'owner_id is required', timestamp },
-        { status: 400 }
-      );
-    }
-    
-    const supabase = getSupabaseAdmin();
-    
-    // TODO: Implement actual Google Calendar sync when OAuth is ready
-    // For now, return sync status and fetch existing events from Atlas
-    
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days_back);
-    
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + days_forward);
-    
-    // Fetch existing executive events for this owner
-    const { data: existingEvents, error: fetchError } = await (supabase as any)
-      .from('executive_events')
-      .select('*')
-      .eq('owner_id', owner_id)
-      .gte('start_time', startDate.toISOString())
-      .lte('end_time', endDate.toISOString())
-      .order('start_time', { ascending: true });
-    
-    if (fetchError) {
-      console.error('[Calendar Sync] Fetch error:', fetchError);
-      throw fetchError;
-    }
-    
-    // Check for Google Calendar integration
-    const hasGoogleCalendar = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-    
-    return NextResponse.json({
-      success: true,
-      sync_status: hasGoogleCalendar ? 'ready' : 'auth_pending',
-      sync_direction,
-      owner_id,
-      owner_email,
-      window: {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
-        days_back,
-        days_forward,
-      },
-      events_synced: 0,
-      events_found: existingEvents?.length || 0,
-      existing_events: existingEvents || [],
-      message: hasGoogleCalendar 
-        ? 'Google Calendar sync ready. Use /api/calendar/sync/execute for full sync.'
-        : 'Google Calendar not configured. Events stored in Atlas only.',
-      timestamp,
-    });
-    
-  } catch (error) {
-    console.error('[Calendar Sync] Error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to sync calendar',
-        timestamp,
-      },
-      { status: 500 }
-    );
-  }
+interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: { dateTime?: string; date?: string };
+  end: { dateTime?: string; date?: string };
+  status: string;
+  htmlLink?: string;
+  calendarId: string;
+  calendarName: string;
+}
+
+interface SyncResult {
+  synced: number;
+  skipped: number;
+  errors: number;
+  events: CalendarEvent[];
 }
 
 export async function GET(request: NextRequest) {
-  const timestamp = new Date().toISOString();
-  
+  const searchParams = request.nextUrl.searchParams;
+  const calendarId = searchParams.get('calendar') || 'primary';
+  const daysBack = parseInt(searchParams.get('daysBack') || '7');
+  const daysForward = parseInt(searchParams.get('daysForward') || '30');
+
   try {
-    const { searchParams } = new URL(request.url);
-    const owner_id = searchParams.get('owner_id');
-    const from = searchParams.get('from');
-    const to = searchParams.get('to');
-    
-    const supabase = getSupabaseAdmin();
-    
-    let query = (supabase as any)
-      .from('executive_events')
-      .select('*')
-      .order('start_time', { ascending: true });
-    
-    if (owner_id) {
-      query = query.eq('owner_id', owner_id);
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Calculate date range
+    const now = new Date();
+    const timeMin = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+    const timeMax = new Date(now.getTime() + daysForward * 24 * 60 * 60 * 1000).toISOString();
+
+    // Fetch events from Google Calendar using gog CLI
+    const { stdout, stderr } = await execAsync(
+      `cd /root/.openclaw/workspaces/atlas-agentic-framework && gcal events --calendar="${calendarId}" --max=100 2>&1`
+    );
+
+    if (stderr && !stdout) {
+      throw new Error(`Failed to fetch calendar events: ${stderr}`);
     }
-    
-    if (from) {
-      query = query.gte('start_time', from);
+
+    // Parse gcal output
+    let googleEvents: any[] = [];
+    try {
+      const lines = stdout.trim().split('\n');
+      const jsonLine = lines.find(l => l.trim().startsWith('{') || l.trim().startsWith('['));
+      if (jsonLine) {
+        const parsed = JSON.parse(jsonLine);
+        googleEvents = parsed.items || parsed || [];
+      }
+    } catch (e) {
+      // Fallback: try to parse as JSON directly
+      try {
+        const parsed = JSON.parse(stdout);
+        googleEvents = parsed.items || [];
+      } catch {
+        googleEvents = [];
+      }
     }
-    
-    if (to) {
-      query = query.lte('end_time', to);
-    }
-    
-    const { data: events, error } = await query;
-    
-    if (error) {
-      console.error('[Calendar Sync] Get error:', error);
-      throw error;
-    }
-    
-    return NextResponse.json({
-      success: true,
-      events: events || [],
-      count: events?.length || 0,
-      timestamp,
+
+    // Filter events by date range
+    const filteredEvents = googleEvents.filter((event: any) => {
+      const eventStart = event.start?.dateTime || event.start?.date;
+      if (!eventStart) return false;
+      return eventStart >= timeMin && eventStart <= timeMax;
     });
-    
+
+    // Get calendar name
+    let calendarName = calendarId === 'primary' ? 'Primary Calendar' : calendarId;
+    try {
+      const { stdout: calStdout } = await execAsync(
+        `cd /root/.openclaw/workspaces/atlas-agentic-framework && gcal list 2>&1 | grep -A1 -B1 "${calendarId}" | head -3`
+      );
+      const summaryMatch = calStdout.match(/"summary":\s*"([^"]+)"/);
+      if (summaryMatch) calendarName = summaryMatch[1];
+    } catch {
+      // Use default name
+    }
+
+    // Sync to database
+    const result: SyncResult = { synced: 0, skipped: 0, errors: 0, events: [] };
+
+    for (const event of filteredEvents) {
+      const calendarEventId = event.id;
+      const existing = await supabase
+        .from('calendar_events')
+        .select('id')
+        .eq('calendar_event_id', calendarEventId)
+        .single();
+
+      const eventData = {
+        calendar_event_id: calendarEventId,
+        summary: event.summary || 'Untitled',
+        description: event.description || null,
+        start_time: event.start?.dateTime || event.start?.date,
+        end_time: event.end?.dateTime || event.end?.date,
+        status: event.status || 'confirmed',
+        html_link: event.htmlLink || null,
+        calendar_id: calendarId,
+        calendar_name: calendarName,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existing.data) {
+        // Update existing
+        const { error } = await supabase
+          .from('calendar_events')
+          .update(eventData)
+          .eq('calendar_event_id', calendarEventId);
+
+        if (error) {
+          result.errors++;
+          console.error('Update error:', error);
+        } else {
+          result.synced++;
+        }
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('calendar_events')
+          .insert({ ...eventData, created_at: new Date().toISOString() });
+
+        if (error) {
+          result.errors++;
+          console.error('Insert error:', error);
+        } else {
+          result.synced++;
+        }
+      }
+
+      result.events.push({
+        id: calendarEventId,
+        summary: event.summary || 'Untitled',
+        description: event.description,
+        start: event.start,
+        end: event.end,
+        status: event.status,
+        htmlLink: event.htmlLink,
+        calendarId,
+        calendarName,
+      });
+    }
+
+    return Response.json({
+      success: true,
+      result,
+      timeRange: { timeMin, timeMax },
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
-    console.error('[Calendar Sync] Get error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to fetch events',
-        timestamp,
+    console.error('Calendar sync error:', error);
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
       },
       { status: 500 }
     );

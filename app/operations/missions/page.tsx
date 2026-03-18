@@ -249,17 +249,17 @@ export default function MissionsPage() {
                   
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    {(mission.status === 'blocked' || mission.status === 'remediating') && (
+                    {mission.status === 'blocked' && (
                       <button className="p-2 text-yellow-400 hover:bg-yellow-900/30 rounded-lg" title="Unblock">
                         <RotateCcw className="w-4 h-4" />
                       </button>
                     )}
-                    {(mission.status === 'queued' || mission.status === 'requested' || mission.status === 'accepted' || mission.status === 'draft') && (
+                    {(mission.status === 'queued' || mission.status === 'draft') && (
                       <button className="p-2 text-green-400 hover:bg-green-900/30 rounded-lg" title="Start">
                         <Play className="w-4 h-4" />
                       </button>
                     )}
-                    {(mission.status === 'in_progress' || mission.status === 'executing') && (
+                    {mission.status === 'in_progress' && (
                       <button className="p-2 text-blue-400 hover:bg-blue-900/30 rounded-lg" title="Complete">
                         <CheckCircle2 className="w-4 h-4" />
                       </button>

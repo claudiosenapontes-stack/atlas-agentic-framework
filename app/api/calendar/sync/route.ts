@@ -13,6 +13,21 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 // REBUILD: 9884-FRESH
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -37,7 +52,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: 'Google Calendar not authenticated. Please authenticate first.',
         timestamp: new Date().toISOString(),
-      }, { status: 401 });
+      }, { status: 401, headers: corsHeaders });
     }
 
     const oauth2Client = new OAuth2Client(
@@ -141,13 +156,13 @@ export async function GET(request: NextRequest) {
       timeRange: { timeMin, timeMax },
       timestamp: new Date().toISOString(),
       rebuildMarker: '9884-FRESH',
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Calendar sync error:', error);
     return Response.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString(),
-    }, { status: 500 });
+    }, { status: 500, headers: corsHeaders });
   }
 }

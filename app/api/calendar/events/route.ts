@@ -6,6 +6,21 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SER
 
 export const dynamic = 'force-dynamic';
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const calendarId = searchParams.get('calendar');
@@ -45,7 +60,7 @@ export async function GET(request: NextRequest) {
       events: events || [],
       count: events?.length || 0,
       timestamp: new Date().toISOString(),
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Calendar events fetch error:', error);
     return Response.json(
@@ -54,7 +69,7 @@ export async function GET(request: NextRequest) {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

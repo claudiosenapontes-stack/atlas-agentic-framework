@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+export const dynamic = 'force-dynamic';
+
 // ATLAS-PHASE5-SCOPED-1268: Owner-Useful Recommendation Categories
 type RecommendationCategory = 
   | "retry_optimization"

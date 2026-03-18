@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
-// Deployment trigger: 9869-A Force redeploy for DELETE/PATCH routes
+// Deployment trigger: 9871-9872 Force redeploy - cacheBust bump
 const nextConfig = {
-  cacheBust: 9870,  // Bumped for 9869-A redeploy
+  cacheBust: 9871,  // Bumped for watchlist pipeline deploy
   async headers() {
     return [
       {

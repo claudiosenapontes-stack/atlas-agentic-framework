@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Calendar, RefreshCw, Clock, CheckCircle, AlertCircle, ExternalLink, Trash2, Loader2 } from 'lucide-react';
 
 interface CalendarEvent {
   id: string;
@@ -17,7 +17,6 @@ interface CalendarEvent {
   created_at: string;
 }
 
-// FIX: Move fetch functions OUTSIDE component or define before useEffect
 async function fetchCalendarEvents(): Promise<{ events: CalendarEvent[]; error?: string }> {
   try {
     console.log('[CalendarPage] Fetching events...');
@@ -60,14 +59,28 @@ async function syncCalendarEvents(): Promise<{ result?: any; error?: string }> {
   }
 }
 
+async function deleteCalendarEvent(eventId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`/api/calendar/events/${eventId}`, { method: 'DELETE' });
+    if (response.ok) {
+      return { success: true };
+    } else {
+      const data = await response.json().catch(() => ({}));
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Delete failed' };
+  }
+}
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  // FIX: useEffect calls external functions that are already defined
   useEffect(() => {
     setLoading(true);
     fetchCalendarEvents().then(({ events, error }) => {
@@ -94,7 +107,6 @@ export default function CalendarPage() {
         setError(error);
       } else {
         setSyncResult(result);
-        // Refresh after sync
         fetchCalendarEvents().then(({ events, error }) => {
           setEvents(events);
           setError(error || null);
@@ -102,6 +114,20 @@ export default function CalendarPage() {
       }
       setSyncing(false);
     });
+  };
+
+  const handleDelete = async (eventId: string, eventSummary: string) => {
+    if (!confirm(`Delete "${eventSummary}"? This cannot be undone.`)) return;
+    
+    setDeleting(eventId);
+    const { success, error } = await deleteCalendarEvent(eventId);
+    
+    if (success) {
+      setEvents(prev => prev.filter(e => e.id !== eventId));
+    } else {
+      alert(`Failed to delete: ${error}`);
+    }
+    setDeleting(null);
   };
 
   function formatDate(dateStr: string): string {
@@ -276,17 +302,31 @@ export default function CalendarPage() {
                       <span className="text-slate-400">{event.calendar_name}</span>
                     </div>
                   </div>
-                  {event.html_link && (
-                    <a
-                      href={event.html_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-900/30 rounded-lg transition-colors"
-                      title="Open in Google Calendar"
+                  <div className="flex items-center gap-1">
+                    {event.html_link && (
+                      <a
+                        href={event.html_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-900/30 rounded-lg transition-colors"
+                        title="Open in Google Calendar"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleDelete(event.id, event.summary)}
+                      disabled={deleting === event.id}
+                      className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                      title="Delete event"
                     >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
+                      {deleting === event.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

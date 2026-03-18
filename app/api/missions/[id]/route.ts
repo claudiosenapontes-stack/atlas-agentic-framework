@@ -71,8 +71,7 @@ export async function GET(
     const { data: tasks, error: taskError } = await supabase
       .from('tasks')
       .select('id')
-      .eq('mission_id', missionId)
-      .is('deleted_at', null);
+      .eq('mission_id', missionId);
     
     const actualTaskCount = taskError ? 0 : (tasks?.length || 0);
     

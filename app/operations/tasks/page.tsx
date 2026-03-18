@@ -34,6 +34,35 @@ interface Task {
   mission?: { id: string; title: string };
 }
 
+// FIX: Define fetch function OUTSIDE component or use function declaration
+async function fetchTasksData(): Promise<{ tasks: Task[]; missions: Record<string, { id: string; title: string }> }> {
+  try {
+    const [tasksRes, missionsRes] = await Promise.all([
+      fetch("/api/tasks?limit=200", { cache: 'no-store' }),
+      fetch("/api/missions?limit=100", { cache: 'no-store' }),
+    ]);
+    const tasksData = await tasksRes.json();
+    const missionsData = await missionsRes.json();
+    
+    const missionMap: Record<string, { id: string; title: string }> = {};
+    (missionsData.missions || []).forEach((m: any) => {
+      missionMap[m.id] = { id: m.id, title: m.title };
+    });
+    
+    const enrichedTasks = (tasksData.tasks || []).map((task: Task) => {
+      const now = new Date();
+      const updated = new Date(task.updated_at);
+      const daysStuck = Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...task, stuck_duration: daysStuck };
+    });
+    
+    return { tasks: enrichedTasks, missions: missionMap };
+  } catch (error) {
+    console.error("Failed to fetch tasks:", error);
+    return { tasks: [], missions: {} };
+  }
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [missions, setMissions] = useState<Record<string, { id: string; title: string }>>({});
@@ -42,33 +71,15 @@ export default function TasksPage() {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "graph" | "stats">("list");
 
-  useEffect(() => { fetchTasks(); }, []);
-
-  const fetchTasks = async () => {
-    try {
-      const [tasksRes, missionsRes] = await Promise.all([
-        fetch("/api/tasks?limit=200"),
-        fetch("/api/missions?limit=100"),
-      ]);
-      const tasksData = await tasksRes.json();
-      const missionsData = await missionsRes.json();
-      
-      const missionMap: Record<string, { id: string; title: string }> = {};
-      (missionsData.missions || []).forEach((m: any) => {
-        missionMap[m.id] = { id: m.id, title: m.title };
-      });
-      setMissions(missionMap);
-      
-      const enrichedTasks = (tasksData.tasks || []).map((task: Task) => {
-        const now = new Date();
-        const updated = new Date(task.updated_at);
-        const daysStuck = Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
-        return { ...task, stuck_duration: daysStuck };
-      });
-      setTasks(enrichedTasks);
-    } catch (error) { console.error("Failed:", error); }
-    finally { setLoading(false); }
-  };
+  // FIX: useEffect calls external function that's already defined
+  useEffect(() => {
+    setLoading(true);
+    fetchTasksData().then(({ tasks, missions }) => {
+      setTasks(tasks);
+      setMissions(missions);
+      setLoading(false);
+    });
+  }, []);
 
   const getChildTasks = (parentId: string | null) => tasks.filter(t => t.parent_id === parentId);
   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));

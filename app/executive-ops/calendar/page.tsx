@@ -20,22 +20,28 @@ interface CalendarEvent {
 // FIX: Move fetch functions OUTSIDE component or define before useEffect
 async function fetchCalendarEvents(): Promise<{ events: CalendarEvent[]; error?: string }> {
   try {
+    console.log('[CalendarPage] Fetching events...');
     const response = await fetch('/api/calendar/events?limit=50', { 
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
+    
+    console.log('[CalendarPage] Response status:', response.status);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const data = await response.json();
+    console.log('[CalendarPage] Data received:', { success: data.success, eventCount: data.events?.length });
+    
     if (data.success) {
       return { events: data.events || [] };
     } else {
       return { events: [], error: data.error || 'Failed to fetch events' };
     }
   } catch (err) {
+    console.error('[CalendarPage] Fetch error:', err);
     return { events: [], error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }

@@ -172,17 +172,25 @@ interface WatchlistItem {
 
 async function getWatchlist(): Promise<{ items: WatchlistItem[]; error?: string }> {
   try {
+    console.log('[WatchlistPage] Fetching watchlist...');
     const res = await fetch('/api/watchlist', { cache: 'no-store' });
+    console.log('[WatchlistPage] Response status:', res.status);
+    
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
+      console.error('[WatchlistPage] API error:', errData);
       return { items: [], error: errData.error || `HTTP ${res.status}` };
     }
+    
     const data = await res.json();
+    console.log('[WatchlistPage] Data received:', { success: data.success, itemCount: data.items?.length });
+    
     if (!data.success) {
       return { items: [], error: data.error || 'API returned success: false' };
     }
     return { items: data.items || [] };
   } catch (err: any) {
+    console.error('[WatchlistPage] Fetch error:', err);
     return { items: [], error: err.message || 'Network error' };
   }
 }

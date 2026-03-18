@@ -26,16 +26,30 @@ export default function CalendarPage() {
 
   async function fetchEvents() {
     setLoading(true);
+    setError(null);
+    console.log('[Calendar] Fetching events...');
     try {
-      const response = await fetch('/api/calendar/events?limit=50');
+      const response = await fetch('/api/calendar/events?limit=50', { 
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      console.log('[Calendar] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
+      console.log('[Calendar] Response data:', { success: data.success, count: data.events?.length });
+      
       if (data.success) {
-        setEvents(data.events);
+        setEvents(data.events || []);
         setError(null);
       } else {
         setError(data.error || 'Failed to fetch events');
       }
     } catch (err) {
+      console.error('[Calendar] Fetch error:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);

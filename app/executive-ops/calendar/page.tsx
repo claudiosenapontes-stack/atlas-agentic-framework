@@ -195,6 +195,18 @@ export default function CalendarPage() {
             <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" />
             Loading events...
           </div>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <AlertCircle className="w-8 h-8 mx-auto mb-4 text-red-400" />
+            <p className="text-red-300 mb-2">Failed to load events</p>
+            <p className="text-sm text-slate-500 mb-4">{error}</p>
+            <button
+              onClick={fetchEvents}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+            >
+              Retry
+            </button>
+          </div>
         ) : events.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
             <Calendar className="w-8 h-8 mx-auto mb-4" />

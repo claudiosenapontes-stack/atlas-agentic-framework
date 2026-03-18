@@ -42,7 +42,7 @@ interface Task {
   title: string;
   status: string;
   assigned_agent_id: string | null;
-  mission_id: string;
+  mission_id: string | null;
   execution_id?: string;
   updated_at: string;
   priority?: string;
@@ -122,6 +122,11 @@ export default function MissionsPage() {
       
       if (tasksData.success) {
         setTasks(tasksData.tasks || []);
+        console.log('[MissionsPage] Tasks loaded:', tasksData.tasks?.map((t: any) => ({ 
+          id: t.id?.slice(0,8), 
+          mission_id: t.mission_id?.slice(0,8) || 'null',
+          title: t.title?.slice(0,30)
+        })));
       } else {
         console.warn('[MissionsPage] Tasks API returned success: false', tasksData.error);
       }
@@ -141,7 +146,9 @@ export default function MissionsPage() {
   }, []);
 
   function getMissionTasks(missionId: string): Task[] {
-    return tasks.filter(t => t.mission_id === missionId);
+    const filtered = tasks.filter(t => t.mission_id === missionId);
+    console.log(`[MissionsPage] getMissionTasks(${missionId.slice(0,8)}): ${filtered.length} of ${tasks.length} tasks match`);
+    return filtered;
   }
 
   function getMissionProgress(mission: Mission): number {

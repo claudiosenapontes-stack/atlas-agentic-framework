@@ -207,3 +207,47 @@ export async function PATCH(
     );
   }
 }
+
+/**
+ * DELETE /api/tasks/{id}
+ * ATLAS-PRIME-TASK-DELETE-9918
+ *
+ * Soft delete a task (sets deleted_at timestamp)
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = getSupabaseAdmin();
+  const taskId = params.id;
+  const timestamp = new Date().toISOString();
+
+  try {
+    const { error } = await (supabase as any)
+      .from('tasks')
+      .update({ deleted_at: timestamp, updated_at: timestamp })
+      .eq('id', taskId)
+      .is('deleted_at', null);
+
+    if (error) {
+      console.error('[Tasks] Delete error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message, timestamp },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Task deleted',
+      timestamp,
+    });
+
+  } catch (error: any) {
+    console.error('[Tasks] Delete error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Internal server error', timestamp },
+      { status: 500 }
+    );
+  }
+}

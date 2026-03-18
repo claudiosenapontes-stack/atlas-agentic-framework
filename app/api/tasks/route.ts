@@ -172,6 +172,52 @@ export async function POST(request: NextRequest) {
       return data;
     }, 'verify_task').catch(() => {});
     
+    // ATLAS-MSN-9883-FIX: Auto-promote standalone task to execution-tracked task
+    let executionId = null;
+    if (assigned_agent_id) {
+      try {
+        executionId = randomUUID();
+        await withDbRetry(async () => {
+          const { error: execError } = await supabase
+            .from('executions')
+            .insert({
+              id: executionId,
+              task_id: taskId,
+              agent_id: owner_id,
+              status: 'in_progress',
+              started_at: timestamp,
+              input_payload: {
+                title: title.trim(),
+                description: description || null,
+                task_type: task_type.toLowerCase(),
+                priority: priority.toLowerCase(),
+                mission_id: mission_id || null,
+                source: 'standalone_auto_promote'
+              }
+            });
+          if (execError) throw execError;
+        }, 'create_execution');
+        
+        // Link execution to task
+        await withDbRetry(async () => {
+          const { error: linkError } = await supabase
+            .from('tasks')
+            .update({ 
+              execution_id: executionId,
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', taskId);
+          if (linkError) throw linkError;
+        }, 'link_execution');
+        
+        console.log(`[ATLAS-9883-FIX] Auto-promoted task ${taskId} with execution ${executionId}`);
+      } catch (promoteError: any) {
+        console.error(`[ATLAS-9883-FIX] Failed to auto-promote task ${taskId}:`, promoteError.message);
+        // Continue - task exists even if promotion failed
+      }
+    }
+    
     const duration = Date.now() - startTime;
     
     console.log(JSON.stringify({
@@ -186,7 +232,13 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      task,
+      task: {
+        ...task,
+        execution_id: executionId,
+        status: executionId ? 'in_progress' : 'pending'
+      },
+      execution_id: executionId,
+      auto_promoted: !!executionId,
       verified: true,
       requestId: rid,
       duration

@@ -23,9 +23,6 @@ interface Mission {
   henry_audit_verdict?: string;
 }
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   requested: { label: 'Requested', color: 'text-[#6B7280]', bg: 'bg-[#6B7280]/10', border: 'border-[#6B7280]/30' },
   accepted: { label: 'Accepted', color: 'text-[#3B82F6]', bg: 'bg-[#3B82F6]/10', border: 'border-[#3B82F6]/30' },

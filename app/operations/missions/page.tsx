@@ -222,6 +222,10 @@ export default function MissionsPage() {
                     {mission.status}
                   </span>
                   
+                  <span className="px-2 py-1 bg-gray-700/50 rounded text-xs text-gray-300">
+                    {mission.child_task_count || 0} tasks
+                  </span>
+                  
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{mission.title}</h3>
                     <p className="text-sm text-gray-500 mt-0.5">
@@ -239,7 +243,7 @@ export default function MissionsPage() {
                       <div className="bg-purple-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {tasks.filter(t => t.status === 'completed').length}/{tasks.length} tasks
+                      {mission.completed_task_count || 0}/{mission.child_task_count || 0} tasks
                     </div>
                   </div>
                   
@@ -284,17 +288,37 @@ export default function MissionsPage() {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
                           <Target className="w-4 h-4" />
-                          Child Tasks ({tasks.length})
+                          Child Tasks ({mission.child_task_count || 0})
                         </h4>
                         <div className="flex gap-2 text-xs">
-                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">{tasks.filter(t => t.status === 'pending').length} pending</span>
+                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">{tasks.filter(t => t.status === 'pending' || t.status === 'inbox').length} pending</span>
                           <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">{tasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active</span>
                           <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded">{tasks.filter(t => t.status === 'completed').length} done</span>
                         </div>
                       </div>
                       
+                      {/* Progress bar for mission */}
+                      <div className="mb-4">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-400">Mission Progress</span>
+                          <span className="text-white">{Math.round(((mission.completed_task_count || 0) / (mission.child_task_count || 1)) * 100)}%</span>
+                        </div>
+                        <div className="bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all" 
+                            style={{ width: `${Math.round(((mission.completed_task_count || 0) / (mission.child_task_count || 1)) * 100)}%` }} 
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {mission.completed_task_count || 0} of {mission.child_task_count || 0} tasks completed
+                        </div>
+                      </div>
+                      
                       {tasks.length === 0 ? (
-                        <p className="text-gray-500 text-sm">No tasks assigned to this mission</p>
+                        <div className="text-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto text-purple-500 mb-2" />
+                          <p className="text-gray-500 text-sm">Loading tasks...</p>
+                        </div>
                       ) : (
                         <div className="space-y-2">
                           {tasks.map((task) => (

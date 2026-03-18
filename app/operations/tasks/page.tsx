@@ -3,14 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  GitBranch, 
   ArrowLeft, 
-  Plus, 
   Search,
   Zap,
   User,
-  List,
-  BarChart3
+  Trash2,
+  Loader2
 } from "lucide-react";
 
 interface Task {
@@ -83,15 +81,37 @@ export default function TasksPage() {
   const [missions, setMissions] = useState<Record<string, { id: string; title: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetchTasksData().then(({ tasks, missions }) => {
-      setTasks(tasks);
-      setMissions(missions);
-      setLoading(false);
-    });
+    loadData();
   }, []);
+
+  async function loadData() {
+    setLoading(true);
+    const { tasks, missions } = await fetchTasksData();
+    setTasks(tasks);
+    setMissions(missions);
+    setLoading(false);
+  }
+
+  async function deleteTask(taskId: string) {
+    if (!confirm('Delete this task? This cannot be undone.')) return;
+    
+    setDeleting(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+      } else {
+        alert('Failed to delete task');
+      }
+    } catch (err) {
+      alert('Error deleting task');
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const filteredTasks = tasks.filter(t => 
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,6 +186,7 @@ export default function TasksPage() {
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-32">Mission</th>
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Execution</th>
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Updated</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-12">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1F2226]">
@@ -226,6 +247,16 @@ export default function TasksPage() {
                   <span className="text-xs text-[#9BA3AF]" title={new Date(task.updated_at).toLocaleString()}>
                     {formatTimeAgo(task.updated_at)}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    disabled={deleting === task.id}
+                    className="p-1.5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
+                    title="Delete task"
+                  >
+                    {deleting === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
                 </td>
               </tr>
             ))}

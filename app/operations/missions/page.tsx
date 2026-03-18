@@ -79,56 +79,32 @@ function getTaskStatusColor(status: string): string {
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [missionTasks, setMissionTasks] = useState<Record<string, Task[]>>({});
 
   async function fetchData() {
     try {
       setLoading(true);
-      console.log('[MissionsPage] Fetching data...');
+      console.log('[MissionsPage] Fetching missions...');
       
-      const [missionsRes, tasksRes] = await Promise.all([
-        fetch('/api/missions?limit=100', { cache: 'no-store' }),
-        fetch('/api/tasks?limit=200', { cache: 'no-store' }),
-      ]);
-      
-      console.log('[MissionsPage] Response status:', { missions: missionsRes.status, tasks: tasksRes.status });
+      const missionsRes = await fetch('/api/missions?limit=100', { cache: 'no-store' });
       
       if (!missionsRes.ok) {
-        throw new Error(`Missions API error: ${missionsRes.status} ${missionsRes.statusText}`);
-      }
-      if (!tasksRes.ok) {
-        throw new Error(`Tasks API error: ${tasksRes.status} ${tasksRes.statusText}`);
+        throw new Error(`Missions API error: ${missionsRes.status}`);
       }
       
       const missionsData = await missionsRes.json();
-      const tasksData = await tasksRes.json();
-      
-      console.log('[MissionsPage] Data received:', { 
-        missionsSuccess: missionsData.success, 
-        missionsCount: missionsData.missions?.length,
-        tasksSuccess: tasksData.success,
-        tasksCount: tasksData.tasks?.length
-      });
       
       if (missionsData.success) {
         setMissions(missionsData.missions || []);
-      } else {
-        throw new Error(missionsData.error || 'Missions API returned success: false');
-      }
-      
-      if (tasksData.success) {
-        setTasks(tasksData.tasks || []);
-        console.log('[MissionsPage] Tasks loaded:', tasksData.tasks?.map((t: any) => ({ 
-          id: t.id?.slice(0,8), 
-          mission_id: t.mission_id?.slice(0,8) || 'null',
-          title: t.title?.slice(0,30)
+        console.log('[MissionsPage] Missions loaded:', missionsData.missions?.map((m: any) => ({
+          id: m.id?.slice(0,8),
+          title: m.title?.slice(0,30),
+          child_task_count: m.child_task_count
         })));
-      } else {
-        console.warn('[MissionsPage] Tasks API returned success: false', tasksData.error);
       }
       
       setError(null);
@@ -140,27 +116,38 @@ export default function MissionsPage() {
       setLastRefresh(new Date());
     }
   }
+  
+  // Fetch tasks for a specific mission when expanded
+  async function fetchMissionTasks(missionId: string) {
+    if (missionTasks[missionId]) return; // Already loaded
+    
+    try {
+      const res = await fetch(`/api/tasks?mission_id=${missionId}&limit=100`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      const data = await res.json();
+      if (data.success) {
+        setMissionTasks(prev => ({
+          ...prev,
+          [missionId]: data.tasks || []
+        }));
+      }
+    } catch (err) {
+      console.error(`[MissionsPage] Failed to fetch tasks for ${missionId}:`, err);
+    }
+  }
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  function getMissionTasks(missionId: string): Task[] {
-    const filtered = tasks.filter(t => t.mission_id === missionId);
-    console.log(`[MissionsPage] getMissionTasks(${missionId.slice(0,8)}): ${filtered.length} of ${tasks.length} tasks match`);
-    return filtered;
-  }
-
-  function getMissionProgress(mission: Mission): number {
-    const missionTasks = getMissionTasks(mission.id);
-    if (missionTasks.length === 0) return 0;
-    const completed = missionTasks.filter(t => t.status === 'completed').length;
-    return Math.round((completed / missionTasks.length) * 100);
+  function getMissionTasksLocal(missionId: string): Task[] {
+    return missionTasks[missionId] || [];
   }
 
   function getMissionAgents(missionId: string): string[] {
-    const missionTasks = getMissionTasks(missionId);
-    const agents = new Set(missionTasks.map(t => t.assigned_agent_id).filter(Boolean));
+    const tasks = getMissionTasksLocal(missionId);
+    const agents = new Set(tasks.map(t => t.assigned_agent_id).filter(Boolean));
     return Array.from(agents) as string[];
   }
 
@@ -224,11 +211,17 @@ export default function MissionsPage() {
           </div>
         ) : (
           missions.map((mission) => {
-            const missionTasks = getMissionTasks(mission.id);
-            const progress = getMissionProgress(mission);
-            const agents = getMissionAgents(mission.id);
             const isExpanded = expandedMission === mission.id;
-            const executingTasks = missionTasks.filter(t => t.status === 'executing' || t.status === 'in_progress');
+            const currentTasks = getMissionTasksLocal(mission.id);
+            
+            // Use server-provided counts for header (accurate)
+            const totalTasks = mission.child_task_count || 0;
+            const completedTasks = mission.completed_task_count || 0;
+            const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            // Use fetched tasks for expanded view
+            const executingTasks = currentTasks.filter(t => t.status === 'executing' || t.status === 'in_progress');
+            const agents = [...new Set(currentTasks.map(t => t.assigned_agent_id).filter(Boolean))];
             
             return (
               <div 
@@ -238,7 +231,13 @@ export default function MissionsPage() {
                 {/* Mission Header */}
                 <div 
                   className="p-6 flex items-center gap-4 cursor-pointer hover:bg-[#252525] transition-colors"
-                  onClick={() => setExpandedMission(isExpanded ? null : mission.id)}
+                  onClick={() => {
+                    const newExpanded = isExpanded ? null : mission.id;
+                    setExpandedMission(newExpanded);
+                    if (newExpanded) {
+                      fetchMissionTasks(mission.id);
+                    }
+                  }}
                 >
                   <button className="text-gray-400 hover:text-white">
                     {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
@@ -271,7 +270,7 @@ export default function MissionsPage() {
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {missionTasks.filter(t => t.status === 'completed').length}/{missionTasks.length} tasks
+                      {completedTasks}/{totalTasks} tasks
                     </div>
                   </div>
                   
@@ -312,26 +311,26 @@ export default function MissionsPage() {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
                           <Target className="w-4 h-4" />
-                          Child Tasks ({missionTasks.length})
+                          Child Tasks ({currentTasks.length})
                         </h4>
                         <div className="flex gap-2 text-xs">
                           <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">
-                            {missionTasks.filter(t => t.status === 'pending').length} pending
+                            {currentTasks.filter(t => t.status === 'pending').length} pending
                           </span>
                           <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
-                            {missionTasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active
+                            {currentTasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active
                           </span>
                           <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded">
-                            {missionTasks.filter(t => t.status === 'completed').length} done
+                            {currentTasks.filter(t => t.status === 'completed').length} done
                           </span>
                         </div>
                       </div>
                       
-                      {missionTasks.length === 0 ? (
+                      {currentTasks.length === 0 ? (
                         <p className="text-gray-500 text-sm">No tasks assigned to this mission</p>
                       ) : (
                         <div className="space-y-2">
-                          {missionTasks.map((task) => (
+                          {currentTasks.map((task) => (
                             <Link 
                               key={task.id}
                               href={`/operations/tasks/${task.id}`}

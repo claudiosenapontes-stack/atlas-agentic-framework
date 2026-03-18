@@ -65,6 +65,8 @@ export default function TasksPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -140,6 +142,63 @@ export default function TasksPage() {
   }, {});
 
   const activeExecutions = tasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length;
+  const allFilteredSelected = filteredTasks.length > 0 && filteredTasks.every(t => selectedTasks.has(t.id));
+
+  function toggleSelectTask(taskId: string) {
+    setSelectedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  }
+
+  function toggleSelectAll() {
+    const filteredIds = filteredTasks.map(t => t.id);
+    const allSelected = filteredIds.every(id => selectedTasks.has(id));
+    
+    if (allSelected) {
+      setSelectedTasks(prev => {
+        const newSet = new Set(prev);
+        filteredIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    } else {
+      setSelectedTasks(prev => {
+        const newSet = new Set(prev);
+        filteredIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
+    }
+  }
+
+  async function deleteSelectedTasks() {
+    if (selectedTasks.size === 0) return;
+    if (!confirm(`Delete ${selectedTasks.size} selected tasks? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    const ids = Array.from(selectedTasks);
+    const failed: string[] = [];
+
+    for (const taskId of ids) {
+      try {
+        const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+        if (!res.ok) failed.push(taskId);
+      } catch (err) {
+        failed.push(taskId);
+      }
+    }
+
+    await loadData();
+    setBulkDeleting(false);
+
+    if (failed.length > 0) {
+      alert(`Failed to delete ${failed.length} tasks`);
+    }
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -164,8 +223,33 @@ export default function TasksPage() {
           <button onClick={loadData} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
+          <button onClick={loadData} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
         </div>
       </div>
+
+      {selectedTasks.size > 0 && (
+        <div className="flex items-center justify-between bg-purple-900/30 border border-purple-500/50 rounded-lg p-3">
+          <div className="flex items-center gap-3">
+            <span className="text-purple-300 font-medium">{selectedTasks.size} selected</span>
+            <button 
+              onClick={() => setSelectedTasks(new Set())}
+              className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1"
+            >
+              <X className="w-4 h-4" /> Clear
+            </button>
+          </div>
+          <button
+            onClick={deleteSelectedTasks}
+            disabled={bulkDeleting}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg text-sm"
+          >
+            {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete Selected
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 flex items-center gap-3">
@@ -207,6 +291,15 @@ export default function TasksPage() {
         <table className="w-full">
           <thead className="bg-[#0B0B0C]">
             <tr>
+              <th className="px-2 py-2.5 text-left w-10">
+                <button 
+                  onClick={toggleSelectAll}
+                  className="text-[#6B7280] hover:text-white"
+                  title={allFilteredSelected ? "Deselect all" : "Select all"}
+                >
+                  {allFilteredSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                </button>
+              </th>
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase">Task</th>
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Status</th>
               <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Agent</th>
@@ -220,20 +313,28 @@ export default function TasksPage() {
           <tbody className="divide-y divide-[#1F2226]">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                   <Loader2 className="w-8 h-8 animate-spin mx-auto" />
                   <p className="mt-2">Loading tasks...</p>
                 </td>
               </tr>
             ) : filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                   {searchQuery ? 'No tasks match your search' : 'No tasks found'}
                 </td>
               </tr>
             ) : (
               filteredTasks.map(task => (
-                <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
+                <tr key={task.id} className={`hover:bg-[#0B0B0C]/50 ${selectedTasks.has(task.id) ? 'bg-purple-900/20' : ''}`}>
+                  <td className="px-2 py-3">
+                    <button 
+                      onClick={() => toggleSelectTask(task.id)}
+                      className="text-[#6B7280] hover:text-white"
+                    >
+                      {selectedTasks.has(task.id) ? <CheckSquare className="w-5 h-5 text-purple-400" /> : <Square className="w-5 h-5" />}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">

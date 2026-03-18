@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "output": null,
+  "model": "moonshotai/kimi-k2.5",
+  "tokens_used": 4112,
+  "execution_time": 85.33382248878479,
+  "executed_at": "2026-03-18T14:05:42.620512",
+  "routed_model": "moonshotai/kimi-k2.5",
+  "task_type": "implementation"
+}

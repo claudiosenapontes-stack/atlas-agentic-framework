@@ -151,14 +151,24 @@ export default function MissionsPage() {
   }
 
   async function deleteMission(missionId: string) {
-    if (!confirm('Delete this mission? This cannot be undone.')) return;
+    if (!confirm('Delete this mission and all its tasks? This cannot be undone.')) return;
 
     setDeleting(missionId);
     try {
+      // First delete all child tasks
+      const childTasks = missionTasks[missionId] || [];
+      for (const task of childTasks) {
+        try {
+          await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
+        } catch (err) {
+          console.error(`Failed to delete task ${task.id}:`, err);
+        }
+      }
+
+      // Then delete the mission
       const res = await fetch(`/api/missions/${missionId}`, { method: 'DELETE' });
       if (res.ok) {
         setMissions(prev => prev.filter(m => m.id !== missionId));
-        // Also remove from missionTasks
         setMissionTasks(prev => {
           const newTasks = { ...prev };
           delete newTasks[missionId];
@@ -314,7 +324,7 @@ export default function MissionsPage() {
                     onClick={(e) => { e.stopPropagation(); deleteMission(mission.id); }}
                     disabled={deleting === mission.id}
                     className="p-2 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
-                    title="Delete mission"
+                    title="Delete mission and all tasks"
                   >
                     {deleting === mission.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </button>

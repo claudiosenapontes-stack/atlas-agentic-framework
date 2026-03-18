@@ -8,7 +8,9 @@ import {
   Zap,
   User,
   Trash2,
-  Loader2
+  Loader2,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
 
 interface Task {
@@ -27,26 +29,6 @@ interface Task {
 const AGENT_NAMES: Record<string, string> = {
   'optimus': 'Optimus', 'henry': 'Henry', 'prime': 'Prime', 'harvey': 'Harvey', 'einstein': 'Einstein', 'olivia': 'Olivia',
 };
-
-async function fetchTasksData(): Promise<{ tasks: Task[]; missions: Record<string, { id: string; title: string }> }> {
-  try {
-    const [tasksRes, missionsRes] = await Promise.all([
-      fetch("/api/tasks?limit=200", { cache: 'no-store' }),
-      fetch("/api/missions?limit=100", { cache: 'no-store' }),
-    ]);
-    const tasksData = await tasksRes.json();
-    const missionsData = await missionsRes.json();
-    
-    const missionMap: Record<string, { id: string; title: string }> = {};
-    (missionsData.missions || []).forEach((m: any) => {
-      missionMap[m.id] = { id: m.id, title: m.title };
-    });
-    
-    return { tasks: tasksData.tasks || [], missions: missionMap };
-  } catch (error) {
-    return { tasks: [], missions: {} };
-  }
-}
 
 function getAgentName(agentId?: string): string {
   if (!agentId) return 'Unassigned';
@@ -80,8 +62,10 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [missions, setMissions] = useState<Record<string, { id: string; title: string }>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   useEffect(() => {
     loadData();
@@ -89,10 +73,42 @@ export default function TasksPage() {
 
   async function loadData() {
     setLoading(true);
-    const { tasks, missions } = await fetchTasksData();
-    setTasks(tasks);
-    setMissions(missions);
-    setLoading(false);
+    setError(null);
+    
+    try {
+      // Fetch tasks
+      const tasksRes = await fetch("/api/tasks?limit=200", { cache: 'no-store' });
+      if (!tasksRes.ok) {
+        throw new Error(`Tasks API error: ${tasksRes.status}`);
+      }
+      const tasksData = await tasksRes.json();
+      
+      // Fetch missions (separate try so one failure doesn't break the other)
+      let missionMap: Record<string, { id: string; title: string }> = {};
+      try {
+        const missionsRes = await fetch("/api/missions?limit=100", { cache: 'no-store' });
+        if (missionsRes.ok) {
+          const missionsData = await missionsRes.json();
+          (missionsData.missions || []).forEach((m: any) => {
+            missionMap[m.id] = { id: m.id, title: m.title };
+          });
+        }
+      } catch (e) {
+        console.log('Missions fetch failed, continuing without mission links');
+      }
+      
+      if (tasksData.success) {
+        setTasks(tasksData.tasks || []);
+        setMissions(missionMap);
+      } else {
+        setError(tasksData.error || 'Failed to load tasks');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch tasks');
+    } finally {
+      setLoading(false);
+      setLastRefresh(new Date());
+    }
   }
 
   async function deleteTask(taskId: string) {
@@ -144,8 +160,20 @@ export default function TasksPage() {
               {activeExecutions} executing
             </div>
           )}
+          <span className="text-sm text-[#9BA3AF]">{lastRefresh.toLocaleTimeString()}</span>
+          <button onClick={loadData} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm">
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+          <span className="text-red-200">{error}</span>
+          <button onClick={loadData} className="ml-auto px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">Retry</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-7 gap-3">
         {[
@@ -190,76 +218,91 @@ export default function TasksPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1F2226]">
-            {filteredTasks.map(task => (
-              <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      {task.status === 'blocked' && <span className="text-red-500">⚠</span>}
-                      {task.status === 'executing' && <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />}
-                      <Link href={`/operations/tasks/${task.id}`} className="text-sm font-medium text-white hover:text-[#FF6A00]">
-                        {task.title}
-                      </Link>
-                    </div>
-                    <span className="text-[10px] text-[#6B7280] font-mono">{task.id.slice(0, 8)}...</span>
-                    {task.blocked_reason && (
-                      <span className="text-[10px] text-red-400">Blocker: {task.blocked_reason}</span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(task.status)}`}>
-                    {task.status.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <User className="w-3 h-3 text-[#6B7280]" />
-                    <span className={`text-xs ${task.assigned_agent_id ? 'text-white font-medium' : 'text-[#6B7280]'}`}>
-                      {getAgentName(task.assigned_agent_id)}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs ${task.priority === 'critical' ? 'text-[#FF3B30] font-bold' : task.priority === 'high' ? 'text-[#FF6A00]' : 'text-[#9BA3AF]'}`}>
-                    {task.priority || 'medium'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {task.mission_id && missions[task.mission_id] ? (
-                    <Link href={`/operations/missions/${task.mission_id}`} className="text-xs text-[#3B82F6] hover:underline truncate block max-w-[120px]">
-                      {missions[task.mission_id].title}
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-[#6B7280]">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  {task.execution_id ? (
-                    <span className="text-[10px] font-mono text-orange-400">
-                      {task.execution_id.slice(0, 10)}...
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-[#6B7280]">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs text-[#9BA3AF]" title={new Date(task.updated_at).toLocaleString()}>
-                    {formatTimeAgo(task.updated_at)}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    disabled={deleting === task.id}
-                    className="p-1.5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
-                    title="Delete task"
-                  >
-                    {deleting === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+                  <p className="mt-2">Loading tasks...</p>
                 </td>
               </tr>
-            ))}
+            ) : filteredTasks.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  {searchQuery ? 'No tasks match your search' : 'No tasks found'}
+                </td>
+              </tr>
+            ) : (
+              filteredTasks.map(task => (
+                <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        {task.status === 'blocked' && <span className="text-red-500">⚠</span>}
+                        {task.status === 'executing' && <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />}
+                        <Link href={`/operations/tasks/${task.id}`} className="text-sm font-medium text-white hover:text-[#FF6A00]">
+                          {task.title}
+                        </Link>
+                      </div>
+                      <span className="text-[10px] text-[#6B7280] font-mono">{task.id.slice(0, 8)}...</span>
+                      {task.blocked_reason && (
+                        <span className="text-[10px] text-red-400">Blocker: {task.blocked_reason}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(task.status)}`}>
+                      {task.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3 h-3 text-[#6B7280]" />
+                      <span className={`text-xs ${task.assigned_agent_id ? 'text-white font-medium' : 'text-[#6B7280]'}`}>
+                        {getAgentName(task.assigned_agent_id)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs ${task.priority === 'critical' ? 'text-[#FF3B30] font-bold' : task.priority === 'high' ? 'text-[#FF6A00]' : 'text-[#9BA3AF]'}`}>
+                      {task.priority || 'medium'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {task.mission_id && missions[task.mission_id] ? (
+                      <Link href={`/operations/missions/${task.mission_id}`} className="text-xs text-[#3B82F6] hover:underline truncate block max-w-[120px]">
+                        {missions[task.mission_id].title}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-[#6B7280]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {task.execution_id ? (
+                      <span className="text-[10px] font-mono text-orange-400">
+                        {task.execution_id.slice(0, 10)}...
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#6B7280]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs text-[#9BA3AF]" title={new Date(task.updated_at).toLocaleString()}>
+                      {formatTimeAgo(task.updated_at)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      disabled={deleting === task.id}
+                      className="p-1.5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
+                      title="Delete task"
+                    >
+                      {deleting === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

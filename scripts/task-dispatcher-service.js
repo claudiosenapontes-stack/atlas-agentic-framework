@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Task Dispatcher Standalone Service
- * ATLAS-9925: Runs as PM2 process to bridge Supabase → Redis
+ * ATLAS-9925: Bridges Supabase → Redis for worker consumption
  * 
  * Usage: node scripts/task-dispatcher-service.js
  */
@@ -43,7 +43,7 @@ async function pollAndDispatch() {
   try {
     const { data: tasks, error } = await supabase
       .from('tasks')
-      .select('id, title, description, status, assigned_agent_id, mission_id, priority, type, execution_id')
+      .select('id, title, description, status, assigned_agent_id, mission_id, priority, execution_id')
       .eq('status', 'pending')
       .not('assigned_agent_id', 'is', null)
       .order('created_at', { ascending: true })
@@ -62,7 +62,14 @@ async function pollAndDispatch() {
       if (DISPATCHED_TASKS.has(task.id)) continue;
 
       const agentId = task.assigned_agent_id.toLowerCase();
-      const taskType = task.type || 'code';
+      
+      // Infer task type from agent or title (since 'type' column doesn't exist)
+      let taskType = 'code';
+      const titleLower = (task.title || '').toLowerCase();
+      if (titleLower.includes('research') || agentId === 'einstein') taskType = 'research';
+      else if (titleLower.includes('strategy') || agentId === 'henry') taskType = 'strategy';
+      else if (titleLower.includes('orchestrate') || agentId === 'henry') taskType = 'orchestrate';
+      else if (titleLower.includes('legal') || agentId === 'harvey') taskType = 'legal';
       
       const taskPayload = {
         id: task.id,
@@ -78,18 +85,19 @@ async function pollAndDispatch() {
         enqueued_at: new Date().toISOString(),
       };
 
-      // Push to agent's assignment queue
+      // Push to agent's assignment queue (list for FIFO)
+      // Note: Redis v4+ uses lPush instead of lpush
       const queueKey = `agent:assignments:${agentId}`;
-      await redis.lpush(queueKey, JSON.stringify(taskPayload));
+      await redis.lPush(queueKey, JSON.stringify(taskPayload));
       
-      // Priority queue
+      // Priority queue - use zAdd for sorted set
       const score = task.priority === 'critical' ? 100 : task.priority === 'high' ? 50 : 10;
-      await redis.zadd('task_queue', { score, value: task.id });
+      await redis.zAdd('task_queue', { score, value: task.id });
       
-      // Store task data
+      // Store full task data
       await redis.set(`task:${task.id}`, JSON.stringify(taskPayload));
 
-      // Update task status
+      // Update task status to "in_progress" (worker will pick it up)
       const { error: updateError } = await supabase
         .from('tasks')
         .update({ status: 'in_progress', updated_at: new Date().toISOString() })

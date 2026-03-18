@@ -78,9 +78,12 @@ export default function MissionsPage() {
   async function fetchMissions() {
     try {
       setLoading(true);
+      console.log('[Missions] Fetching...');
       const res = await fetch('/api/missions', { cache: 'no-store' });
+      console.log('[Missions] Response:', res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      console.log('[Missions] Data:', { success: data.success, count: data.missions?.length });
       
       if (data.success) {
         setMissions(data.missions || []);
@@ -89,6 +92,7 @@ export default function MissionsPage() {
         setError(data.error || 'Failed to fetch missions');
       }
     } catch (err: any) {
+      console.error('[Missions] Error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);

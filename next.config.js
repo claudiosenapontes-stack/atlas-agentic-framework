@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
-// Deployment trigger: 9869-MSN-CORS-Fix
+// Deployment trigger: 9885-CRITICAL-FIX
 const nextConfig = {
+  cacheBust: 9885, // Force redeploy
   async headers() {
     return [
       {

@@ -42,8 +42,7 @@ interface TimeBlock {
 
 async function getCalendarToday(): Promise<CalendarToday | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
-    const res = await fetch(`${baseUrl}/api/calendar/today`, { cache: 'no-store' });
+    const res = await fetch('/api/calendar/today', { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch calendar');
     return await res.json();
   } catch {

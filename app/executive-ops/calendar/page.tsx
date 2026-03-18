@@ -17,67 +17,86 @@ interface CalendarEvent {
   created_at: string;
 }
 
+// FIX: Move fetch functions OUTSIDE component or define before useEffect
+async function fetchCalendarEvents(): Promise<{ events: CalendarEvent[]; error?: string }> {
+  try {
+    const response = await fetch('/api/calendar/events?limit=50', { 
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (data.success) {
+      return { events: data.events || [] };
+    } else {
+      return { events: [], error: data.error || 'Failed to fetch events' };
+    }
+  } catch (err) {
+    return { events: [], error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+async function syncCalendarEvents(): Promise<{ result?: any; error?: string }> {
+  try {
+    const response = await fetch('/api/calendar/sync?daysBack=7&daysForward=30');
+    const data = await response.json();
+    if (data.success) {
+      return { result: data.result };
+    } else {
+      return { error: data.error || 'Sync failed' };
+    }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Sync error' };
+  }
+}
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<any>(null);
 
-  async function fetchEvents() {
+  // FIX: useEffect calls external functions that are already defined
+  useEffect(() => {
     setLoading(true);
-    setError(null);
-    console.log('[Calendar] Fetching events...');
-    try {
-      const response = await fetch('/api/calendar/events?limit=50', { 
-        cache: 'no-store',
-        headers: { 'Accept': 'application/json' }
-      });
-      console.log('[Calendar] Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('[Calendar] Response data:', { success: data.success, count: data.events?.length });
-      
-      if (data.success) {
-        setEvents(data.events || []);
-        setError(null);
-      } else {
-        setError(data.error || 'Failed to fetch events');
-      }
-    } catch (err) {
-      console.error('[Calendar] Fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
+    fetchCalendarEvents().then(({ events, error }) => {
+      setEvents(events);
+      setError(error || null);
       setLoading(false);
-    }
-  }
+    });
+  }, []);
 
-  async function syncCalendar() {
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchCalendarEvents().then(({ events, error }) => {
+      setEvents(events);
+      setError(error || null);
+      setLoading(false);
+    });
+  };
+
+  const handleSync = () => {
     setSyncing(true);
     setSyncResult(null);
-    try {
-      const response = await fetch('/api/calendar/sync?daysBack=7&daysForward=30');
-      const data = await response.json();
-      if (data.success) {
-        setSyncResult(data.result);
-        await fetchEvents();
+    syncCalendarEvents().then(({ result, error }) => {
+      if (error) {
+        setError(error);
       } else {
-        setError(data.error || 'Sync failed');
+        setSyncResult(result);
+        // Refresh after sync
+        fetchCalendarEvents().then(({ events, error }) => {
+          setEvents(events);
+          setError(error || null);
+        });
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sync error');
-    } finally {
       setSyncing(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+    });
+  };
 
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
@@ -113,7 +132,7 @@ export default function CalendarPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={fetchEvents}
+            onClick={handleRefresh}
             disabled={loading}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg flex items-center gap-2 disabled:opacity-50"
           >
@@ -121,7 +140,7 @@ export default function CalendarPage() {
             Refresh
           </button>
           <button
-            onClick={syncCalendar}
+            onClick={handleSync}
             disabled={syncing}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg flex items-center gap-2 disabled:opacity-50"
           >
@@ -195,13 +214,13 @@ export default function CalendarPage() {
             <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" />
             Loading events...
           </div>
-        ) : error ? (
+        ) : error && events.length === 0 ? (
           <div className="p-8 text-center">
             <AlertCircle className="w-8 h-8 mx-auto mb-4 text-red-400" />
             <p className="text-red-300 mb-2">Failed to load events</p>
             <p className="text-sm text-slate-500 mb-4">{error}</p>
             <button
-              onClick={fetchEvents}
+              onClick={handleRefresh}
               className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
             >
               Retry

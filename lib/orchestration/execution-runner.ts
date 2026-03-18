@@ -157,16 +157,53 @@ async function fetchExecutableTasks(): Promise<ExecutionTask[]> {
       }
     });
 
-    // Filter to only fully eligible tasks and fetch execution details
+    // Filter to only fully eligible tasks and fetch/create execution details
     const eligibleTasks: ExecutionTask[] = [];
     
     for (const task of tasks as any[]) {
+      let executionId = task.execution_id;
+      
+      // ATLAS-9907: Auto-create execution for standalone tasks without execution_id
+      if (!executionId) {
+        console.log(`[ExecutionRunner] [AUTO-CREATE] taskId=${task.id} - Creating execution for standalone task`);
+        
+        const { data: newExecution, error: createError } = await supabaseAdmin
+          .from("executions")
+          .insert({
+            task_id: task.id,
+            agent_id: task.assigned_agent_id,
+            status: "in_progress",
+            started_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        
+        if (createError || !newExecution) {
+          console.error(`[ExecutionRunner] [ERROR] taskId=${task.id} - Failed to create execution:`, createError);
+          continue;
+        }
+        
+        executionId = (newExecution as any).id;
+        
+        // Update task with execution_id
+        const { error: updateError } = await supabaseAdmin
+          .from("tasks")
+          .update({ execution_id: executionId, status: "in_progress" })
+          .eq("id", task.id);
+        
+        if (updateError) {
+          console.error(`[ExecutionRunner] [ERROR] taskId=${task.id} - Failed to update task with execution_id:`, updateError);
+          continue;
+        }
+        
+        console.log(`[ExecutionRunner] [AUTO-CREATE] taskId=${task.id} - Created execution ${executionId}`);
+      }
 
       // Fetch the execution record to verify it exists and is in_progress
       const { data: execution, error: execError } = await supabaseAdmin
         .from("executions")
         .select("id, status, agent_id")
-        .eq("id", task.execution_id)
+        .eq("id", executionId)
         .single();
 
       if (execError || !execution) {

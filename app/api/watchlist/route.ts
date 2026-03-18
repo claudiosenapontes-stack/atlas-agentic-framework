@@ -32,21 +32,6 @@ export async function GET(request: NextRequest) {
           rule_type,
           action_type,
           is_active,
-          notify_agent_ids,
-          notify_emails,
-          escalation_agent_id,
-          company_id,
-          email_account,
-          folder_pattern,
-          auto_execute,
-          require_approval,
-          max_daily_alerts,
-          cooldown_minutes,
-          description,
-          match_count,
-          last_matched_at,
-          owner_id,
-          created_by,
           created_at,
           updated_at
         `)
@@ -180,34 +165,13 @@ export async function POST(request: NextRequest) {
     const id = randomUUID();
     
     // Build core payload only (columns that exist in DB)
-    const insertPayload = {
+    const insertPayload: any = {
       id,
       name,
       pattern,
       rule_type,
       action_type,
       is_active: true,
-      
-      // Routing
-      notify_agent_ids: Array.isArray(notify_agent_ids) ? notify_agent_ids : [],
-      notify_emails: Array.isArray(notify_emails) ? notify_emails : [],
-      escalation_agent_id,
-      
-      // Scope
-      company_id,
-      email_account,
-      folder_pattern,
-      
-      // Execution
-      auto_execute,
-      require_approval,
-      max_daily_alerts,
-      cooldown_minutes,
-      
-      // Metadata
-      description,
-      owner_id,
-      
       created_at: timestamp,
       updated_at: timestamp,
     };

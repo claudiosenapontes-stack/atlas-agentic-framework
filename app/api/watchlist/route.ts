@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseAdmin();
     
-    // Query watch_rules with ALL metadata columns
+    // Query watch_rules with core columns only
     const { data, error } = await withDbRetry(async () => {
       return await (supabase as any)
         .from('watch_rules')
@@ -32,31 +32,17 @@ export async function GET(request: NextRequest) {
           rule_type,
           action_type,
           is_active,
-          critical_keywords,
-          high_keywords,
-          medium_keywords,
-          exclude_keywords,
-          classification_rules,
-          reply_scope,
-          auto_reply_enabled,
-          auto_reply_template,
-          follow_up_default_hours,
-          follow_up_urgent_hours,
-          follow_up_critical_hours,
-          auto_summarize,
           notify_agent_ids,
           notify_emails,
           escalation_agent_id,
           company_id,
           email_account,
           folder_pattern,
-          watch_schedule,
           auto_execute,
           require_approval,
           max_daily_alerts,
           cooldown_minutes,
           description,
-          rule_metadata,
           match_count,
           last_matched_at,
           owner_id,
@@ -193,7 +179,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const id = randomUUID();
     
-    // Build complete payload with ALL metadata
+    // Build core payload only (columns that exist in DB)
     const insertPayload = {
       id,
       name,
@@ -201,24 +187,6 @@ export async function POST(request: NextRequest) {
       rule_type,
       action_type,
       is_active: true,
-      
-      // Keywords
-      critical_keywords: Array.isArray(critical_keywords) ? critical_keywords : [],
-      high_keywords: Array.isArray(high_keywords) ? high_keywords : [],
-      medium_keywords: Array.isArray(medium_keywords) ? medium_keywords : [],
-      exclude_keywords: Array.isArray(exclude_keywords) ? exclude_keywords : [],
-      classification_rules: classification_rules || {},
-      
-      // Reply config
-      reply_scope,
-      auto_reply_enabled,
-      auto_reply_template,
-      
-      // Follow-up
-      follow_up_default_hours,
-      follow_up_urgent_hours,
-      follow_up_critical_hours,
-      auto_summarize,
       
       // Routing
       notify_agent_ids: Array.isArray(notify_agent_ids) ? notify_agent_ids : [],
@@ -229,7 +197,6 @@ export async function POST(request: NextRequest) {
       company_id,
       email_account,
       folder_pattern,
-      watch_schedule: watch_schedule || { type: 'realtime' },
       
       // Execution
       auto_execute,
@@ -239,7 +206,6 @@ export async function POST(request: NextRequest) {
       
       // Metadata
       description,
-      rule_metadata: rule_metadata || {},
       owner_id,
       
       created_at: timestamp,

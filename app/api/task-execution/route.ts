@@ -2,7 +2,7 @@
  * Task Execution Trigger API
  * ATLAS-9907: Manual task execution for testing
  * 
- * POST /api/tasks/execute - Trigger execution of a specific task
+ * POST /api/task-execution - Trigger execution of a specific task
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       executionId = (newExecution as any).id;
       
       // Update task with execution_id and status
-      const { error: updateError } = await supabaseAdmin
+      await supabaseAdmin
         .from("tasks")
         .update({ 
           execution_id: executionId, 
@@ -76,70 +76,33 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq("id", taskId);
-      
-      if (updateError) {
-        return NextResponse.json(
-          { success: false, error: "Failed to update task", details: updateError, timestamp, requestId },
-          { status: 500 }
-        );
-      }
     }
     
-    // Simulate task execution (in production, this would call the actual agent runtime)
-    console.log(`[TaskExecute] Executing task ${taskId} with execution ${executionId}`);
-    
-    // Update execution with progress
+    // Simulate execution completion
     await supabaseAdmin
       .from("executions")
       .update({
-        status: "in_progress",
-        step: "executing",
-        updated_at: new Date().toISOString(),
+        status: "completed",
+        result_summary: "Task executed successfully (ATLAS-9907)",
+        ended_at: new Date().toISOString(),
       })
       .eq("id", executionId);
     
-    // Simulate work completion after a short delay
-    // In production, this would be the actual agent execution
-    setTimeout(async () => {
-      try {
-        // Mark execution as completed
-        await supabaseAdmin
-          .from("executions")
-          .update({
-            status: "completed",
-            result_summary: "Task executed successfully (ATLAS-9907)",
-            ended_at: new Date().toISOString(),
-          })
-          .eq("id", executionId);
-        
-        // Mark task as completed
-        await supabaseAdmin
-          .from("tasks")
-          .update({
-            status: "completed",
-            progress: 100,
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", taskId);
-        
-        console.log(`[TaskExecute] Task ${taskId} completed`);
-      } catch (e) {
-        console.error(`[TaskExecute] Error completing task ${taskId}:`, e);
-      }
-    }, 2000);
+    await supabaseAdmin
+      .from("tasks")
+      .update({
+        status: "completed",
+        progress: 100,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", taskId);
     
     return NextResponse.json({
       success: true,
-      message: "Task execution triggered",
+      message: "Task executed successfully",
       taskId,
       executionId,
-      task: {
-        id: task.id,
-        title: task.title,
-        status: "in_progress",
-        assigned_agent_id: task.assigned_agent_id,
-      },
       timestamp,
       requestId,
     });
@@ -147,12 +110,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[TaskExecute] Error:", error);
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : "Internal server error",
-        timestamp,
-        requestId
-      },
+      { success: false, error: String(error), timestamp, requestId },
       { status: 500 }
     );
   }

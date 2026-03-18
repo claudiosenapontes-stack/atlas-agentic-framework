@@ -210,9 +210,9 @@ export async function PATCH(
 
 /**
  * DELETE /api/tasks/{id}
- * ATLAS-PRIME-TASK-DELETE-9918
+ * ATLAS-PRIME-TASK-DELETE-9921
  *
- * Soft delete a task (sets deleted_at timestamp)
+ * Hard delete a task (tasks table has no deleted_at column)
  */
 export async function DELETE(
   request: NextRequest,
@@ -225,9 +225,8 @@ export async function DELETE(
   try {
     const { error } = await (supabase as any)
       .from('tasks')
-      .update({ deleted_at: timestamp, updated_at: timestamp })
-      .eq('id', taskId)
-      .is('deleted_at', null);
+      .delete()
+      .eq('id', taskId);
 
     if (error) {
       console.error('[Tasks] Delete error:', error);

@@ -4,21 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Target,
-  Plus,
   Loader2,
-  CheckCircle2,
-  Clock,
   AlertCircle,
   RefreshCw,
   ChevronDown,
   ChevronRight,
   User,
   Calendar,
-  Play,
-  RotateCcw,
-  X,
   Zap,
-  BarChart3
+  Trash2
 } from 'lucide-react';
 
 interface Mission {
@@ -83,33 +77,20 @@ export default function MissionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [missionTasks, setMissionTasks] = useState<Record<string, Task[]>>({});
 
   async function fetchData() {
     try {
       setLoading(true);
-      console.log('[MissionsPage] Fetching missions...');
-      
       const missionsRes = await fetch('/api/missions?limit=100', { cache: 'no-store' });
       
-      if (!missionsRes.ok) {
-        throw new Error(`Missions API error: ${missionsRes.status}`);
-      }
+      if (!missionsRes.ok) throw new Error(`Missions API error: ${missionsRes.status}`);
       
       const missionsData = await missionsRes.json();
-      
-      if (missionsData.success) {
-        setMissions(missionsData.missions || []);
-        console.log('[MissionsPage] Missions loaded:', missionsData.missions?.map((m: any) => ({
-          id: m.id?.slice(0,8),
-          title: m.title?.slice(0,30),
-          child_task_count: m.child_task_count
-        })));
-      }
-      
+      if (missionsData.success) setMissions(missionsData.missions || []);
       setError(null);
     } catch (err: any) {
-      console.error('[MissionsPage] Fetch error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -117,23 +98,35 @@ export default function MissionsPage() {
     }
   }
   
-  // Fetch tasks for a specific mission when expanded
   async function fetchMissionTasks(missionId: string) {
-    if (missionTasks[missionId]) return; // Already loaded
-    
+    if (missionTasks[missionId]) return;
     try {
       const res = await fetch(`/api/tasks?mission_id=${missionId}&limit=100`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      
       const data = await res.json();
       if (data.success) {
-        setMissionTasks(prev => ({
-          ...prev,
-          [missionId]: data.tasks || []
-        }));
+        setMissionTasks(prev => ({ ...prev, [missionId]: data.tasks || [] }));
       }
     } catch (err) {
-      console.error(`[MissionsPage] Failed to fetch tasks for ${missionId}:`, err);
+      console.error(`Failed to fetch tasks for ${missionId}:`, err);
+    }
+  }
+
+  async function deleteMission(missionId: string) {
+    if (!confirm('Delete this mission? This cannot be undone.')) return;
+    
+    setDeleting(missionId);
+    try {
+      const res = await fetch(`/api/missions/${missionId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMissions(prev => prev.filter(m => m.id !== missionId));
+      } else {
+        alert('Failed to delete mission');
+      }
+    } catch (err) {
+      alert('Error deleting mission');
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -143,6 +136,13 @@ export default function MissionsPage() {
 
   function getMissionTasksLocal(missionId: string): Task[] {
     return missionTasks[missionId] || [];
+  }
+
+  function getMissionProgress(mission: Mission): number {
+    const tasks = getMissionTasksLocal(mission.id);
+    if (tasks.length === 0) return 0;
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    return Math.round((completed / tasks.length) * 100);
   }
 
   function getMissionAgents(missionId: string): string[] {
@@ -161,32 +161,22 @@ export default function MissionsPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white p-6">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Target className="w-8 h-8 text-purple-500" />
             Mission Control
           </h1>
-          <p className="text-gray-400 mt-1">
-            Track mission progress and execution state
-          </p>
+          <p className="text-gray-400 mt-1">Track mission progress and execution state</p>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-400">
-            Last refresh: {lastRefresh.toLocaleTimeString()}
-          </span>
-          <button
-            onClick={fetchData}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
+          <span className="text-sm text-gray-400">Last refresh: {lastRefresh.toLocaleTimeString()}</span>
+          <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg">
+            <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-5 gap-4 mb-8">
         <StatCard label="Total" value={stats.total} color="purple" />
         <StatCard label="Queued" value={stats.queued} color="blue" />
@@ -195,7 +185,6 @@ export default function MissionsPage() {
         <StatCard label="Blocked" value={stats.blocked} color="red" />
       </div>
 
-      {/* Error */}
       {error && (
         <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 mb-6 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-400" />
@@ -203,7 +192,6 @@ export default function MissionsPage() {
         </div>
       )}
 
-      {/* Missions List */}
       <div className="space-y-4">
         {missions.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -211,44 +199,29 @@ export default function MissionsPage() {
           </div>
         ) : (
           missions.map((mission) => {
+            const tasks = getMissionTasksLocal(mission.id);
+            const progress = getMissionProgress(mission);
+            const agents = getMissionAgents(mission.id);
             const isExpanded = expandedMission === mission.id;
-            const currentTasks = getMissionTasksLocal(mission.id);
-            
-            // Use server-provided counts for header (accurate)
-            const totalTasks = mission.child_task_count || 0;
-            const completedTasks = mission.completed_task_count || 0;
-            const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-            
-            // Use fetched tasks for expanded view
-            const executingTasks = currentTasks.filter(t => t.status === 'executing' || t.status === 'in_progress');
-            const agents = [...new Set(currentTasks.map(t => t.assigned_agent_id).filter(Boolean))];
+            const executingTasks = tasks.filter(t => t.status === 'executing' || t.status === 'in_progress');
             
             return (
-              <div 
-                key={mission.id} 
-                className="bg-[#1A1A1A] rounded-xl border border-[#2A2A2A] overflow-hidden"
-              >
-                {/* Mission Header */}
+              <div key={mission.id} className="bg-[#1A1A1A] rounded-xl border border-[#2A2A2A] overflow-hidden">
                 <div 
                   className="p-6 flex items-center gap-4 cursor-pointer hover:bg-[#252525] transition-colors"
                   onClick={() => {
-                    const newExpanded = isExpanded ? null : mission.id;
-                    setExpandedMission(newExpanded);
-                    if (newExpanded) {
-                      fetchMissionTasks(mission.id);
-                    }
+                    setExpandedMission(isExpanded ? null : mission.id);
+                    if (!isExpanded) fetchMissionTasks(mission.id);
                   }}
                 >
                   <button className="text-gray-400 hover:text-white">
                     {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                   </button>
                   
-                  {/* Status */}
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[mission.status]}`}>
                     {mission.status}
                   </span>
                   
-                  {/* Title */}
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{mission.title}</h3>
                     <p className="text-sm text-gray-500 mt-0.5">
@@ -257,30 +230,23 @@ export default function MissionsPage() {
                     </p>
                   </div>
                   
-                  {/* Progress */}
                   <div className="w-40">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-400">Progress</span>
                       <span className="text-white">{progress}%</span>
                     </div>
                     <div className="bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-purple-500 h-2 rounded-full transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
+                      <div className="bg-purple-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {completedTasks}/{totalTasks} tasks
+                      {tasks.filter(t => t.status === 'completed').length}/{tasks.length} tasks
                     </div>
                   </div>
                   
-                  {/* Agents */}
                   <div className="flex items-center gap-2 min-w-[140px]">
                     <User className="w-4 h-4 text-gray-400" />
                     <div className="flex flex-col">
-                      <span className="text-xs text-gray-400">
-                        {agents.length} agent{agents.length !== 1 ? 's' : ''}
-                      </span>
+                      <span className="text-xs text-gray-400">{agents.length} agent{agents.length !== 1 ? 's' : ''}</span>
                       <span className="text-xs text-white">
                         {agents.slice(0, 2).map(getAgentName).join(', ')}
                         {agents.length > 2 && '...'}
@@ -288,16 +254,23 @@ export default function MissionsPage() {
                     </div>
                   </div>
                   
-                  {/* Executing Badge */}
                   {executingTasks.length > 0 && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 rounded text-xs text-purple-400">
                       <Zap className="w-3 h-3 animate-pulse" />
                       {executingTasks.length}
                     </div>
                   )}
+                  
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteMission(mission.id); }}
+                    disabled={deleting === mission.id}
+                    className="p-2 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
+                    title="Delete mission"
+                  >
+                    {deleting === mission.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
                 </div>
                 
-                {/* Expanded Tasks */}
                 {isExpanded && (
                   <div className="border-t border-[#2A2A2A] bg-[#151515]">
                     {mission.blocker_reason && (
@@ -311,44 +284,30 @@ export default function MissionsPage() {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
                           <Target className="w-4 h-4" />
-                          Child Tasks ({currentTasks.length})
+                          Child Tasks ({tasks.length})
                         </h4>
                         <div className="flex gap-2 text-xs">
-                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">
-                            {currentTasks.filter(t => t.status === 'pending').length} pending
-                          </span>
-                          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
-                            {currentTasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active
-                          </span>
-                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded">
-                            {currentTasks.filter(t => t.status === 'completed').length} done
-                          </span>
+                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">{tasks.filter(t => t.status === 'pending').length} pending</span>
+                          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">{tasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active</span>
+                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded">{tasks.filter(t => t.status === 'completed').length} done</span>
                         </div>
                       </div>
                       
-                      {currentTasks.length === 0 ? (
+                      {tasks.length === 0 ? (
                         <p className="text-gray-500 text-sm">No tasks assigned to this mission</p>
                       ) : (
                         <div className="space-y-2">
-                          {currentTasks.map((task) => (
-                            <Link 
-                              key={task.id}
-                              href={`/operations/tasks/${task.id}`}
+                          {tasks.map((task) => (
+                            <Link key={task.id} href={`/operations/tasks/${task.id}`}
                               className="flex items-center gap-3 p-3 bg-[#1A1A1A] rounded-lg hover:bg-[#252525] transition-colors"
                             >
                               <div className={`w-2 h-2 rounded-full ${getTaskStatusColor(task.status)}`} />
                               <span className="flex-1 text-sm text-white">{task.title}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[task.status] || 'bg-gray-500/20'}`}>
-                                {task.status}
-                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[task.status] || 'bg-gray-500/20'}`}>{task.status}</span>
                               {task.execution_id && (
-                                <span className="text-[10px] font-mono text-orange-400" title={task.execution_id}>
-                                  {task.execution_id.slice(0, 6)}...
-                                </span>
+                                <span className="text-[10px] font-mono text-orange-400" title={task.execution_id}>{task.execution_id.slice(0, 6)}...</span>
                               )}
-                              <span className="text-xs text-gray-400 min-w-[80px]">
-                                {getAgentName(task.assigned_agent_id)}
-                              </span>
+                              <span className="text-xs text-gray-400 min-w-[80px]">{getAgentName(task.assigned_agent_id)}</span>
                             </Link>
                           ))}
                         </div>
@@ -356,10 +315,7 @@ export default function MissionsPage() {
                     </div>
                     
                     <div className="px-4 pb-4 text-xs text-gray-500 flex items-center gap-4">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        Created: {new Date(mission.created_at).toLocaleString()}
-                      </span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Created: {new Date(mission.created_at).toLocaleString()}</span>
                       <span>Updated: {new Date(mission.updated_at).toLocaleString()}</span>
                     </div>
                   </div>
@@ -381,7 +337,6 @@ function StatCard({ label, value, color }: { label: string; value: number; color
     green: 'bg-green-900/20 border-green-700 text-green-400',
     red: 'bg-red-900/20 border-red-700 text-red-400',
   };
-  
   return (
     <div className={`p-4 rounded-xl border ${colorClasses[color]}`}>
       <div className="text-2xl font-bold">{value}</div>

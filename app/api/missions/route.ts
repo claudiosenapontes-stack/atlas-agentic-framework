@@ -42,8 +42,7 @@ export async function GET(request: NextRequest) {
       const { data: tasks, error: taskError } = await supabase
         .from('tasks')
         .select('mission_id, status')
-        .in('mission_id', missionIds)
-        .is('deleted_at', null);
+        .in('mission_id', missionIds);
       
       if (!taskError && tasks) {
         for (const t of tasks) {

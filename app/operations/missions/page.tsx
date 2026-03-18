@@ -99,16 +99,23 @@ export default function MissionsPage() {
   }
   
   async function fetchMissionTasks(missionId: string) {
-    if (missionTasks[missionId]) return;
+    // Don't refetch if we already have tasks for this mission
+    if (missionTasks[missionId] && missionTasks[missionId].length > 0) return;
     try {
+      console.log(`[MissionsPage] Fetching tasks for mission ${missionId}`);
       const res = await fetch(`/api/tasks?mission_id=${missionId}&limit=100`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      console.log(`[MissionsPage] Tasks response:`, data);
       if (data.success) {
         setMissionTasks(prev => ({ ...prev, [missionId]: data.tasks || [] }));
+      } else {
+        console.error(`[MissionsPage] API error:`, data.error);
+        setMissionTasks(prev => ({ ...prev, [missionId]: [] }));
       }
     } catch (err) {
-      console.error(`Failed to fetch tasks for ${missionId}:`, err);
+      console.error(`[MissionsPage] Failed to fetch tasks for ${missionId}:`, err);
+      setMissionTasks(prev => ({ ...prev, [missionId]: [] }));
     }
   }
 
@@ -314,10 +321,14 @@ export default function MissionsPage() {
                         </div>
                       </div>
                       
-                      {tasks.length === 0 ? (
+                      {tasks.length === 0 && mission.child_task_count === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500 text-sm">No tasks assigned to this mission</p>
+                        </div>
+                      ) : tasks.length === 0 && mission.child_task_count > 0 ? (
                         <div className="text-center py-8">
                           <Loader2 className="w-6 h-6 animate-spin mx-auto text-purple-500 mb-2" />
-                          <p className="text-gray-500 text-sm">Loading tasks...</p>
+                          <p className="text-gray-500 text-sm">Loading {mission.child_task_count} tasks...</p>
                         </div>
                       ) : (
                         <div className="space-y-2">

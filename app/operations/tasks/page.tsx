@@ -7,34 +7,29 @@ import {
   ArrowLeft, 
   Plus, 
   Search,
-  ChevronRight,
-  ChevronDown,
-  CheckCircle2,
-  Circle,
-  Clock,
-  AlertCircle,
+  Zap,
+  User,
   List,
   BarChart3
 } from "lucide-react";
-import { TaskGraphVisualization } from "../components/TaskGraphVisualization";
 
 interface Task {
   id: string;
   title: string;
   status: string;
-  parent_id: string | null;
-  agent_id: string | null;
+  assigned_agent_id?: string;
+  execution_id?: string;
   created_at: string;
   updated_at: string;
   priority?: string;
-  assigned_agent?: { display_name: string };
-  blocked_since?: string;
-  stuck_duration?: number;
   mission_id?: string;
-  mission?: { id: string; title: string };
+  blocked_reason?: string;
 }
 
-// FIX: Define fetch function OUTSIDE component or use function declaration
+const AGENT_NAMES: Record<string, string> = {
+  'optimus': 'Optimus', 'henry': 'Henry', 'prime': 'Prime', 'harvey': 'Harvey', 'einstein': 'Einstein', 'olivia': 'Olivia',
+};
+
 async function fetchTasksData(): Promise<{ tasks: Task[]; missions: Record<string, { id: string; title: string }> }> {
   try {
     const [tasksRes, missionsRes] = await Promise.all([
@@ -49,18 +44,38 @@ async function fetchTasksData(): Promise<{ tasks: Task[]; missions: Record<strin
       missionMap[m.id] = { id: m.id, title: m.title };
     });
     
-    const enrichedTasks = (tasksData.tasks || []).map((task: Task) => {
-      const now = new Date();
-      const updated = new Date(task.updated_at);
-      const daysStuck = Math.floor((now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24));
-      return { ...task, stuck_duration: daysStuck };
-    });
-    
-    return { tasks: enrichedTasks, missions: missionMap };
+    return { tasks: tasksData.tasks || [], missions: missionMap };
   } catch (error) {
-    console.error("Failed to fetch tasks:", error);
     return { tasks: [], missions: {} };
   }
+}
+
+function getAgentName(agentId?: string): string {
+  if (!agentId) return 'Unassigned';
+  return AGENT_NAMES[agentId.toLowerCase()] || agentId;
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+}
+
+function getStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    in_progress: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    executing: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    completed: 'bg-green-500/20 text-green-400 border-green-500/30',
+    blocked: 'bg-red-500/20 text-red-400 border-red-500/30',
+  };
+  return colors[status] || 'bg-gray-500/20 text-gray-400';
 }
 
 export default function TasksPage() {
@@ -68,10 +83,7 @@ export default function TasksPage() {
   const [missions, setMissions] = useState<Record<string, { id: string; title: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<"list" | "graph" | "stats">("list");
 
-  // FIX: useEffect calls external function that's already defined
   useEffect(() => {
     setLoading(true);
     fetchTasksData().then(({ tasks, missions }) => {
@@ -81,32 +93,49 @@ export default function TasksPage() {
     });
   }, []);
 
-  const getChildTasks = (parentId: string | null) => tasks.filter(t => t.parent_id === parentId);
-  const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredTasks = tasks.filter(t => 
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    getAgentName(t.assigned_agent_id).toLowerCase().includes(searchQuery.toLowerCase())
+  );
   
-  const tasksByStatus = tasks.reduce((acc: any, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
+  const tasksByStatus = tasks.reduce((acc: any, t) => { 
+    acc[t.status] = (acc[t.status] || 0) + 1; 
+    return acc; 
+  }, {});
+
+  const activeExecutions = tasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length;
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/operations"><button className="hover:bg-[#1F2226] p-2 rounded"><ArrowLeft className="w-5 h-5" /></button></Link>
+          <Link href="/operations">
+            <button className="hover:bg-[#1F2226] p-2 rounded text-white"><ArrowLeft className="w-5 h-5" /></button>
+          </Link>
           <div>
             <h1 className="text-2xl font-bold text-white">Task Operations</h1>
-            <p className="text-[#9BA3AF] text-sm">Unified task management within Operations</p>
+            <p className="text-[#9BA3AF] text-sm">Real-time execution visibility</p>
           </div>
         </div>
-        <button className="bg-[#FF6A00] px-4 py-2 rounded-lg text-white"><Plus className="w-4 h-4 inline mr-2" />New Task</button>
+        <div className="flex items-center gap-3">
+          {activeExecutions > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-full text-sm">
+              <Zap className="w-4 h-4 animate-pulse" />
+              {activeExecutions} executing
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-7 gap-3">
         {[
           { label: "Total", value: tasks.length },
-          { label: "Inbox", value: tasksByStatus.inbox || 0 },
-          { label: "Active", value: tasksByStatus.in_progress || 0, color: "text-[#FFB020]" },
+          { label: "Pending", value: tasksByStatus.pending || 0, color: "text-yellow-400" },
+          { label: "Executing", value: tasksByStatus.executing || tasksByStatus.in_progress || 0, color: "text-purple-400" },
           { label: "Blocked", value: tasksByStatus.blocked || 0, color: "text-red-500" },
           { label: "Completed", value: tasksByStatus.completed || 0, color: "text-green-500" },
-          { label: "Root", value: tasks.filter(t => !t.parent_id).length },
+          { label: "With Agent", value: tasks.filter(t => t.assigned_agent_id).length, color: "text-blue-400" },
+          { label: "With Execution", value: tasks.filter(t => t.execution_id).length, color: "text-orange-400" },
         ].map(stat => (
           <div key={stat.label} className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
             <p className="text-[#9BA3AF] text-sm">{stat.label}</p>
@@ -115,151 +144,94 @@ export default function TasksPage() {
         ))}
       </div>
 
-      <div className="flex items-center gap-2 border-b border-[#1F2226]">
-        {[
-          { id: "list", icon: List, label: "Task Queue" },
-          { id: "graph", icon: GitBranch, label: "Hierarchy Graph" },
-          { id: "stats", icon: BarChart3, label: "Analytics" },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setViewMode(tab.id as any)} 
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              viewMode === tab.id ? "border-[#FF6A00] text-white" : "border-transparent text-[#9BA3AF] hover:text-white"
-            }`}>
-            <tab.icon className="w-4 h-4" /> {tab.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <Search className="w-4 h-4 text-[#9BA3AF]" />
+        <input 
+          type="text" 
+          value={searchQuery} 
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search tasks or agents..." 
+          className="bg-[#1F2226] border border-[#2A2D32] text-white px-3 py-2 rounded-lg max-w-md" 
+        />
       </div>
-
-      {viewMode === "list" && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-[#9BA3AF]" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..." className="bg-[#1F2226] border border-[#2A2D32] text-white px-3 py-2 rounded-lg max-w-md" />
-          </div>
-          <div className="bg-[#111214] border border-[#1F2226] rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-[#0B0B0C]">
-                <tr>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase">Task</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Status</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Owner</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-32">Mission</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Stuck Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#1F2226]">
-                {filteredTasks.slice(0, 50).map(task => (
-                  <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          {task.status === 'blocked' && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
-                          <Link href={`/operations/tasks/${task.id}`} className="text-sm font-medium text-white hover:text-[#FF6A00]">{task.title}</Link>
-                        </div>
-                        <span className="text-[10px] text-[#6B7280] font-mono">{task.id.slice(0, 8)}...</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${task.status === 'completed' ? 'bg-green-500/20 text-green-500' : task.status === 'blocked' ? 'bg-red-500/20 text-red-500' : task.status === 'in_progress' ? 'bg-[#FF6A00]/20 text-[#FF6A00]' : 'bg-[#9BA3AF]/20 text-[#9BA3AF]'}`}>
-                        {task.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs text-white">{task.assigned_agent?.display_name || task.agent_id?.slice(0, 8) || 'Unassigned'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs ${task.priority === 'high' ? 'text-[#FF3B30]' : task.priority === 'medium' ? 'text-[#FFB020]' : 'text-[#9BA3AF]'}`}>{task.priority || 'medium'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.mission_id && missions[task.mission_id] ? (
-                        <Link href={`/operations/missions/${task.mission_id}`} className="text-xs text-[#FF6A00] hover:underline truncate block max-w-[120px]">
-                          {missions[task.mission_id].title}
-                        </Link>
-                      ) : task.mission ? (
-                        <Link href={`/operations/missions/${task.mission.id}`} className="text-xs text-[#FF6A00] hover:underline truncate block max-w-[120px]">
-                          {task.mission.title}
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-[#6B7280]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.status === 'blocked' && (
-                        <span className="text-xs font-medium text-red-400">
-                          {task.stuck_duration ? `${task.stuck_duration}d stuck` : 'Blocked'}
-                        </span>
-                      )}
-                      {task.status === 'in_progress' && task.stuck_duration && task.stuck_duration > 3 && (
-                        <span className="text-xs font-medium text-[#FFB020]">
-                          {task.stuck_duration}d no update
-                        </span>
-                      )}
-                      {task.status !== 'blocked' && !(task.status === 'in_progress' && task.stuck_duration && task.stuck_duration > 3) && (
-                        <span className="text-xs text-[#6B7280]">{task.stuck_duration ? `${task.stuck_duration}d ago` : '—'}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {viewMode === "graph" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-[#111214] border border-[#1F2226] rounded-lg">
-            <div className="p-4 border-b border-[#1F2226]">
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-[#9BA3AF]" />
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..." className="bg-[#1F2226] border border-[#2A2D32] text-white px-3 py-2 rounded-lg flex-1 text-sm" />
-              </div>
-            </div>
-            <div className="max-h-[600px] overflow-y-auto p-2">
-              {loading ? <div className="p-4 text-center text-[#9BA3AF]">Loading...</div> : 
-               tasks.filter(t => !t.parent_id).length === 0 ? <div className="p-4 text-center text-[#9BA3AF]">No tasks</div> :
-               tasks.filter(t => !t.parent_id).map(task => (
-                 <div key={task.id} className="flex flex-col py-2 px-3 hover:bg-[#1F2226] rounded">
-                   <div className="flex items-center gap-2">
-                     <Circle className="w-4 h-4 text-[#9BA3AF]" />
-                     <span className="text-sm text-white truncate">{task.title}</span>
-                   </div>
-                   <span className="text-[10px] text-[#6B7280] font-mono ml-6">{task.id.slice(0, 8)}... • {task.assigned_agent?.display_name || task.agent_id?.slice(0, 8) || 'Unassigned'}</span>
-                 </div>
-               ))}
-            </div>
-          </div>
-          <div className="lg:col-span-2 bg-[#111214] border border-[#1F2226] rounded-lg p-4">
-            <h3 className="text-white font-medium mb-4">Visual Task Graph</h3>
-            <TaskGraphVisualization tasks={tasks} />
-          </div>
-        </div>
-      )}
-
-      {viewMode === "stats" && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
-            <h3 className="text-white font-medium mb-4">Status Distribution</h3>
-            <div className="space-y-2">
-              {Object.entries(tasksByStatus).map(([status, count]: [string, any]) => (
-                <div key={status} className="flex items-center justify-between">
-                  <span className="text-sm text-[#9BA3AF]">{status}</span>
-                  <span className="text-sm text-white">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-[#111214] border border-[#1F2226] rounded-lg p-4">
-            <h3 className="text-white font-medium mb-4">Task Overview</h3>
-            <p className="text-[#9BA3AF] text-sm">Total tasks: {tasks.length}</p>
-            <p className="text-[#9BA3AF] text-sm">With parent: {tasks.filter(t => t.parent_id).length}</p>
-            <p className="text-[#9BA3AF] text-sm">Root level: {tasks.filter(t => !t.parent_id).length}</p>
-          </div>
-        </div>
-      )}
+      
+      <div className="bg-[#111214] border border-[#1F2226] rounded-lg overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-[#0B0B0C]">
+            <tr>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase">Task</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-24">Status</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Agent</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Priority</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-32">Mission</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-28">Execution</th>
+              <th className="px-4 py-2.5 text-left text-[10px] text-[#6B7280] uppercase w-20">Updated</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#1F2226]">
+            {filteredTasks.map(task => (
+              <tr key={task.id} className="hover:bg-[#0B0B0C]/50">
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      {task.status === 'blocked' && <span className="text-red-500">⚠</span>}
+                      {task.status === 'executing' && <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />}
+                      <Link href={`/operations/tasks/${task.id}`} className="text-sm font-medium text-white hover:text-[#FF6A00]">
+                        {task.title}
+                      </Link>
+                    </div>
+                    <span className="text-[10px] text-[#6B7280] font-mono">{task.id.slice(0, 8)}...</span>
+                    {task.blocked_reason && (
+                      <span className="text-[10px] text-red-400">Blocker: {task.blocked_reason}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(task.status)}`}>
+                    {task.status.replace('_', ' ')}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3 h-3 text-[#6B7280]" />
+                    <span className={`text-xs ${task.assigned_agent_id ? 'text-white font-medium' : 'text-[#6B7280]'}`}>
+                      {getAgentName(task.assigned_agent_id)}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs ${task.priority === 'critical' ? 'text-[#FF3B30] font-bold' : task.priority === 'high' ? 'text-[#FF6A00]' : 'text-[#9BA3AF]'}`}>
+                    {task.priority || 'medium'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {task.mission_id && missions[task.mission_id] ? (
+                    <Link href={`/operations/missions/${task.mission_id}`} className="text-xs text-[#3B82F6] hover:underline truncate block max-w-[120px]">
+                      {missions[task.mission_id].title}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-[#6B7280]">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {task.execution_id ? (
+                    <span className="text-[10px] font-mono text-orange-400">
+                      {task.execution_id.slice(0, 10)}...
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[#6B7280]">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-xs text-[#9BA3AF]" title={new Date(task.updated_at).toLocaleString()}>
+                    {formatTimeAgo(task.updated_at)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   Target,
   Plus,
   Loader2,
   CheckCircle2,
   Clock,
-  XCircle,
   AlertCircle,
   RefreshCw,
   ChevronDown,
@@ -16,7 +16,9 @@ import {
   Calendar,
   Play,
   RotateCcw,
-  X
+  X,
+  Zap,
+  BarChart3
 } from 'lucide-react';
 
 interface Mission {
@@ -26,7 +28,6 @@ interface Mission {
   status: 'draft' | 'queued' | 'in_progress' | 'complete' | 'blocked';
   priority: 'low' | 'medium' | 'high' | 'critical';
   assigned_agent_id: string | null;
-  parent_mission_id: string | null;
   child_task_count: number;
   completed_task_count: number;
   created_at: string;
@@ -42,30 +43,39 @@ interface Task {
   status: string;
   assigned_agent_id: string | null;
   mission_id: string;
+  execution_id?: string;
+  updated_at: string;
+  priority?: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-800 border-gray-300',
-  queued: 'bg-blue-100 text-blue-800 border-blue-300',
-  in_progress: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  executing: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  complete: 'bg-green-100 text-green-800 border-green-300',
-  completed: 'bg-green-100 text-green-800 border-green-300',
-  closed: 'bg-green-100 text-green-800 border-green-300',
-  blocked: 'bg-red-100 text-red-800 border-red-300',
-  requested: 'bg-gray-100 text-gray-800 border-gray-300',
-  accepted: 'bg-blue-100 text-blue-800 border-blue-300',
-  decomposed: 'bg-purple-100 text-purple-800 border-purple-300',
-  verifying: 'bg-teal-100 text-teal-800 border-teal-300',
-  remediating: 'bg-orange-100 text-orange-800 border-orange-300',
+const AGENT_NAMES: Record<string, string> = {
+  'optimus': 'Optimus', 'henry': 'Henry', 'prime': 'Prime', 'harvey': 'Harvey', 'einstein': 'Einstein', 'olivia': 'Olivia',
 };
 
-const PRIORITY_COLORS = {
-  low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
+const STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  queued: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  in_progress: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  executing: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  complete: 'bg-green-500/20 text-green-400 border-green-500/30',
+  blocked: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
+
+function getAgentName(agentId?: string | null): string {
+  if (!agentId) return 'Unassigned';
+  return AGENT_NAMES[agentId.toLowerCase()] || agentId;
+}
+
+function getTaskStatusColor(status: string): string {
+  const colors: Record<string, string> = {
+    pending: 'bg-yellow-500',
+    in_progress: 'bg-blue-500',
+    executing: 'bg-purple-500',
+    completed: 'bg-green-500',
+    blocked: 'bg-red-500',
+  };
+  return colors[status] || 'bg-gray-500';
+}
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -75,24 +85,25 @@ export default function MissionsPage() {
   const [expandedMission, setExpandedMission] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  async function fetchMissions() {
+  async function fetchData() {
     try {
       setLoading(true);
-      console.log('[Missions] Fetching...');
-      const res = await fetch('/api/missions', { cache: 'no-store' });
-      console.log('[Missions] Response:', res.status);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      console.log('[Missions] Data:', { success: data.success, count: data.missions?.length });
+      const [missionsRes, tasksRes] = await Promise.all([
+        fetch('/api/missions?limit=100', { cache: 'no-store' }),
+        fetch('/api/tasks?limit=200', { cache: 'no-store' }),
+      ]);
       
-      if (data.success) {
-        setMissions(data.missions || []);
-        setError(null);
-      } else {
-        setError(data.error || 'Failed to fetch missions');
+      const missionsData = await missionsRes.json();
+      const tasksData = await tasksRes.json();
+      
+      if (missionsData.success) {
+        setMissions(missionsData.missions || []);
       }
+      if (tasksData.success) {
+        setTasks(tasksData.tasks || []);
+      }
+      setError(null);
     } catch (err: any) {
-      console.error('[Missions] Error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -100,40 +111,34 @@ export default function MissionsPage() {
     }
   }
 
-  async function fetchTasks() {
-    try {
-      const res = await fetch('/api/tasks', { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.success) {
-        setTasks(data.tasks || []);
-      }
-    } catch {
-      // Silent fail
-    }
-  }
-
   useEffect(() => {
-    fetchMissions();
-    fetchTasks();
+    fetchData();
   }, []);
-
-  const stats = {
-    total: missions.length,
-    queued: missions.filter(m => m.status === 'draft').length,
-    inProgress: missions.filter(m => m.status === 'in_progress').length,
-    complete: missions.filter(m => m.status === 'complete').length,
-    blocked: missions.filter(m => m.status === 'blocked').length,
-  };
 
   function getMissionTasks(missionId: string): Task[] {
     return tasks.filter(t => t.mission_id === missionId);
   }
 
-  function getProgressPercent(mission: Mission): number {
-    if (!mission.child_task_count) return 0;
-    return Math.round((mission.completed_task_count / mission.child_task_count) * 100);
+  function getMissionProgress(mission: Mission): number {
+    const missionTasks = getMissionTasks(mission.id);
+    if (missionTasks.length === 0) return 0;
+    const completed = missionTasks.filter(t => t.status === 'completed').length;
+    return Math.round((completed / missionTasks.length) * 100);
   }
+
+  function getMissionAgents(missionId: string): string[] {
+    const missionTasks = getMissionTasks(missionId);
+    const agents = new Set(missionTasks.map(t => t.assigned_agent_id).filter(Boolean));
+    return Array.from(agents) as string[];
+  }
+
+  const stats = {
+    total: missions.length,
+    queued: missions.filter(m => m.status === 'draft' || m.status === 'queued').length,
+    inProgress: missions.filter(m => m.status === 'in_progress').length,
+    complete: missions.filter(m => m.status === 'complete').length,
+    blocked: missions.filter(m => m.status === 'blocked').length,
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white p-6">
@@ -145,7 +150,7 @@ export default function MissionsPage() {
             Mission Control
           </h1>
           <p className="text-gray-400 mt-1">
-            Manage mission queue, track progress, and unblock work
+            Track mission progress and execution state
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -153,15 +158,11 @@ export default function MissionsPage() {
             Last refresh: {lastRefresh.toLocaleTimeString()}
           </span>
           <button
-            onClick={() => { fetchMissions(); fetchTasks(); }}
+            onClick={fetchData}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
-            <Plus className="w-4 h-4" />
-            New Mission
           </button>
         </div>
       </div>
@@ -192,8 +193,10 @@ export default function MissionsPage() {
         ) : (
           missions.map((mission) => {
             const missionTasks = getMissionTasks(mission.id);
-            const progress = getProgressPercent(mission);
+            const progress = getMissionProgress(mission);
+            const agents = getMissionAgents(mission.id);
             const isExpanded = expandedMission === mission.id;
+            const executingTasks = missionTasks.filter(t => t.status === 'executing' || t.status === 'in_progress');
             
             return (
               <div 
@@ -214,11 +217,6 @@ export default function MissionsPage() {
                     {mission.status}
                   </span>
                   
-                  {/* Priority */}
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${PRIORITY_COLORS[mission.priority]}`}>
-                    {mission.priority}
-                  </span>
-                  
                   {/* Title */}
                   <div className="flex-1">
                     <h3 className="font-semibold text-white">{mission.title}</h3>
@@ -229,7 +227,7 @@ export default function MissionsPage() {
                   </div>
                   
                   {/* Progress */}
-                  <div className="w-32">
+                  <div className="w-40">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-400">Progress</span>
                       <span className="text-white">{progress}%</span>
@@ -241,37 +239,31 @@ export default function MissionsPage() {
                       />
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {mission.completed_task_count}/{mission.child_task_count} tasks
+                      {missionTasks.filter(t => t.status === 'completed').length}/{missionTasks.length} tasks
                     </div>
                   </div>
                   
-                  {/* Agent */}
-                  <div className="flex items-center gap-2 text-gray-400 text-sm min-w-[120px]">
-                    <User className="w-4 h-4" />
-                    {mission.assigned_agent_id?.slice(0, 8) || 'Unassigned'}
+                  {/* Agents */}
+                  <div className="flex items-center gap-2 min-w-[140px]">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-400">
+                        {agents.length} agent{agents.length !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-xs text-white">
+                        {agents.slice(0, 2).map(getAgentName).join(', ')}
+                        {agents.length > 2 && '...'}
+                      </span>
+                    </div>
                   </div>
                   
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {mission.status === 'blocked' && (
-                      <button className="p-2 text-yellow-400 hover:bg-yellow-900/30 rounded-lg" title="Unblock">
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    )}
-                    {(mission.status === 'queued' || mission.status === 'draft') && (
-                      <button className="p-2 text-green-400 hover:bg-green-900/30 rounded-lg" title="Start">
-                        <Play className="w-4 h-4" />
-                      </button>
-                    )}
-                    {mission.status === 'in_progress' && (
-                      <button className="p-2 text-blue-400 hover:bg-blue-900/30 rounded-lg" title="Complete">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-lg" title="Delete">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {/* Executing Badge */}
+                  {executingTasks.length > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 rounded text-xs text-purple-400">
+                      <Zap className="w-3 h-3 animate-pulse" />
+                      {executingTasks.length}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Expanded Tasks */}
@@ -285,26 +277,48 @@ export default function MissionsPage() {
                     )}
                     
                     <div className="p-4">
-                      <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
-                        <Target className="w-4 h-4" />
-                        Child Tasks ({missionTasks.length})
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+                          <Target className="w-4 h-4" />
+                          Child Tasks ({missionTasks.length})
+                        </h4>
+                        <div className="flex gap-2 text-xs">
+                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded">
+                            {missionTasks.filter(t => t.status === 'pending').length} pending
+                          </span>
+                          <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
+                            {missionTasks.filter(t => t.status === 'executing' || t.status === 'in_progress').length} active
+                          </span>
+                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded">
+                            {missionTasks.filter(t => t.status === 'completed').length} done
+                          </span>
+                        </div>
+                      </div>
                       
                       {missionTasks.length === 0 ? (
                         <p className="text-gray-500 text-sm">No tasks assigned to this mission</p>
                       ) : (
                         <div className="space-y-2">
                           {missionTasks.map((task) => (
-                            <div 
-                              key={task.id} 
-                              className="flex items-center gap-3 p-3 bg-[#1A1A1A] rounded-lg"
+                            <Link 
+                              key={task.id}
+                              href={`/operations/tasks/${task.id}`}
+                              className="flex items-center gap-3 p-3 bg-[#1A1A1A] rounded-lg hover:bg-[#252525] transition-colors"
                             >
-                              <StatusDot status={task.status} />
-                              <span className="flex-1 text-sm">{task.title}</span>
-                              <span className="text-xs text-gray-500">
-                                {task.assigned_agent_id?.slice(0, 8) || 'Unassigned'}
+                              <div className={`w-2 h-2 rounded-full ${getTaskStatusColor(task.status)}`} />
+                              <span className="flex-1 text-sm text-white">{task.title}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[task.status] || 'bg-gray-500/20'}`}>
+                                {task.status}
                               </span>
-                            </div>
+                              {task.execution_id && (
+                                <span className="text-[10px] font-mono text-orange-400" title={task.execution_id}>
+                                  {task.execution_id.slice(0, 6)}...
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-400 min-w-[80px]">
+                                {getAgentName(task.assigned_agent_id)}
+                              </span>
+                            </Link>
                           ))}
                         </div>
                       )}
@@ -316,12 +330,6 @@ export default function MissionsPage() {
                         Created: {new Date(mission.created_at).toLocaleString()}
                       </span>
                       <span>Updated: {new Date(mission.updated_at).toLocaleString()}</span>
-                      {mission.started_at && (
-                        <span>Started: {new Date(mission.started_at).toLocaleString()}</span>
-                      )}
-                      {mission.completed_at && (
-                        <span>Completed: {new Date(mission.completed_at).toLocaleString()}</span>
-                      )}
                     </div>
                   </div>
                 )}
@@ -348,19 +356,5 @@ function StatCard({ label, value, color }: { label: string; value: number; color
       <div className="text-2xl font-bold">{value}</div>
       <div className="text-sm opacity-80 mt-1">{label}</div>
     </div>
-  );
-}
-
-function StatusDot({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: 'bg-yellow-500',
-    in_progress: 'bg-blue-500',
-    completed: 'bg-green-500',
-    failed: 'bg-red-500',
-    blocked: 'bg-gray-500',
-  };
-  
-  return (
-    <div className={`w-2 h-2 rounded-full ${colors[status] || 'bg-gray-500'}`} />
   );
 }

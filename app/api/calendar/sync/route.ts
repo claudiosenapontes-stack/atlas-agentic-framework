@@ -1,14 +1,18 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+// Google OAuth credentials from environment
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/callback';
+
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 interface CalendarEvent {
   id: string;
@@ -43,49 +47,57 @@ export async function GET(request: NextRequest) {
     const timeMin = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString();
     const timeMax = new Date(now.getTime() + daysForward * 24 * 60 * 60 * 1000).toISOString();
 
-    // Fetch events from Google Calendar using gog CLI
-    const { stdout, stderr } = await execAsync(
-      `cd /root/.openclaw/workspaces/atlas-agentic-framework && gcal events --calendar="${calendarId}" --max=100 2>&1`
+    // Get stored OAuth tokens from database
+    const { data: tokens, error: tokenError } = await supabase
+      .from('google_auth_tokens')
+      .select('*')
+      .eq('provider', 'google_calendar')
+      .single();
+
+    if (tokenError || !tokens?.access_token) {
+      return Response.json(
+        {
+          success: false,
+          error: 'Google Calendar not authenticated. Please run: gog calendar auth',
+          timestamp: new Date().toISOString(),
+        },
+        { status: 401 }
+      );
+    }
+
+    // Create OAuth client
+    const oauth2Client = new OAuth2Client(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET,
+      GOOGLE_REDIRECT_URI
     );
 
-    if (stderr && !stdout) {
-      throw new Error(`Failed to fetch calendar events: ${stderr}`);
-    }
-
-    // Parse gcal output
-    let googleEvents: any[] = [];
-    try {
-      const lines = stdout.trim().split('\n');
-      const jsonLine = lines.find(l => l.trim().startsWith('{') || l.trim().startsWith('['));
-      if (jsonLine) {
-        const parsed = JSON.parse(jsonLine);
-        googleEvents = parsed.items || parsed || [];
-      }
-    } catch (e) {
-      // Fallback: try to parse as JSON directly
-      try {
-        const parsed = JSON.parse(stdout);
-        googleEvents = parsed.items || [];
-      } catch {
-        googleEvents = [];
-      }
-    }
-
-    // Filter events by date range
-    const filteredEvents = googleEvents.filter((event: any) => {
-      const eventStart = event.start?.dateTime || event.start?.date;
-      if (!eventStart) return false;
-      return eventStart >= timeMin && eventStart <= timeMax;
+    oauth2Client.setCredentials({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date: tokens.expires_at ? new Date(tokens.expires_at).getTime() : undefined,
     });
 
-    // Get calendar name
+    // Create Calendar API client
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Fetch events from Google Calendar
+    const response = await calendar.events.list({
+      calendarId,
+      timeMin,
+      timeMax,
+      maxResults: 100,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const googleEvents = response.data.items || [];
+
+    // Get calendar metadata
     let calendarName = calendarId === 'primary' ? 'Primary Calendar' : calendarId;
     try {
-      const { stdout: calStdout } = await execAsync(
-        `cd /root/.openclaw/workspaces/atlas-agentic-framework && gcal list 2>&1 | grep -A1 -B1 "${calendarId}" | head -3`
-      );
-      const summaryMatch = calStdout.match(/"summary":\s*"([^"]+)"/);
-      if (summaryMatch) calendarName = summaryMatch[1];
+      const calResponse = await calendar.calendars.get({ calendarId });
+      calendarName = calResponse.data.summary || calendarName;
     } catch {
       // Use default name
     }
@@ -93,13 +105,14 @@ export async function GET(request: NextRequest) {
     // Sync to database
     const result: SyncResult = { synced: 0, skipped: 0, errors: 0, events: [] };
 
-    for (const event of filteredEvents) {
-      const calendarEventId = event.id;
-      const existing = await supabase
+    for (const event of googleEvents) {
+      const calendarEventId = event.id!;
+      
+      const { data: existing } = await supabase
         .from('calendar_events')
         .select('id')
         .eq('calendar_event_id', calendarEventId)
-        .single();
+        .maybeSingle();
 
       const eventData = {
         calendar_event_id: calendarEventId,
@@ -114,8 +127,7 @@ export async function GET(request: NextRequest) {
         updated_at: new Date().toISOString(),
       };
 
-      if (existing.data) {
-        // Update existing
+      if (existing) {
         const { error } = await supabase
           .from('calendar_events')
           .update(eventData)
@@ -128,7 +140,6 @@ export async function GET(request: NextRequest) {
           result.synced++;
         }
       } else {
-        // Insert new
         const { error } = await supabase
           .from('calendar_events')
           .insert({ ...eventData, created_at: new Date().toISOString() });
@@ -144,11 +155,11 @@ export async function GET(request: NextRequest) {
       result.events.push({
         id: calendarEventId,
         summary: event.summary || 'Untitled',
-        description: event.description,
-        start: event.start,
-        end: event.end,
-        status: event.status,
-        htmlLink: event.htmlLink,
+        description: event.description || undefined,
+        start: event.start as any,
+        end: event.end as any,
+        status: event.status || 'confirmed',
+        htmlLink: event.htmlLink || undefined,
         calendarId,
         calendarName,
       });

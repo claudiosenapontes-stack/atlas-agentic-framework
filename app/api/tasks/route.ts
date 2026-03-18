@@ -58,3 +58,54 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// POST /api/tasks - Create new task
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
+  try {
+    const body = await request.json();
+    const supabase = getSupabaseAdmin();
+    
+    const taskData = {
+      id: body.id || crypto.randomUUID(),
+      title: body.title,
+      description: body.description || null,
+      mission_id: body.mission_id || null,
+      assigned_agent_id: body.assigned_agent_id || null,
+      status: body.status || 'pending',
+      priority: body.priority || 'medium',
+      task_type: body.task_type || 'implementation',
+      task_order: body.task_order || 0,
+      owner_id: body.owner_id || 'system',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .insert(taskData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Update mission child_task_count
+    if (body.mission_id) {
+      await supabase.rpc('increment_task_count', { mission_uuid: body.mission_id });
+    }
+    
+    return NextResponse.json({
+      success: true,
+      task,
+      duration: Date.now() - startTime
+    }, { status: 201 });
+    
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      duration: Date.now() - startTime
+    }, { status: 500 });
+  }
+}

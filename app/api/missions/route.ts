@@ -81,3 +81,54 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// POST /api/missions - Create new mission
+export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const rid = requestId();
+  
+  try {
+    const body = await request.json();
+    const supabase = getSupabaseAdmin();
+    
+    const missionData = {
+      id: randomUUID(),
+      title: body.title,
+      description: body.description || null,
+      objective: body.objective || null,
+      status: body.status || 'draft',
+      phase: body.phase || 'planning',
+      priority: body.priority || 'medium',
+      created_by: body.created_by || 'system',
+      assigned_to: body.assigned_to || null,
+      child_task_count: 0,
+      completed_task_count: 0,
+      progress_percent: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data: mission, error } = await supabase
+      .from('missions')
+      .insert(missionData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return NextResponse.json({
+      success: true,
+      mission,
+      requestId: rid,
+      duration: Date.now() - startTime
+    }, { status: 201 });
+    
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      requestId: rid,
+      duration: Date.now() - startTime
+    }, { status: 500 });
+  }
+}

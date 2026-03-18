@@ -40,6 +40,7 @@ export interface WatchRule {
   owner_id?: string;
   company_id?: string;
   description?: string;
+  escalation_agent_id?: string;
 }
 
 export interface MatchResult {

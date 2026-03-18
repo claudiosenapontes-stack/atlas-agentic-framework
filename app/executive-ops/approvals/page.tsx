@@ -25,13 +25,27 @@ interface Approval {
 
 async function getApprovals(): Promise<Approval[] | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://atlas-agentic-framework.vercel.app';
-    const res = await fetch(`${baseUrl}/api/approvals`, { cache: 'no-store' });
+    const res = await fetch('/api/approvals', { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch approvals');
     const data = await res.json();
     return data.approvals || [];
   } catch {
     return null;
+  }
+}
+
+async function updateApprovalStatus(id: string, status: 'approved' | 'rejected'): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/approvals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.success;
+  } catch {
+    return false;
   }
 }
 
@@ -120,7 +134,7 @@ export default function ApprovalsPage() {
         ) : (
           <div className="space-y-2">
             {filteredApprovals.map((approval) => (
-              <ApprovalCard key={approval.id} approval={approval} />
+              <ApprovalCard key={approval.id} approval={approval} onStatusChange={loadApprovals} />
             ))}
           </div>
         )}
@@ -129,12 +143,17 @@ export default function ApprovalsPage() {
   );
 }
 
-function ApprovalCard({ approval }: { approval: Approval }) {
+function ApprovalCard({ approval, onStatusChange }: { approval: Approval; onStatusChange?: () => void }) {
   const [actionLoading, setActionLoading] = useState<null | 'approve' | 'reject'>(null);
+  const [currentStatus, setCurrentStatus] = useState(approval.status);
 
   const handleAction = async (action: 'approve' | 'reject') => {
     setActionLoading(action);
-    await new Promise(r => setTimeout(r, 500));
+    const success = await updateApprovalStatus(approval.id, action === 'approve' ? 'approved' : 'rejected');
+    if (success) {
+      setCurrentStatus(action === 'approve' ? 'approved' : 'rejected');
+      onStatusChange?.();
+    }
     setActionLoading(null);
   };
 
@@ -150,8 +169,8 @@ function ApprovalCard({ approval }: { approval: Approval }) {
             <span className={`px-2 py-0.5 text-xs rounded border ${PRIORITY_COLORS[priority]}`}>
               {priority.toUpperCase()}
             </span>
-            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[approval.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.pending}`}>
-              {approval.status}
+            <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[currentStatus as keyof typeof STATUS_COLORS] || STATUS_COLORS.pending}`}>
+              {currentStatus}
             </span>
           </div>
           <h3 className="font-medium text-white mb-1">{approval.type || 'Untitled Request'}</h3>
@@ -167,7 +186,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
           </div>
         </div>
         
-        {approval.status === 'pending' && (
+        {currentStatus === 'pending' && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleAction('approve')}

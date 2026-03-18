@@ -10,7 +10,8 @@ import {
   Trash2,
   Loader2,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react";
 
 interface Task {

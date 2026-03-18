@@ -11,7 +11,9 @@ import {
   Loader2,
   RefreshCw,
   AlertCircle,
-  X
+  X,
+  CheckSquare,
+  Square
 } from "lucide-react";
 
 interface Task {

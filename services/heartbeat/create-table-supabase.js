@@ -72,3 +72,54 @@ async function createTableUsingSupabase() {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
+      }
+    });
+
+    console.log('Executing table creation...');
+    
+    // For creating tables, we need to use the SQL API through a custom RPC call
+    // Since direct SQL execution isn't available in client-side operations,
+    // we'll use the REST API to create the table structure
+    
+    // First, let's check if the table exists by attempting a simple query
+    const { data: tableData, error: tableError } = await supabase
+      .from('agent_heartbeats')
+      .select('*')
+      .limit(1);
+    
+    if (tableError && tableError.message.includes('Could not find the table') || tableError.code === 'PGRST201') {
+      console.log('Table does not exist, creating...');
+      
+      // We'll need to use the SQL API via the built-in SQL editor through admin panel
+      // For now, let's provide the SQL statement to create the table
+      console.log('📝 To create the table, execute this SQL in Supabase SQL editor:');
+      console.log(createTableSQL);
+      
+      throw new Error('Table creation requires manual SQL execution - see SQL statement above');
+    } else {
+      console.log('✅ Table appears to exist');
+      if (tableData) {
+        console.log(`Found ${tableData.length} existing records`);
+      }
+      
+      // Verify table schema
+      const { data: columnInfo, error: columnError } = await supabase
+        .rpc('get_table_columns', { table_name: 'agent_heartbeats' });
+      
+      if (!columnError) {
+        console.log('📊 Table schema verified');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
+  }
+}
+
+createTableUsingSupabase().then(() => {
+  console.log('✅ Table creation process completed');
+}).catch(error => {
+  console.error('❌ Fatal error:', error.message);
+  process.exit(1);
+});

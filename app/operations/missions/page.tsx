@@ -88,22 +88,47 @@ export default function MissionsPage() {
   async function fetchData() {
     try {
       setLoading(true);
+      console.log('[MissionsPage] Fetching data...');
+      
       const [missionsRes, tasksRes] = await Promise.all([
         fetch('/api/missions?limit=100', { cache: 'no-store' }),
         fetch('/api/tasks?limit=200', { cache: 'no-store' }),
       ]);
       
+      console.log('[MissionsPage] Response status:', { missions: missionsRes.status, tasks: tasksRes.status });
+      
+      if (!missionsRes.ok) {
+        throw new Error(`Missions API error: ${missionsRes.status} ${missionsRes.statusText}`);
+      }
+      if (!tasksRes.ok) {
+        throw new Error(`Tasks API error: ${tasksRes.status} ${tasksRes.statusText}`);
+      }
+      
       const missionsData = await missionsRes.json();
       const tasksData = await tasksRes.json();
       
+      console.log('[MissionsPage] Data received:', { 
+        missionsSuccess: missionsData.success, 
+        missionsCount: missionsData.missions?.length,
+        tasksSuccess: tasksData.success,
+        tasksCount: tasksData.tasks?.length
+      });
+      
       if (missionsData.success) {
         setMissions(missionsData.missions || []);
+      } else {
+        throw new Error(missionsData.error || 'Missions API returned success: false');
       }
+      
       if (tasksData.success) {
         setTasks(tasksData.tasks || []);
+      } else {
+        console.warn('[MissionsPage] Tasks API returned success: false', tasksData.error);
       }
+      
       setError(null);
     } catch (err: any) {
+      console.error('[MissionsPage] Fetch error:', err);
       setError(err.message);
     } finally {
       setLoading(false);

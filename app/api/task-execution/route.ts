@@ -43,41 +43,61 @@ export async function POST(request: NextRequest) {
     
     // Check if task has execution_id, auto-create if not
     let executionId = task.execution_id;
-    
+
     if (!executionId) {
       console.log(`[TaskExecute] Auto-creating execution for task ${taskId}`);
-      
+
+      // Resolve agent name -> agent UUID if needed
+      let executionAgentId = task.assigned_agent_id;
+
+      if (executionAgentId) {
+        const { data: agentRow } = await supabaseAdmin
+          .from("agents")
+          .select("id")
+          .eq("name", executionAgentId)
+          .maybeSingle();
+
+        if (agentRow?.id) {
+          executionAgentId = agentRow.id;
+        }
+      }
+
       const { data: newExecution, error: createError } = await supabaseAdmin
         .from("executions")
         .insert({
           task_id: taskId,
-          agent_id: task.assigned_agent_id,
+          agent_id: executionAgentId,
           status: "in_progress",
           started_at: new Date().toISOString(),
         })
         .select("id")
         .single();
-      
+
       if (createError || !newExecution) {
         return NextResponse.json(
-          { success: false, error: "Failed to create execution", details: createError, timestamp, requestId },
+          {
+            success: false,
+            error: "Failed to create execution",
+            details: createError,
+            timestamp,
+            requestId,
+          },
           { status: 500 }
         );
       }
-      
+
       executionId = (newExecution as any).id;
-      
+
       // Update task with execution_id and status
       await supabaseAdmin
         .from("tasks")
-        .update({ 
-          execution_id: executionId, 
+        .update({
+          execution_id: executionId,
           status: "in_progress",
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("id", taskId);
-    }
-    
+    }    
     // Simulate execution completion
     await supabaseAdmin
       .from("executions")

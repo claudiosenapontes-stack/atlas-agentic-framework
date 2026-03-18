@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   X,
   MoreHorizontal,
-  CheckCircle2
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 
 interface WatchlistItem {
@@ -28,19 +29,41 @@ interface WatchlistItem {
   updated_at: string;
 }
 
-async function getWatchlist(): Promise<WatchlistItem[] | null> {
+async function getWatchlist(): Promise<{ items: WatchlistItem[]; error?: string }> {
   try {
     const res = await fetch('/api/watchlist', { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch watchlist');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { items: [], error: errData.error || `HTTP ${res.status}` };
+    }
     const data = await res.json();
-    return data.items || [];
-  } catch {
-    return null;
+    if (!data.success) {
+      return { items: [], error: data.error || 'API returned success: false' };
+    }
+    return { items: data.items || [] };
+  } catch (err: any) {
+    return { items: [], error: err.message || 'Network error' };
+  }
+}
+
+async function deleteWatchlistItem(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`/api/watchlist?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      cache: 'no-store'
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, error: errData.error || `HTTP ${res.status}` };
+    }
+    const data = await res.json();
+    return { success: data.success || false, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
   }
 }
 
 function getRulePriority(ruleType: string): 'p0' | 'p1' | 'p2' | 'p3' {
-  // Map rule types to priority levels
   if (ruleType === 'critical_alert' || ruleType === 'ceo_escalation') return 'p0';
   if (ruleType === 'opportunity' || ruleType === 'lead') return 'p1';
   if (ruleType === 'keyword_match') return 'p2';
@@ -74,26 +97,49 @@ const STATUS_ICONS = {
 };
 
 export default function WatchlistPage() {
-  const [items, setItems] = useState<WatchlistItem[] | null>(null);
+  const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [filter, setFilter] = useState<'all' | 'p0' | 'p1' | 'blocked'>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Initial load
   useEffect(() => {
-    getWatchlist().then(data => {
-      setItems(data);
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    
+    getWatchlist().then(({ items, error }) => {
+      if (!mounted) return;
+      if (error) setError(error);
+      setItems(items);
       setLoading(false);
     });
+    
+    return () => { mounted = false; };
   }, []);
 
-  const filteredItems = items?.filter(item => {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this watch rule?')) return;
+    setDeletingId(id);
+    const result = await deleteWatchlistItem(id);
+    if (result.success) {
+      setItems(prev => prev.filter(i => i.id !== id));
+    } else {
+      alert('Delete failed: ' + (result.error || 'Unknown error'));
+    }
+    setDeletingId(null);
+  };
+
+  const filteredItems = items.filter(item => {
     if (filter === 'all') return true;
     if (filter === 'blocked') return !item.is_active;
     return getRulePriority(item.rule_type) === filter;
-  }) || [];
+  });
 
-  const p0Count = items?.filter(i => getRulePriority(i.rule_type) === 'p0').length || 0;
-  const blockedCount = items?.filter(i => !i.is_active).length || 0;
+  const p0Count = items.filter(i => getRulePriority(i.rule_type) === 'p0').length;
+  const blockedCount = items.filter(i => !i.is_active).length;
 
   return (
     <div className="min-h-screen bg-[#0B0B0C]">
@@ -132,31 +178,54 @@ export default function WatchlistPage() {
                   : 'text-[#6B7280] hover:text-white hover:bg-[#1F2226]'
               }`}
             >
-              {f === 'all' && `All (${items?.length || 0})`}
+              {f === 'all' && `All (${items.length})`}
               {f === 'p0' && `P0 (${p0Count})`}
-              {f === 'p1' && `P1 (${items?.filter(i => getRulePriority(i.rule_type) === 'p1').length || 0})`}
+              {f === 'p1' && `P1 (${items.filter(i => getRulePriority(i.rule_type) === 'p1').length})`}
               {f === 'blocked' && `Blocked (${blockedCount})`}
             </button>
           ))}
         </div>
 
-        {loading ? (
+        {/* Loading State */}
+        {loading && (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-[#6B7280] animate-spin" />
             <span className="ml-2 text-[#6B7280]">Loading watchlist...</span>
           </div>
-        ) : filteredItems.length === 0 ? (
+        )}
+
+        {/* Error State */}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-12 bg-[#111214] border border-[#FF3B30]/30 rounded-[10px]">
+            <AlertCircle className="w-8 h-8 text-[#FF3B30] mb-4" />
+            <p className="text-sm text-[#FF3B30]">Failed to load watchlist</p>
+            <p className="text-xs text-[#6B7280] mt-1">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-[#1F2226] text-white rounded-lg text-sm hover:bg-[#2a2d32]"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && filteredItems.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 bg-[#111214] border border-[#1F2226] rounded-[10px]">
             <Eye className="w-8 h-8 text-[#6B7280] mb-4" />
             <p className="text-sm text-[#9BA3AF]">{filter === 'all' ? 'Watchlist empty' : `No ${filter} items`}</p>
             <p className="text-xs text-[#6B7280] mt-1">Add rules to track priorities</p>
           </div>
-        ) : (
+        )}
+
+        {/* Items List */}
+        {!loading && !error && filteredItems.length > 0 && (
           <div className="space-y-2">
             {filteredItems.map((item) => {
               const mappedStatus = getItemStatus(item.is_active);
               const mappedPriority = getRulePriority(item.rule_type);
               const StatusIcon = STATUS_ICONS[mappedStatus] || AlertCircle;
+              const isDeleting = deletingId === item.id;
               return (
                 <div
                   key={item.id}
@@ -188,9 +257,23 @@ export default function WatchlistPage() {
                         )}
                       </div>
                     </div>
-                    <button className="p-2 text-[#6B7280] hover:text-white">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleDelete(item.id)}
+                        disabled={isDeleting}
+                        className="p-2 text-[#6B7280] hover:text-[#FF3B30] disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Delete"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button className="p-2 text-[#6B7280] hover:text-white">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -18,9 +18,6 @@ import {
 } from "lucide-react";
 import { TaskGraphVisualization } from "../components/TaskGraphVisualization";
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 interface Task {
   id: string;
   title: string;

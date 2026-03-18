@@ -13,6 +13,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+// CACHE_BUST: 9884-REBUILD-FORCE-UPDATE
 
 interface CalendarEvent {
   id: string;

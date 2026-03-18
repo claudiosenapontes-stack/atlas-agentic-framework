@@ -13,6 +13,10 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata = {
   title: 'Atlas Agentic Corporation',
   description: 'Atlas Agentic Framework Dashboard',
+  other: {
+    'build-timestamp': '2026-03-18T02:55:00Z',
+    'deploy-commit': '9876-FORCE',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

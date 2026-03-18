@@ -446,7 +446,7 @@ async function createTaskWithDependencies(params: {
     assigned_agent_id: params.assignedAgentId,
     priority: params.priority || 'medium',
     parent_task_id: params.parentTaskId,
-    status: params.status || 'approved',
+    status: params.status || 'pending',
   };
   
   console.log('[TaskCreate] Insert data:', JSON.stringify(insertData));
@@ -591,7 +591,7 @@ export async function ingestCommand(input: CommandInput): Promise<{
     taskType,
     assignedAgentId: classified.targetAgent,
     priority: determinePriority(classified.riskLevel, input.sourceChannel),
-    status: 'approved',
+    status: 'pending',
   });
   
   // Step 7: Log routing event

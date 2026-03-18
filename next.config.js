@@ -1,14 +1,15 @@
 /** @type {import('next').NextConfig} */
-// Deployment trigger: 9884-MSN-CacheBust
+// Deployment trigger: 9869-MSN-CORS-Fix
 const nextConfig = {
-  cacheBust: 9884,  // Bumped for ATLAS-MSN-9884 calendar sync fix
   async headers() {
     return [
       {
         source: '/api/:path*',
         headers: [
           { key: 'Cache-Control', value: 'no-store, max-age=0' },
-          { key: 'X-Cache-Bust', value: '9884' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, PATCH, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
         ],
       },
     ];

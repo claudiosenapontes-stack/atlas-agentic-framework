@@ -26,7 +26,6 @@ export interface WatchRule {
   rule_type: string;
   action_type: string;
   is_active: boolean;
-  priority: string;
   critical_keywords: string[];
   high_keywords: string[];
   medium_keywords: string[];
@@ -61,7 +60,7 @@ export async function loadActiveWatchRules(): Promise<WatchRule[]> {
       .from('watch_rules')
       .select('*')
       .eq('is_active', true)
-      .order('priority', { ascending: false });
+      .order('created_at', { ascending: false });
   }, 'load_active_watch_rules');
   
   if (error) {

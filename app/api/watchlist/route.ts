@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
           rule_type,
           action_type,
           is_active,
-          priority,
           critical_keywords,
           high_keywords,
           medium_keywords,
@@ -130,7 +129,6 @@ export async function POST(request: NextRequest) {
       pattern, 
       rule_type = 'keyword_match',
       action_type = 'alert',
-      priority = 'medium',
       
       // Keywords
       critical_keywords = [],
@@ -202,7 +200,6 @@ export async function POST(request: NextRequest) {
       pattern,
       rule_type,
       action_type,
-      priority,
       is_active: true,
       
       // Keywords

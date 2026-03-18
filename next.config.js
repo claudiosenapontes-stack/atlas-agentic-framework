@@ -1,14 +1,14 @@
 /** @type {import('next').NextConfig} */
-// Deployment trigger: 9871-9872 Force redeploy - cacheBust bump
+// Deployment trigger: 9884-MSN-CacheBust
 const nextConfig = {
-  cacheBust: 9871,  // Bumped for watchlist pipeline deploy
+  cacheBust: 9884,  // Bumped for ATLAS-MSN-9884 calendar sync fix
   async headers() {
     return [
       {
         source: '/api/:path*',
         headers: [
           { key: 'Cache-Control', value: 'no-store, max-age=0' },
-          { key: 'X-Cache-Bust', value: '9819' },
+          { key: 'X-Cache-Bust', value: '9884' },
         ],
       },
     ];

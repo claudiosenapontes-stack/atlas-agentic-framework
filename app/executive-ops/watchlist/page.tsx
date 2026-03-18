@@ -15,6 +15,147 @@ import {
   Trash2
 } from 'lucide-react';
 
+// New Watchlist Item Form Component
+function NewWatchlistForm({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    pattern: '',
+    rule_type: 'keyword_match',
+    action_type: 'alert',
+    description: '',
+  });
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create watchlist item');
+      }
+
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-[#111214] border border-[#1F2226] rounded-[10px] w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-white">Add Watchlist Item</h2>
+          <button onClick={onClose} className="text-[#6B7280] hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {formError && (
+          <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg mb-4">
+            <p className="text-sm text-red-300">{formError}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-[#6B7280] mb-1">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1F2226] border border-[#2a2d32] rounded-lg text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00]"
+              placeholder="e.g., ARQIA Design Team"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-[#6B7280] mb-1">Pattern (email or keyword)</label>
+            <input
+              type="text"
+              value={formData.pattern}
+              onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1F2226] border border-[#2a2d32] rounded-lg text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00]"
+              placeholder="e.g., design@company.com"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-[#6B7280] mb-1">Rule Type</label>
+            <select
+              value={formData.rule_type}
+              onChange={(e) => setFormData({ ...formData, rule_type: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1F2226] border border-[#2a2d32] rounded-lg text-white focus:outline-none focus:border-[#FF6A00]"
+            >
+              <option value="keyword_match">Keyword Match</option>
+              <option value="critical_alert">Critical Alert</option>
+              <option value="ceo_escalation">CEO Escalation</option>
+              <option value="opportunity">Opportunity</option>
+              <option value="lead">Lead</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[#6B7280] mb-1">Action Type</label>
+            <select
+              value={formData.action_type}
+              onChange={(e) => setFormData({ ...formData, action_type: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1F2226] border border-[#2a2d32] rounded-lg text-white focus:outline-none focus:border-[#FF6A00]"
+            >
+              <option value="alert">Alert</option>
+              <option value="task">Create Task</option>
+              <option value="approval">Request Approval</option>
+              <option value="followup">Schedule Follow-up</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm text-[#6B7280] mb-1">Description (optional)</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-3 py-2 bg-[#1F2226] border border-[#2a2d32] rounded-lg text-white placeholder-[#6B7280] focus:outline-none focus:border-[#FF6A00] h-20 resize-none"
+              placeholder="Why is this contact important?"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-[#1F2226] text-white rounded-lg hover:bg-[#2a2d32] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 px-4 py-2 bg-[#FF6A00] text-white rounded-lg hover:bg-[#FF6A00]/90 transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Creating...' : 'Add Item'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 interface WatchlistItem {
   id: string;
   name: string;
@@ -165,6 +306,18 @@ export default function WatchlistPage() {
             </button>
           </div>
         </div>
+
+        {/* New Item Form Modal */}
+        {showNewForm && (
+          <NewWatchlistForm 
+            onClose={() => setShowNewForm(false)} 
+            onSuccess={() => {
+              getWatchlist().then(({ items, error }) => {
+                if (!error) setItems(items);
+              });
+            }}
+          />
+        )}
 
         {/* Filters */}
         <div className="flex items-center gap-2 mb-4">

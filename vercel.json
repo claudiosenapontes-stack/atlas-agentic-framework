@@ -7,8 +7,9 @@
   "public": true,
   "build": {
     "env": {
-      "FORCE_BUILD": "2026-03-17-0705-9225-FRESH"
+      "FORCE_BUILD": "9876-FORCE-REBUILD-2026-03-18-0300"
     }
   },
+  "installCommand": "npm ci --force",
   "rewrites": []
 }

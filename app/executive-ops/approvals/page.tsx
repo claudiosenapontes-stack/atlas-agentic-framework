@@ -67,11 +67,15 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
+  const loadApprovals = async () => {
+    setLoading(true);
+    const data = await getApprovals();
+    setApprovals(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    getApprovals().then(data => {
-      setApprovals(data);
-      setLoading(false);
-    });
+    loadApprovals();
   }, []);
 
   const filteredApprovals = approvals?.filter(a => {

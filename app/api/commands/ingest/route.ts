@@ -6,7 +6,7 @@ const COMPANY_ID_MAP: Record<string, string> = {
   ARQIA: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
   arqia: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
 };
-const DEFAULT_SOURCE_USER_ID = 'PASTE-REAL-USER-UUID-HERE';
+const DEFAULT_SOURCE_USER_ID = 'cfcdb716-cdee-4c38-a3a6-80de2e6dac36';
 
 // POST /api/commands/ingest
 // Normalized entry point for all commands with Phase 3B routing
@@ -33,20 +33,24 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
     // Normalize companyId: allow ARQIA code/slug, resolve to canonical UUID
     const normalizedCompanyId =
       COMPANY_ID_MAP[String(body.companyId)] ?? String(body.companyId);
 
+    // Default user for system-triggered commands
+    const DEFAULT_SOURCE_USER_ID = 'cfcdb716-cdee-4c38-a3a6-80de2e6dac36';
+
     // Check if this is a complex command with subtasks
-    const isComplexCommand = body.subTasks && Array.isArray(body.subTasks) && body.subTasks.length > 0;
+    const isComplexCommand =
+      body.subTasks &&
+      Array.isArray(body.subTasks) &&
+      body.subTasks.length > 0;
 
     let result;
     if (isComplexCommand) {
-      // Use complex command ingestion with parent/child tasks
       result = await ingestComplexCommand({
         sourceChannel: body.sourceChannel,
-        sourceUserId: body.sourceUserId=cfcdb716-cdee-4c38-a3a6-80de2e6dac36 ,
+        sourceUserId: body.sourceUserId ?? DEFAULT_SOURCE_USER_ID,
         sourceMessageId: body.sourceMessageId,
         companyId: normalizedCompanyId,
         commandText: body.commandText,
@@ -54,17 +58,16 @@ export async function POST(request: NextRequest) {
         subTasks: body.subTasks,
       });
     } else {
-      // Standard command ingestion
       result = await ingestCommand({
         sourceChannel: body.sourceChannel,
-        sourceUserId: body.sourceUserId=cfcdb716-cdee-4c38-a3a6-80de2e6dac36,
+        sourceUserId: body.sourceUserId ?? DEFAULT_SOURCE_USER_ID,
         sourceMessageId: body.sourceMessageId,
         companyId: normalizedCompanyId,
         commandText: body.commandText,
         metadata: body.metadata,
       });
     }
-
+  
     // Build response
     const response: Record<string, any> = {
       success: true,

@@ -152,17 +152,24 @@ export default function MissionsPage() {
 
   async function deleteMission(missionId: string) {
     if (!confirm('Delete this mission? This cannot be undone.')) return;
-    
+
     setDeleting(missionId);
     try {
       const res = await fetch(`/api/missions/${missionId}`, { method: 'DELETE' });
       if (res.ok) {
         setMissions(prev => prev.filter(m => m.id !== missionId));
+        // Also remove from missionTasks
+        setMissionTasks(prev => {
+          const newTasks = { ...prev };
+          delete newTasks[missionId];
+          return newTasks;
+        });
       } else {
-        alert('Failed to delete mission');
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }));
+        alert(`Failed to delete mission: ${data.error || res.statusText}`);
       }
-    } catch (err) {
-      alert('Error deleting mission');
+    } catch (err: any) {
+      alert(`Error deleting mission: ${err.message}`);
     } finally {
       setDeleting(null);
     }

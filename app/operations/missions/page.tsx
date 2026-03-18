@@ -116,10 +116,10 @@ export default function MissionsPage() {
 
   const stats = {
     total: missions.length,
-    queued: missions.filter(m => m.status === 'queued' || m.status === 'requested' || m.status === 'accepted').length,
-    inProgress: missions.filter(m => m.status === 'in_progress' || m.status === 'executing' || m.status === 'decomposed').length,
-    complete: missions.filter(m => m.status === 'complete' || m.status === 'completed' || m.status === 'closed' || m.status === 'verifying').length,
-    blocked: missions.filter(m => m.status === 'blocked' || m.status === 'remediating').length,
+    queued: missions.filter(m => m.status === 'draft').length,
+    inProgress: missions.filter(m => m.status === 'in_progress').length,
+    complete: missions.filter(m => m.status === 'complete').length,
+    blocked: missions.filter(m => m.status === 'blocked').length,
   };
 
   function getMissionTasks(missionId: string): Task[] {

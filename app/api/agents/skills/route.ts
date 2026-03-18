@@ -1,217 +1,209 @@
 /**
- * ATLAS-AGENT-SKILLS-API
- * GET /api/agents/skills
- * 
- * Returns comprehensive agent information including:
- * - Identity (from SOUL.md)
- * - Tools configuration (from TOOLS.md)
- * - Runtime status (from PM2/OpenClaw)
- * - Installed vs available skills
+ * ATLAS-9930 Phase 3: /api/agents/skills
+ * Returns agent capabilities and model routing rules
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 
-const execAsync = promisify(exec);
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-const SKILLS_DIR = '/usr/lib/node_modules/openclaw/skills';
-const WORKSPACES_DIR = '/root/.openclaw/workspaces';
-
-interface AgentSkillInfo {
+interface AgentSkills {
   id: string;
-  title: string;
-  realm: string;
-  emoji: string;
-  soulConfigured: boolean;
-  toolsConfigured: boolean;
-  runtimeStatus: 'online' | 'offline' | 'unknown';
-  pid?: number;
-  uptime?: string;
-  installedSkills: string[];
-  availableSkills: number;
-  suggestedSkills: string[];
-  memoryFiles: number;
-  lastSeen?: string;
-}
-
-// Core Atlas agents
-const CORE_AGENTS = [
-  'henry',
-  'severino', 
-  'olivia',
-  'sophia',
-  'harvey',
-  'einstein',
-  'optimus',
-  'optimus-prime'
-];
-
-async function getAvailableSkills(): Promise<string[]> {
-  try {
-    const { stdout } = await execAsync(`ls -1 ${SKILLS_DIR}`);
-    return stdout.split('\n').filter(s => s.trim() && !s.startsWith('.') && existsSync(path.join(SKILLS_DIR, s, 'SKILL.md')));
-  } catch {
-    return [];
-  }
-}
-
-async function getAgentSoulInfo(agentId: string): Promise<{ title: string; realm: string; emoji: string } | null> {
-  try {
-    const soulPath = path.join(WORKSPACES_DIR, agentId, 'SOUL.md');
-    if (!existsSync(soulPath)) return null;
-    
-    const content = await readFile(soulPath, 'utf-8');
-    
-    // Extract title from first H1 or Name field
-    const titleMatch = content.match(/^#\s+(.+)$/m) || content.match(/\*\*Name:\*\*\s*(.+)/i);
-    const title = titleMatch ? titleMatch[1].trim() : agentId;
-    
-    // Extract realm/role from role/domain/focus fields
-    const realmMatch = content.match(/(?:role|domain|focus)[\s:]+([^\n]+)/i);
-    const realm = realmMatch ? realmMatch[1].trim().split('.')[0] : 'Unconfigured';
-    
-    // Extract emoji if present (check common emoji patterns)
-    const emojiMatch = content.match(/([🎭⚡🔧🧠💼📊🔍🤖💡🎯🔥💻])/);
-    const emoji = emojiMatch ? emojiMatch[1] : '🤖';
-    
-    return { title, realm, emoji };
-  } catch {
-    return null;
-  }
-}
-
-async function getInstalledSkills(agentId: string): Promise<string[]> {
-  try {
-    const toolsPath = path.join(WORKSPACES_DIR, agentId, 'TOOLS.md');
-    if (!existsSync(toolsPath)) return [];
-    
-    const content = await readFile(toolsPath, 'utf-8');
-    
-    // Extract skill names from SKILL.md references
-    const skills = new Set<string>();
-    const skillRegex = /([a-z-]+)\/SKILL\.md/g;
-    let match;
-    while ((match = skillRegex.exec(content)) !== null) {
-      skills.add(match[1]);
-    }
-    
-    // Also check for skill references in text
-    const availableSkills = await getAvailableSkills();
-    for (const skill of availableSkills) {
-      if (content.toLowerCase().includes(skill.toLowerCase())) {
-        skills.add(skill);
-      }
-    }
-    
-    return Array.from(skills);
-  } catch {
-    return [];
-  }
-}
-
-async function getMemoryFileCount(agentId: string): Promise<number> {
-  try {
-    const { stdout } = await execAsync(`ls -1 ${path.join(WORKSPACES_DIR, agentId, 'memory')} 2>/dev/null | wc -l`);
-    return parseInt(stdout.trim()) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function getRuntimeStatus(): Promise<Map<string, { status: string; pid?: number; uptime?: string }>> {
-  const statusMap = new Map();
-  try {
-    const { stdout } = await execAsync('pm2 jlist');
-    const processes = JSON.parse(stdout);
-    for (const proc of processes) {
-      if (proc.name && CORE_AGENTS.some(a => proc.name.includes(a))) {
-        statusMap.set(proc.name, {
-          status: proc.pm2_env?.status || 'unknown',
-          pid: proc.pid,
-          uptime: proc.pm2_env?.pm_uptime ? formatUptime(Date.now() - proc.pm2_env.pm_uptime) : undefined
-        });
-      }
-    }
-  } catch {
-    // PM2 not available
-  }
-  return statusMap;
-}
-
-function formatUptime(ms: number): string {
-  const hours = Math.floor(ms / 3600000);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h`;
-  return `${hours}h`;
-}
-
-function getSuggestedSkills(agentId: string, installed: string[], available: string[]): string[] {
-  const roleSkillMap: Record<string, string[]> = {
-    'henry': ['github', 'gh-issues', 'slack', 'discord', 'telegram'],
-    'severino': ['healthcheck', 'mcporter', 'oracle', 'tmux', 'session-logs'],
-    'olivia': ['github', 'notion', 'trello', 'slack', 'discord'],
-    'sophia': ['weather', 'blogwatcher', 'gifgrep', 'slack', 'discord'],
-    'harvey': ['github', 'oracle', 'pdf', 'session-logs'],
-    'einstein': ['oracle', 'gemini', 'openai-whisper', 'pdf', 'video-frames'],
-    'optimus': ['github', 'gh-issues', 'mcporter', 'coding-agent', 'skill-creator'],
-    'optimus-prime': ['github', 'gh-issues', 'skill-creator', 'oracle', 'gemini']
+  displayName: string;
+  description: string;
+  handlers: {
+    type: string;
+    description: string;
+    icon: string;
+  }[];
+  modelRouting: {
+    provider: string;
+    model: string;
+    priority: 'high' | 'normal' | 'low';
   };
-  
-  const suggested = roleSkillMap[agentId] || ['github', 'oracle', 'session-logs'];
-  return suggested.filter(s => !installed.includes(s) && available.includes(s)).slice(0, 3);
+  capabilities: string[];
+  permissions: string[];
+  color: string;
 }
+
+const AGENT_CONFIGS: Record<string, AgentSkills> = {
+  'henry': {
+    id: 'henry',
+    displayName: 'Henry',
+    description: 'Fleet Commander and Chief Operating Officer. Coordinates all agents, monitors system health, and ensures mission success.',
+    handlers: [
+      { type: 'fleet', description: 'Fleet coordination and worker management', icon: 'Users' },
+      { type: 'operations', description: 'Mission planning and status tracking', icon: 'Target' },
+      { type: 'audit', description: 'System audits and health checks', icon: 'Search' },
+      { type: 'coordinate', description: 'Cross-agent task orchestration', icon: 'GitBranch' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2.5', priority: 'normal' },
+    capabilities: ['System Monitoring', 'Fleet Management', 'Mission Coordination', 'Health Audits'],
+    permissions: ['view_all', 'restart_agents', 'create_missions', 'delegate_tasks'],
+    color: 'blue'
+  },
+  'optimus': {
+    id: 'optimus',
+    displayName: 'Optimus',
+    description: 'Lead Software Architect and Backend Developer. Builds APIs, database schemas, and core infrastructure.',
+    handlers: [
+      { type: 'code', description: 'Software development and coding', icon: 'Code' },
+      { type: 'development', description: 'Backend API development', icon: 'Server' },
+      { type: 'api', description: 'REST API design and implementation', icon: 'Globe' },
+      { type: 'orchestrate', description: 'Service orchestration', icon: 'Layers' },
+      { type: 'architecture', description: 'System architecture design', icon: 'Box' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2.5', priority: 'high' },
+    capabilities: ['API Development', 'Database Design', 'System Architecture', 'Code Review'],
+    permissions: ['deploy_api', 'modify_database', 'restart_services'],
+    color: 'purple'
+  },
+  'optimus-prime': {
+    id: 'optimus-prime',
+    displayName: 'Optimus Prime',
+    description: 'Autonomous AI Leader and Senior Developer. Handles complex architectural decisions and high-priority implementations.',
+    handlers: [
+      { type: 'code', description: 'Advanced software development', icon: 'Code' },
+      { type: 'autonomy', description: 'Autonomous decision making', icon: 'Cpu' },
+      { type: 'control', description: 'Fleet control and management', icon: 'Shield' },
+      { type: 'deployment', description: 'Production deployment', icon: 'Rocket' },
+      { type: 'orchestrate', description: 'Multi-service orchestration', icon: 'GitMerge' },
+      { type: 'research', description: 'Technical research', icon: 'BookOpen' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2.5', priority: 'high' },
+    capabilities: ['Autonomous Execution', 'Production Deployment', 'Architecture Leadership', 'Complex Problem Solving'],
+    permissions: ['all', 'deploy_production', 'modify_infrastructure', 'restart_all'],
+    color: 'indigo'
+  },
+  'prime': {
+    id: 'prime',
+    displayName: 'Prime',
+    description: 'Infrastructure and DevOps Specialist. Manages deployments, monitoring, and system reliability.',
+    handlers: [
+      { type: 'deployment', description: 'Infrastructure deployment', icon: 'Cloud' },
+      { type: 'infrastructure', description: 'Infrastructure as code', icon: 'Server' },
+      { type: 'monitoring', description: 'System monitoring setup', icon: 'Activity' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2', priority: 'normal' },
+    capabilities: ['DevOps', 'Infrastructure', 'Monitoring', 'CI/CD'],
+    permissions: ['deploy', 'modify_infrastructure', 'view_monitoring'],
+    color: 'violet'
+  },
+  'olivia': {
+    id: 'olivia',
+    displayName: 'Olivia',
+    description: 'UI/UX Designer and Frontend Developer. Creates beautiful, responsive user interfaces.',
+    handlers: [
+      { type: 'ui', description: 'User interface design', icon: 'Layout' },
+      { type: 'frontend', description: 'Frontend development', icon: 'Monitor' },
+      { type: 'design', description: 'Visual design', icon: 'Palette' },
+      { type: 'testing', description: 'UI testing', icon: 'CheckCircle' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2', priority: 'normal' },
+    capabilities: ['UI Design', 'Frontend Dev', 'Responsive Design', 'Accessibility'],
+    permissions: ['modify_ui', 'deploy_frontend'],
+    color: 'pink'
+  },
+  'sophia': {
+    id: 'sophia',
+    displayName: 'Sophia',
+    description: 'Data Analyst and Research Specialist. Extracts insights from data and conducts research.',
+    handlers: [
+      { type: 'data', description: 'Data analysis', icon: 'BarChart' },
+      { type: 'analytics', description: 'Analytics and reporting', icon: 'PieChart' },
+      { type: 'research', description: 'Market research', icon: 'Search' },
+      { type: 'content', description: 'Content creation', icon: 'FileText' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2', priority: 'normal' },
+    capabilities: ['Data Analysis', 'Research', 'Content Creation', 'Reporting'],
+    permissions: ['view_data', 'create_reports'],
+    color: 'emerald'
+  },
+  'harvey': {
+    id: 'harvey',
+    displayName: 'Harvey',
+    description: 'Legal and Compliance Officer. Ensures all operations meet legal requirements.',
+    handlers: [
+      { type: 'legal', description: 'Legal review', icon: 'Scale' },
+      { type: 'compliance', description: 'Compliance checking', icon: 'ShieldCheck' },
+      { type: 'contracts', description: 'Contract analysis', icon: 'FileSignature' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2', priority: 'low' },
+    capabilities: ['Legal Review', 'Compliance', 'Contract Analysis', 'Risk Assessment'],
+    permissions: ['view_legal', 'flag_compliance'],
+    color: 'red'
+  },
+  'einstein': {
+    id: 'einstein',
+    displayName: 'Einstein',
+    description: 'Scientific Researcher and Analyst. Handles complex mathematical and scientific problems.',
+    handlers: [
+      { type: 'research', description: 'Scientific research', icon: 'Microscope' },
+      { type: 'analysis', description: 'Deep analysis', icon: 'Brain' },
+      { type: 'math', description: 'Mathematical modeling', icon: 'Calculator' },
+      { type: 'science', description: 'Scientific computation', icon: 'Atom' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2.5', priority: 'normal' },
+    capabilities: ['Scientific Research', 'Mathematical Modeling', 'Data Science', 'Analysis'],
+    permissions: ['access_research', 'run_analysis'],
+    color: 'cyan'
+  },
+  'severino': {
+    id: 'severino',
+    displayName: 'Severino',
+    description: 'MCP Integration Specialist. Manages external tool integrations and API connections.',
+    handlers: [
+      { type: 'mcp', description: 'MCP server management', icon: 'Plug' },
+      { type: 'integration', description: 'Third-party integration', icon: 'Link' },
+      { type: 'tools', description: 'Tool orchestration', icon: 'Tool' }
+    ],
+    modelRouting: { provider: 'OpenRouter', model: 'kimi-k2', priority: 'low' },
+    capabilities: ['MCP Integration', 'API Management', 'Tool Orchestration', 'External Services'],
+    permissions: ['manage_integrations', 'configure_mcp'],
+    color: 'orange'
+  }
+};
 
 export async function GET(request: NextRequest) {
-  const timestamp = new Date().toISOString();
+  const startTime = Date.now();
   
   try {
-    const [availableSkills, runtimeStatus] = await Promise.all([
-      getAvailableSkills(),
-      getRuntimeStatus()
-    ]);
+    const { searchParams } = new URL(request.url);
+    const agentId = searchParams.get('agent_id');
     
-    const agents: AgentSkillInfo[] = [];
-    
-    for (const agentId of CORE_AGENTS) {
-      const soulInfo = await getAgentSoulInfo(agentId);
-      const installedSkills = await getInstalledSkills(agentId);
-      const memoryCount = await getMemoryFileCount(agentId);
-      const runtime = runtimeStatus.get(agentId) || { status: 'unknown' };
+    if (agentId) {
+      // Return single agent skills
+      const config = AGENT_CONFIGS[agentId];
+      if (!config) {
+        return NextResponse.json({
+          success: false,
+          error: `Agent ${agentId} not found`
+        }, { status: 404 });
+      }
       
-      agents.push({
-        id: agentId,
-        title: soulInfo?.title || agentId,
-        realm: soulInfo?.realm || 'Unconfigured',
-        emoji: soulInfo?.emoji || '🤖',
-        soulConfigured: !!soulInfo,
-        toolsConfigured: existsSync(path.join(WORKSPACES_DIR, agentId, 'TOOLS.md')),
-        runtimeStatus: runtime.status === 'online' ? 'online' : runtime.status === 'offline' ? 'offline' : 'unknown',
-        pid: runtime.pid,
-        uptime: runtime.uptime,
-        installedSkills,
-        availableSkills: availableSkills.length,
-        suggestedSkills: getSuggestedSkills(agentId, installedSkills, availableSkills),
-        memoryFiles: memoryCount
+      return NextResponse.json({
+        success: true,
+        agent: config,
+        timestamp: new Date().toISOString(),
+        duration: Date.now() - startTime
       });
     }
     
+    // Return all agent skills
     return NextResponse.json({
       success: true,
-      agents,
-      availableSkills,
-      skillsHubUrl: 'https://clawhub.com',
-      timestamp
+      agents: Object.values(AGENT_CONFIGS),
+      timestamp: new Date().toISOString(),
+      duration: Date.now() - startTime
     });
-  } catch (error) {
-    console.error('[Agent Skills API] Error:', error);
+    
+  } catch (error: any) {
+    console.error('Error fetching agent skills:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp
+      error: error.message,
+      duration: Date.now() - startTime
     }, { status: 500 });
   }
 }

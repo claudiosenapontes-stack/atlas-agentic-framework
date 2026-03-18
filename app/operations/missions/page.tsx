@@ -44,12 +44,20 @@ interface Task {
   mission_id: string;
 }
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-800 border-gray-300',
   queued: 'bg-blue-100 text-blue-800 border-blue-300',
   in_progress: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  executing: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   complete: 'bg-green-100 text-green-800 border-green-300',
+  completed: 'bg-green-100 text-green-800 border-green-300',
+  closed: 'bg-green-100 text-green-800 border-green-300',
   blocked: 'bg-red-100 text-red-800 border-red-300',
+  requested: 'bg-gray-100 text-gray-800 border-gray-300',
+  accepted: 'bg-blue-100 text-blue-800 border-blue-300',
+  decomposed: 'bg-purple-100 text-purple-800 border-purple-300',
+  verifying: 'bg-teal-100 text-teal-800 border-teal-300',
+  remediating: 'bg-orange-100 text-orange-800 border-orange-300',
 };
 
 const PRIORITY_COLORS = {
@@ -108,10 +116,10 @@ export default function MissionsPage() {
 
   const stats = {
     total: missions.length,
-    queued: missions.filter(m => m.status === 'queued').length,
-    inProgress: missions.filter(m => m.status === 'in_progress').length,
-    complete: missions.filter(m => m.status === 'complete').length,
-    blocked: missions.filter(m => m.status === 'blocked').length,
+    queued: missions.filter(m => m.status === 'queued' || m.status === 'requested' || m.status === 'accepted').length,
+    inProgress: missions.filter(m => m.status === 'in_progress' || m.status === 'executing' || m.status === 'decomposed').length,
+    complete: missions.filter(m => m.status === 'complete' || m.status === 'completed' || m.status === 'closed' || m.status === 'verifying').length,
+    blocked: missions.filter(m => m.status === 'blocked' || m.status === 'remediating').length,
   };
 
   function getMissionTasks(missionId: string): Task[] {
@@ -241,17 +249,17 @@ export default function MissionsPage() {
                   
                   {/* Actions */}
                   <div className="flex items-center gap-2">
-                    {mission.status === 'blocked' && (
+                    {(mission.status === 'blocked' || mission.status === 'remediating') && (
                       <button className="p-2 text-yellow-400 hover:bg-yellow-900/30 rounded-lg" title="Unblock">
                         <RotateCcw className="w-4 h-4" />
                       </button>
                     )}
-                    {mission.status === 'queued' && (
+                    {(mission.status === 'queued' || mission.status === 'requested' || mission.status === 'accepted' || mission.status === 'draft') && (
                       <button className="p-2 text-green-400 hover:bg-green-900/30 rounded-lg" title="Start">
                         <Play className="w-4 h-4" />
                       </button>
                     )}
-                    {mission.status === 'in_progress' && (
+                    {(mission.status === 'in_progress' || mission.status === 'executing') && (
                       <button className="p-2 text-blue-400 hover:bg-blue-900/30 rounded-lg" title="Complete">
                         <CheckCircle2 className="w-4 h-4" />
                       </button>

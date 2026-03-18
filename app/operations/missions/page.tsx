@@ -88,13 +88,44 @@ export default function MissionsPage() {
       if (!missionsRes.ok) throw new Error(`Missions API error: ${missionsRes.status}`);
       
       const missionsData = await missionsRes.json();
-      if (missionsData.success) setMissions(missionsData.missions || []);
+      if (missionsData.success) {
+        const missions = missionsData.missions || [];
+        setMissions(missions);
+        
+        // Pre-fetch tasks for all missions on load
+        if (missions.length > 0) {
+          fetchAllMissionTasks(missions.map((m: Mission) => m.id));
+        }
+      }
       setError(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
       setLastRefresh(new Date());
+    }
+  }
+  
+  async function fetchAllMissionTasks(missionIds: string[]) {
+    try {
+      const res = await fetch(`/api/tasks?limit=200`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.success) {
+        // Group tasks by mission_id
+        const tasksByMission: Record<string, Task[]> = {};
+        for (const task of (data.tasks || [])) {
+          if (task.mission_id) {
+            if (!tasksByMission[task.mission_id]) {
+              tasksByMission[task.mission_id] = [];
+            }
+            tasksByMission[task.mission_id].push(task);
+          }
+        }
+        setMissionTasks(prev => ({ ...prev, ...tasksByMission }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err);
     }
   }
   

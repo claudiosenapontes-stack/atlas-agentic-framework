@@ -117,7 +117,7 @@ async function fetchExecutableTasks(): Promise<ExecutionTask[]> {
     // Legacy tasks may have status="inbox" or "pending"
     console.log(`[ExecutionRunner] [CRITERIA] Querying for tasks with status IN ('inbox','pending','in_progress') AND assigned_agent_id NOT NULL AND execution_id NOT NULL`);
 
-    // Query for eligible workflow tasks with proper guards
+    // Query for eligible tasks - FIXED: Allow standalone tasks without execution_id
     const { data: tasks, error: tasksError } = await supabaseAdmin
       .from("tasks")
       .select(`
@@ -130,7 +130,7 @@ async function fetchExecutableTasks(): Promise<ExecutionTask[]> {
       `)
       .in("status", ["inbox", "pending", "in_progress"])
       .not("assigned_agent_id", "is", null)
-      .not("execution_id", "is", null)
+      // REMOVED: .not("execution_id", "is", null) - allows standalone tasks
       .order("created_at", { ascending: false })  // Prioritize newer tasks
       .limit(MAX_CONCURRENT_EXECUTIONS);
 

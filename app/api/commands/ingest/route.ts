@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestCommand, ingestComplexCommand } from '@/lib/command-bus';
 
+// Canonical company UUID map
+const COMPANY_ID_MAP: Record<string, string> = {
+  ARQIA: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
+  arqia: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
+};
+
 // POST /api/commands/ingest
 // Normalized entry point for all commands with Phase 3B routing
 
@@ -9,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log('[API] Request body:', JSON.stringify(body));
-    
+
     // Validate required fields
     if (!body.sourceChannel || !body.companyId || !body.commandText) {
       return NextResponse.json(
@@ -17,7 +23,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Validate source channel
     const validChannels = ['telegram', 'mission_control', 'cron', 'webhook', 'api'];
     if (!validChannels.includes(body.sourceChannel)) {
@@ -26,10 +32,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    // Normalize companyId: allow ARQIA code/slug, resolve to canonical UUID
+    const normalizedCompanyId =
+      COMPANY_ID_MAP[String(body.companyId)] ?? String(body.companyId);
+
     // Check if this is a complex command with subtasks
     const isComplexCommand = body.subTasks && Array.isArray(body.subTasks) && body.subTasks.length > 0;
-    
+
     let result;
     if (isComplexCommand) {
       // Use complex command ingestion with parent/child tasks
@@ -37,7 +47,7 @@ export async function POST(request: NextRequest) {
         sourceChannel: body.sourceChannel,
         sourceUserId: body.sourceUserId,
         sourceMessageId: body.sourceMessageId,
-        companyId: body.companyId,
+        companyId: normalizedCompanyId,
         commandText: body.commandText,
         metadata: body.metadata,
         subTasks: body.subTasks,
@@ -48,22 +58,22 @@ export async function POST(request: NextRequest) {
         sourceChannel: body.sourceChannel,
         sourceUserId: body.sourceUserId,
         sourceMessageId: body.sourceMessageId,
-        companyId: body.companyId,
+        companyId: normalizedCompanyId,
         commandText: body.commandText,
         metadata: body.metadata,
       });
     }
-    
+
     // Build response
     const response: Record<string, any> = {
       success: true,
       commandId: result.commandId,
       status: result.status,
-      message: result.status === 'awaiting_approval' 
+      message: result.status === 'awaiting_approval'
         ? 'Command requires approval before execution'
         : 'Command queued for execution',
     };
-    
+
     // Add fields based on result type
     if ('parentTaskId' in result) {
       // Complex command result
@@ -79,9 +89,9 @@ export async function POST(request: NextRequest) {
         response.routedToAgent = result.routedToAgent;
       }
     }
-    
+
     return NextResponse.json(response);
-    
+
   } catch (error: any) {
     console.error('[Commands API] Error:', error);
     return NextResponse.json(

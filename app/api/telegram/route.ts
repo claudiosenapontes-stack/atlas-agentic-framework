@@ -6,17 +6,28 @@ export async function POST(req: NextRequest) {
 
     console.log("[Telegram] Incoming:", body);
 
-    // Extract message safely
-    const message =
-      body?.message?.text ||
-      body?.edited_message?.text ||
-      "";
+    const telegramMessage = body?.message || body?.edited_message;
 
-    if (!message) {
+    if (!telegramMessage) {
       return NextResponse.json({ success: true, ignored: true });
     }
 
-    // 🔥 THIS IS THE FIX FOR YOUR 401
+    const messageText = telegramMessage?.text || "";
+    if (!messageText) {
+      return NextResponse.json({ success: true, ignored: true });
+    }
+
+    const telegramUserId = telegramMessage?.from?.id?.toString() || null;
+    const telegramChatId = telegramMessage?.chat?.id?.toString() || null;
+    const telegramMessageId = telegramMessage?.message_id?.toString() || null;
+
+    console.log("[Telegram] Extracted Identity:", {
+      telegramUserId,
+      telegramChatId,
+      telegramMessageId,
+      messageText,
+    });
+
     const response = await fetch(
       "https://atlas-agentic-framework.vercel.app/api/commands/ingest",
       {
@@ -26,14 +37,17 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           sourceChannel: "telegram",
-
-          // ✅ MUST BE REAL UUID FROM USERS TABLE
-          sourceUserId: "cfcdb716-cdee-4c38-a3a6-80de2e6dac36",
-
-          // keep your working company UUID (NOT "ARQIA")
+          sourceUserId: telegramChatId ?? telegramUserId,
+          sourceMessageId: telegramMessageId,
           companyId: "64c8d2e8-da05-4f77-8898-9b1726bf8fd9",
-
-          commandText: message,
+          commandText: messageText,
+          metadata: {
+            telegramUserId,
+            telegramChatId,
+            telegramMessageId,
+            telegramUsername: telegramMessage?.from?.username ?? null,
+            telegramFirstName: telegramMessage?.from?.first_name ?? null,
+          },
         }),
       }
     );
@@ -42,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     console.log("[Telegram] Routed:", data);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, routed: data });
   } catch (error) {
     console.error("[Telegram] Error:", error);
 

@@ -6,7 +6,6 @@ const COMPANY_ID_MAP: Record<string, string> = {
   ARQIA: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
   arqia: '64c8d2e8-da05-4f77-8898-9b1726bf8fd9',
 };
-const DEFAULT_SOURCE_USER_ID = 'cfcdb716-cdee-4c38-a3a6-80de2e6dac36';
 
 // POST /api/commands/ingest
 // Normalized entry point for all commands with Phase 3B routing
@@ -33,12 +32,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
     // Normalize companyId: allow ARQIA code/slug, resolve to canonical UUID
     const normalizedCompanyId =
       COMPANY_ID_MAP[String(body.companyId)] ?? String(body.companyId);
 
-    // Default user for system-triggered commands
-    const DEFAULT_SOURCE_USER_ID = 'cfcdb716-cdee-4c38-a3a6-80de2e6dac36';
+    // Telegram must preserve real sender/chat identity
+    if (body.sourceChannel === 'telegram' && !body.sourceUserId) {
+      return NextResponse.json(
+        { error: 'Missing Telegram identity' },
+        { status: 400 }
+      );
+    }
 
     // Check if this is a complex command with subtasks
     const isComplexCommand =
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (isComplexCommand) {
       result = await ingestComplexCommand({
         sourceChannel: body.sourceChannel,
-        sourceUserId: body.sourceUserId ?? DEFAULT_SOURCE_USER_ID,
+        sourceUserId: body.sourceUserId ?? null,
         sourceMessageId: body.sourceMessageId,
         companyId: normalizedCompanyId,
         commandText: body.commandText,
@@ -60,14 +65,14 @@ export async function POST(request: NextRequest) {
     } else {
       result = await ingestCommand({
         sourceChannel: body.sourceChannel,
-        sourceUserId: body.sourceUserId ?? DEFAULT_SOURCE_USER_ID,
+        sourceUserId: body.sourceUserId ?? null,
         sourceMessageId: body.sourceMessageId,
         companyId: normalizedCompanyId,
         commandText: body.commandText,
         metadata: body.metadata,
       });
     }
-  
+
     // Build response
     const response: Record<string, any> = {
       success: true,

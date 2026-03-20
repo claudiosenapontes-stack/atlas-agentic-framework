@@ -12,7 +12,7 @@ import { createServiceLogger } from "@/lib/logging";
 
 const logger = createServiceLogger("ExecutionRunner");
 
-const POLL_INTERVAL_MS = 5000; // 5 seconds between polls
+const POLL_INTERVAL_MS = 30000; // ATLAS-P0-FIX-003: 30 seconds between polls
 const MAX_CONCURRENT_EXECUTIONS = 5;
 
 interface ExecutionTask {
@@ -360,35 +360,106 @@ async function resolveAgentConfig(agentId: string): Promise<{ name: string; mode
 
 /**
  * Invoke agent execution
- * This simulates the execution for now - in production this would call the actual agent runtime
+ * ATLAS-P0-FIX-002: Queue task to Redis for worker consumption and poll for completion
  */
 async function invokeAgentExecution(
   task: ExecutionTask,
   agentConfig: { name: string; model?: string }
 ): Promise<{ success: boolean; output: string; error?: string; tokensUsed?: number }> {
-  console.log(`[ExecutionRunner] Executing agent: ${agentConfig.name}`);
+  console.log(`[ExecutionRunner] Queuing task for agent: ${agentConfig.name}`);
   console.log(`[ExecutionRunner] Task: ${task.title}`);
 
-  // TODO: Integrate with actual agent runtime (OpenClaw, command-bus, etc.)
-  // For now, simulate execution with a placeholder response
-  
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // Import Redis client
+  const { createClient } = await import("redis");
+  const redis = createClient({
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+  });
+  await redis.connect();
 
-  // Generate a mock output
-  const output = `Executed by ${agentConfig.name}: ${task.title}\n\nTask completed successfully.`;
-  
-  // Simulate token usage
-  const tokensUsed = Math.floor(Math.random() * 1000) + 100;
+  try {
+    // Build task payload for worker
+    const taskPayload = {
+      id: task.taskId,
+      type: "code",
+      title: task.title,
+      description: task.description,
+      assigned_agent_id: task.agentId,
+      execution_id: task.executionId,
+      priority: "high",
+      target_agents: [task.agentId],
+      enqueued_at: new Date().toISOString(),
+    };
 
-  console.log(`[ExecutionRunner] Simulated execution complete`);
-  console.log(`[ExecutionRunner] Tokens used: ${tokensUsed}`);
+    // Queue to agent's assignment queue
+    const queueKey = `agent:assignments:${task.agentId}`;
+    await redis.lpush(queueKey, JSON.stringify(taskPayload));
+    console.log(`[ExecutionRunner] Task queued to ${queueKey}`);
 
-  return {
-    success: true,
-    output,
-    tokensUsed,
-  };
+    // Also add to sorted set for priority handling
+    await redis.zadd("task_queue", { score: 50, value: task.taskId });
+
+    // Store task data for worker
+    await redis.set(`task:${task.taskId}`, JSON.stringify(taskPayload));
+
+    // Poll for completion (workers will execute and update Supabase)
+    const maxWaitMs = 10 * 60 * 1000; // 10 minute timeout
+    const pollIntervalMs = 2000; // 2 second poll
+    const startTime = Date.now();
+
+    console.log(`[ExecutionRunner] Polling for execution completion...`);
+
+    while (Date.now() - startTime < maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+      // Check execution status in Supabase
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: execution, error } = await supabaseAdmin
+        .from("executions")
+        .select("status, output_preview, error_message, tokens_used")
+        .eq("id", task.executionId)
+        .single();
+
+      if (error) {
+        console.error(`[ExecutionRunner] Poll error:`, error);
+        continue;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const execData = execution as any;
+
+      if (execData.status === "completed") {
+        console.log(`[ExecutionRunner] Execution completed`);
+        return {
+          success: true,
+          output: execData.output_preview || "Task completed",
+          tokensUsed: execData.tokens_used || 0,
+        };
+      }
+
+      if (execData.status === "failed") {
+        console.log(`[ExecutionRunner] Execution failed`);
+        return {
+          success: false,
+          output: "",
+          error: execData.error_message || "Execution failed",
+          tokensUsed: execData.tokens_used || 0,
+        };
+      }
+
+      // Still running, continue polling
+      console.log(`[ExecutionRunner] Still running... (${Math.round((Date.now() - startTime) / 1000)}s)`);
+    }
+
+    // Timeout
+    return {
+      success: false,
+      output: "",
+      error: "Execution timed out after 10 minutes",
+    };
+
+  } finally {
+    await redis.disconnect();
+  }
 }
 
 /**

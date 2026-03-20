@@ -139,16 +139,9 @@ async function pollAndDispatch(): Promise<void> {
       // Store full task data
       await redis.set(`task:${task.id}`, JSON.stringify(taskPayload));
 
-      // Update task status to "in_progress" (worker will pick it up)
-      const { error: updateError } = await supabase
-        .from("tasks")
-        .update({ status: "in_progress", updated_at: new Date().toISOString() })
-        .eq("id", task.id);
-
-      if (updateError) {
-        console.error(`[TaskDispatcher] Failed to update task ${task.id}:`, updateError);
-        continue;
-      }
+      // ATLAS-P0-FIX-001: DO NOT update status to "in_progress" here
+      // Worker must claim from "pending" status for atomic claim
+      // Status remains "pending" until worker claims it
 
       DISPATCHED_TASKS.add(task.id);
       console.log(`[TaskDispatcher] ✓ Dispatched task ${task.id.slice(0,8)} to ${agentId} (${taskType})`);

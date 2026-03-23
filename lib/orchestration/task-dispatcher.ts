@@ -105,7 +105,7 @@ async function pollAndDispatch(): Promise<void> {
           continue;
         }
 
-        const task = JSON.parse(taskData);
+        const task = JSON.parse(taskData as string);
         const agentId = (task.assigned_agent_id || task.agent_id || "henry").toLowerCase();
         
         // Build task payload for worker

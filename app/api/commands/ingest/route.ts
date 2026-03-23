@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
         commandText: body.commandText,
         metadata: body.metadata,
         subTasks: body.subTasks,
+        mode: body.mode, // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
       });
     } else {
       result = await ingestCommand({
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         companyId: normalizedCompanyId,
         commandText: body.commandText,
         metadata: body.metadata,
+        mode: body.mode, // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
       });
     }
 
@@ -83,6 +85,9 @@ export async function POST(request: NextRequest) {
         : 'Command queued for execution',
     };
 
+    // Add execution mode (ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001)
+    response.executionMode = result.executionMode || 'direct';
+    
     // Add fields based on result type
     if ('parentTaskId' in result) {
       // Complex command result
@@ -126,7 +131,8 @@ export async function GET() {
       'parent_child_tasks',
       'task_dependencies',
       'canonical_event_logging',
-      'model_routing_k2_k25'
+      'model_routing_k2_k25',
+      'direct_vs_mission_mode_policy' // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
     ],
   });
 }

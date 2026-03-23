@@ -118,6 +118,7 @@ export interface CommandInput {
   companyId: string;
   commandText: string;
   metadata?: Record<string, unknown>;
+  mode?: 'direct' | 'mission'; // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
 }
 
 export interface ClassifiedCommand {
@@ -171,6 +172,39 @@ export async function logEvent(params: {
   } catch (error) {
     console.error('[EventLog] Failed to log event:', error);
   }
+}
+
+// ============================================================================
+// MODE DETECTION (ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001)
+// ============================================================================
+function determineExecutionMode(text: string, explicitMode?: string): 'direct' | 'mission' {
+  // If explicit mode provided, use it
+  if (explicitMode === 'mission') return 'mission';
+  if (explicitMode === 'direct') return 'direct';
+  
+  const t = text.toLowerCase();
+  
+  // Mission mode indicators - only trigger when explicitly complex
+  const missionIndicators = [
+    'mission:',
+    'mission mode',
+    'orchestrate',
+    'coordinate multiple',
+    'parallel tasks',
+    'child tasks',
+    'subtasks:',
+    'decompose',
+    'break down into',
+    'assign to multiple',
+    'team effort',
+  ];
+  
+  for (const indicator of missionIndicators) {
+    if (t.includes(indicator)) return 'mission';
+  }
+  
+  // Default: DIRECT mode for all Telegram/simple commands
+  return 'direct';
 }
 
 // ============================================================================
@@ -489,6 +523,7 @@ export async function ingestCommand(input: CommandInput): Promise<{
   status: string;
   taskId?: string;
   routedToAgent?: string;
+  executionMode?: 'direct' | 'mission'; // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
 }> {
   console.log('[CommandBus] Ingesting from', input.sourceChannel, ':', input.commandText.slice(0, 50));
   
@@ -508,7 +543,10 @@ export async function ingestCommand(input: CommandInput): Promise<{
   // Step 2: Classify the command
   const classified = classifyCommand(input.commandText, input.sourceChannel);
   
-  console.log('[CommandBus] Classified:', classified.commandType, '->', classified.targetAgent, 'using', classified.targetModel);
+  // Step 2b: Determine execution mode (ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001)
+  const executionMode = determineExecutionMode(input.commandText, input.mode);
+  
+  console.log('[CommandBus] Classified:', classified.commandType, '->', classified.targetAgent, 'using', classified.targetModel, '| Mode:', executionMode);
   
   // Step 3: Log classification event
   await logEvent({
@@ -522,6 +560,8 @@ export async function ingestCommand(input: CommandInput): Promise<{
       target_model: classified.targetModel,
       routing_reason: classified.routingReason,
       parsed_intent: classified.parsedIntent,
+      // execution_mode: executionMode, // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
+      // NOTE: Column needs to be added to DB first, tracked in metadata for now
     },
   });
   
@@ -543,6 +583,8 @@ export async function ingestCommand(input: CommandInput): Promise<{
       requires_approval: classified.requiresApproval,
       estimated_cost_usd: classified.estimatedCost,
       status: classified.requiresApproval ? 'awaiting_approval' : 'pending',
+      // execution_mode: executionMode, // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
+      // NOTE: Column needs to be added to DB first, tracked in metadata for now
     })
     .select()
     .single();
@@ -638,6 +680,7 @@ export async function ingestCommand(input: CommandInput): Promise<{
     status: 'pending',
     taskId: task.id,
     routedToAgent: classified.targetAgent,
+    executionMode, // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
   };
 }
 
@@ -772,6 +815,7 @@ export async function ingestComplexCommand(input: CommandInput & {
   parentTaskId: string;
   childTaskIds: string[];
   status: string;
+  executionMode: "direct" | "mission";
 }> {
   // First, create the parent command and task
   const result = await ingestCommand(input);
@@ -782,6 +826,7 @@ export async function ingestComplexCommand(input: CommandInput & {
       parentTaskId: result.taskId || '',
       childTaskIds: [],
       status: result.status,
+      executionMode: 'direct', // No subtasks = direct mode
     };
   }
   
@@ -818,6 +863,7 @@ export async function ingestComplexCommand(input: CommandInput & {
     parentTaskId: result.taskId,
     childTaskIds,
     status: result.status,
+    executionMode: 'mission', // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001: Complex = mission mode
   };
 }
 

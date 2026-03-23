@@ -78,73 +78,123 @@ export async function stopTaskDispatcher(): Promise<void> {
 }
 
 /**
- * Poll Supabase for pending tasks and dispatch to Redis
+ * Poll for pending tasks and dispatch to Redis
+ * ATLAS-P0-HOTFIX-002: Dual-mode operation (Redis-first + Supabase fallback)
  */
 async function pollAndDispatch(): Promise<void> {
   if (!isRunning) return;
 
   try {
-    const supabase = getSupabaseAdmin();
     const redis = await getRedisClient();
 
-    // Find pending tasks that haven't been dispatched
-    const { data: tasks, error } = await supabase
-      .from("tasks")
-      .select("id, title, description, status, assigned_agent_id, mission_id, priority, type, execution_id")
-      .eq("status", "pending")
-      .not("assigned_agent_id", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(MAX_DISPATCH_PER_CYCLE);
+    // ATLAS-P0-HOTFIX-002: Try Redis task_queue first (bypass Supabase timeout issues)
+    const queuedTaskIds = await redis.zrange("task_queue", 0, MAX_DISPATCH_PER_CYCLE - 1) as string[];
+    
+    if (queuedTaskIds && queuedTaskIds.length > 0) {
+      console.log(`[TaskDispatcher] Found ${queuedTaskIds.length} task(s) in Redis task_queue`);
+      
+      for (const taskId of queuedTaskIds) {
+        // Skip if already dispatched this session
+        if (DISPATCHED_TASKS.has(taskId)) continue;
 
-    if (error) {
-      console.error("[TaskDispatcher] Query error:", error);
-      return;
+        // Get task data from Redis
+        const taskData = await redis.get(`task:${taskId}`);
+        if (!taskData) {
+          console.log(`[TaskDispatcher] No data for task ${taskId}, removing from queue`);
+          await redis.zrem("task_queue", taskId);
+          continue;
+        }
+
+        const task = JSON.parse(taskData);
+        const agentId = (task.assigned_agent_id || task.agent_id || "henry").toLowerCase();
+        
+        // Build task payload for worker
+        const taskPayload = {
+          id: task.id || taskId,
+          type: task.type || "code",
+          title: task.title || "Untitled Task",
+          description: task.description || "",
+          assigned_agent_id: agentId,
+          mission_id: task.mission_id || null,
+          priority: task.priority || "medium",
+          execution_id: task.execution_id || null,
+          status: "queued",
+          target_agents: [agentId],
+          enqueued_at: new Date().toISOString(),
+        };
+
+        // Push to agent's assignment queue (list for FIFO) - THIS IS THE FIX
+        const queueKey = `agent:assignments:${agentId}`;
+        await redis.lpush(queueKey, JSON.stringify(taskPayload));
+        
+        // Remove from task_queue since we've dispatched it
+        await redis.zrem("task_queue", taskId);
+        
+        // Store full task data
+        await redis.set(`task:${taskId}`, JSON.stringify(taskPayload));
+
+        DISPATCHED_TASKS.add(taskId);
+        console.log(`[TaskDispatcher] ✓ Dispatched task ${taskId.slice(0,8)} to ${agentId} queue: ${queueKey}`);
+      }
+      
+      // If we dispatched from Redis, we're done for this cycle
+      if (DISPATCHED_TASKS.size > 0) return;
     }
 
-    if (!tasks || tasks.length === 0) return;
-
-    console.log(`[TaskDispatcher] Found ${tasks.length} pending task(s)`);
-
-    for (const task of tasks as any[]) {
-      // Skip if already dispatched this session
-      if (DISPATCHED_TASKS.has(task.id)) continue;
-
-      // Determine queue based on assignment
-      const agentId = task.assigned_agent_id.toLowerCase();
-      const taskType = task.type || "code";
+    // Fallback: Try Supabase query (with timeout protection)
+    try {
+      const supabase = getSupabaseAdmin();
       
-      // Build task payload for worker
-      const taskPayload = {
-        id: task.id,
-        type: taskType,
-        title: task.title,
-        description: task.description,
-        assigned_agent_id: agentId,
-        mission_id: task.mission_id,
-        priority: task.priority || "medium",
-        execution_id: task.execution_id,
-        status: "queued",
-        target_agents: [agentId],
-        enqueued_at: new Date().toISOString(),
-      };
+      const { data: tasks, error } = await supabase
+        .from("tasks")
+        .select("id, title, description, status, assigned_agent_id, mission_id, priority, type, execution_id")
+        .eq("status", "pending")
+        .not("assigned_agent_id", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(MAX_DISPATCH_PER_CYCLE);
 
-      // Push to agent's assignment queue (list for FIFO)
-      const queueKey = `agent:assignments:${agentId}`;
-      await redis.lpush(queueKey, JSON.stringify(taskPayload));
-      
-      // Also add to task_queue sorted set for priority handling
-      const score = task.priority === "critical" ? 100 : task.priority === "high" ? 50 : 10;
-      await redis.zadd("task_queue", { score, value: task.id });
-      
-      // Store full task data
-      await redis.set(`task:${task.id}`, JSON.stringify(taskPayload));
+      if (error) {
+        console.error("[TaskDispatcher] Supabase query error:", error.message);
+        return;
+      }
 
-      // ATLAS-P0-FIX-001: DO NOT update status to "in_progress" here
-      // Worker must claim from "pending" status for atomic claim
-      // Status remains "pending" until worker claims it
+      if (!tasks || tasks.length === 0) return;
 
-      DISPATCHED_TASKS.add(task.id);
-      console.log(`[TaskDispatcher] ✓ Dispatched task ${task.id.slice(0,8)} to ${agentId} (${taskType})`);
+      console.log(`[TaskDispatcher] Found ${tasks.length} pending task(s) in Supabase`);
+
+      for (const task of tasks as any[]) {
+        if (DISPATCHED_TASKS.has(task.id)) continue;
+
+        const agentId = task.assigned_agent_id.toLowerCase();
+        const taskType = task.type || "code";
+        
+        const taskPayload = {
+          id: task.id,
+          type: taskType,
+          title: task.title,
+          description: task.description,
+          assigned_agent_id: agentId,
+          mission_id: task.mission_id,
+          priority: task.priority || "medium",
+          execution_id: task.execution_id,
+          status: "queued",
+          target_agents: [agentId],
+          enqueued_at: new Date().toISOString(),
+        };
+
+        const queueKey = `agent:assignments:${agentId}`;
+        await redis.lpush(queueKey, JSON.stringify(taskPayload));
+        
+        // ATLAS-P0B-FIX-001: Removed task_queue and task:{id} writes
+        // Workers consume directly from agent:assignments queues
+        // This prevents orphaned task IDs without payloads
+
+        // ATLAS-P0-FIX-001: DO NOT update status to "in_progress" here
+        DISPATCHED_TASKS.add(task.id);
+        console.log(`[TaskDispatcher] ✓ Dispatched task ${task.id.slice(0,8)} to ${agentId} (${taskType})`);
+      }
+    } catch (supabaseError) {
+      console.error("[TaskDispatcher] Supabase connection failed, using Redis-only mode:", (supabaseError as Error).message);
     }
 
   } catch (error) {

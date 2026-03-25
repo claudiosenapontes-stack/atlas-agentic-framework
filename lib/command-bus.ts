@@ -96,6 +96,107 @@ const AGENT_ROUTING: Record<string, { agent: string; reason: string }> = {
 };
 
 // ============================================================================
+// TRUE DIRECT EXECUTION LANE - ATLAS-OPTIMUS-TRUE-DIRECT-EXECUTION-LANE-001
+// ============================================================================
+
+/**
+ * Check if a command should use TRUE direct execution (bypass worker pipeline)
+ * Returns the agent name if direct, null if should use standard pipeline
+ */
+export function detectDirectExecutionAgent(commandText: string): string | null {
+  if (!commandText) return null;
+  
+  const text = commandText.trim();
+  const lowerText = text.toLowerCase();
+  
+  // Explicit DIRECT: prefix always triggers direct mode
+  if (/^DIRECT:/i.test(text)) {
+    // Extract agent name after DIRECT: if present
+    const afterPrefix = text.replace(/^DIRECT:/i, '').trim();
+    for (const agent of AGENT_NAMES) {
+      if (afterPrefix.toLowerCase().startsWith(agent)) {
+        return agent;
+      }
+    }
+    // If no agent specified but DIRECT: used, default to henry
+    return 'henry';
+  }
+  
+  // Check for agent name at the very start (e.g., "Henry ping", "Olivia schedule")
+  const words = lowerText.split(/\s+/);
+  if (words.length >= 2) {
+    const firstWord = words[0];
+    if (AGENT_NAMES.includes(firstWord)) {
+      // Check if this is a simple command (not complex)
+      const afterAgent = words.slice(1).join(' ').toLowerCase();
+      
+      // Simple patterns suitable for direct execution
+      const simplePatterns = [
+        /^ping$/i,
+        /^status$/i,
+        /^hello$/i,
+        /^hi$/i,
+        /^help$/i,
+        /^audit/i,
+        /^report/i,
+        /^check/i,
+        /^show/i,
+        /^list/i,
+        /^get/i,
+        /^what\s+/i,
+        /^who\s+/i,
+        /^when\s+/i,
+        /^where\s+/i,
+        /^how\s+/i,
+        /^tell\s+me/i,
+        /^return/i,
+        /^echo/i,
+        /^monitor/i,
+        /^verify/i,
+        /^confirm/i,
+        /^summarize/i,
+        /^summary/i,
+      ];
+      
+      // Complex patterns that should NOT be direct
+      const complexPatterns = [
+        /implement/i,
+        /create\s+(a|an)\s+(new|full)/i,
+        /build\s+(a|an)/i,
+        /develop/i,
+        /deploy/i,
+        /mission/i,
+        /project/i,
+        /workflow/i,
+        /schedule.*recurring/i,
+        /every\s+(day|week|hour)/i,
+        /coordinate\s+with/i,
+        /orchestrate/i,
+        /multiple\s+agents/i,
+        /subtask/i,
+        /child\s+task/i,
+      ];
+      
+      const isSimple = simplePatterns.some(p => p.test(afterAgent));
+      const isComplex = complexPatterns.some(p => p.test(afterAgent));
+      
+      if (isSimple && !isComplex) {
+        return firstWord;
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Check if command is a direct command (for API responses)
+ */
+export function isDirectCommand(commandText: string): boolean {
+  return detectDirectExecutionAgent(commandText) !== null;
+}
+
+// ============================================================================
 // RISK MATRIX
 // ============================================================================
 const RISK_MATRIX: Record<string, { level: string; threshold: number }> = {

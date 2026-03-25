@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ingestCommand, ingestComplexCommand } from '@/lib/command-bus';
+import { ingestCommand, ingestComplexCommand, detectDirectExecutionAgent } from '@/lib/command-bus';
+import { executeDirectCommand } from '@/lib/direct-executor';
 
 // Canonical company UUID map
 const COMPANY_ID_MAP: Record<string, string> = {
@@ -43,6 +44,40 @@ export async function POST(request: NextRequest) {
         { error: 'Missing Telegram identity' },
         { status: 400 }
       );
+    }
+
+    // ATLAS-OPTIMUS-TRUE-DIRECT-EXECUTION-LANE-001
+    // Check for TRUE direct execution (bypasses worker pipeline)
+    const directAgent = detectDirectExecutionAgent(body.commandText);
+    if (directAgent && body.mode !== 'mission') {
+      console.log(`[DIRECT_LANE] Detected direct command for ${directAgent}: ${body.commandText.substring(0, 50)}...`);
+      
+      const directStartTime = Date.now();
+      const result = await executeDirectCommand({
+        commandText: body.commandText,
+        agentId: directAgent,
+        sourceChannel: body.sourceChannel,
+        sourceUserId: body.sourceUserId,
+        companyId: normalizedCompanyId,
+        metadata: body.metadata,
+      });
+      
+      const totalTimeMs = Date.now() - directStartTime;
+      console.log(`[DIRECT_LANE] Completed in ${totalTimeMs}ms, task ${result.taskId}`);
+      
+      return NextResponse.json({
+        success: result.success,
+        executionMode: 'direct_true', // True direct lane - bypasses worker pipeline
+        taskId: result.taskId,
+        routedToAgent: directAgent,
+        output: result.output,
+        executionTimeMs: result.executionTimeMs,
+        timeToFirstOutputMs: totalTimeMs,
+        persisted: result.persisted,
+        message: result.success 
+          ? `Direct execution completed in ${result.executionTimeMs}ms`
+          : `Direct execution failed: ${result.output}`,
+      });
     }
 
     // Check if this is a complex command with subtasks
@@ -132,7 +167,8 @@ export async function GET() {
       'task_dependencies',
       'canonical_event_logging',
       'model_routing_k2_k25',
-      'direct_vs_mission_mode_policy' // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
+      'direct_vs_mission_mode_policy', // ATLAS-SOPHIA-DIRECT-VS-MISSION-POLICY-001
+      'true_direct_execution_lane', // ATLAS-OPTIMUS-TRUE-DIRECT-EXECUTION-LANE-001
     ],
   });
 }
